@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+
+# Env & secrets
+.env
+
+# Data & uploads
+data/
+uploads/
+
+# Temp / diagnostic
+bind_trace.txt
+diagnose.py
+
+# IDE
+.idea/
+*.iml
+
+# Claude
+.claude/
