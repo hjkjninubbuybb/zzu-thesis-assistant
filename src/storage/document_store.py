@@ -43,12 +43,19 @@ class DocumentStore:
                 file_size INTEGER DEFAULT 0,
                 chunk_count INTEGER DEFAULT 0,
                 chunk_size INTEGER DEFAULT 256,
+                doc_type TEXT DEFAULT 'plain_text',
                 status TEXT DEFAULT 'processing',
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (kb_name) REFERENCES knowledge_bases(name) ON DELETE CASCADE
             );
         """)
         conn.commit()
+        # 兼容旧数据库：添加 doc_type 列（若不存在，忽略错误）
+        try:
+            conn.execute("ALTER TABLE documents ADD COLUMN doc_type TEXT DEFAULT 'plain_text'")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # 列已存在
         conn.close()
 
     # ── 知识库操作 ────────────────────────────────────────
@@ -105,14 +112,15 @@ class DocumentStore:
         file_size: int = 0,
         chunk_count: int = 0,
         chunk_size: int = 256,
+        doc_type: str = "plain_text",
     ) -> dict:
         conn = self._get_conn()
         now = datetime.now().isoformat()
         conn.execute(
             """INSERT INTO documents
-               (kb_name, file_name, file_size, chunk_count, chunk_size, status, created_at)
-               VALUES (?, ?, ?, ?, ?, 'completed', ?)""",
-            (kb_name, file_name, file_size, chunk_count, chunk_size, now),
+               (kb_name, file_name, file_size, chunk_count, chunk_size, doc_type, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'completed', ?)""",
+            (kb_name, file_name, file_size, chunk_count, chunk_size, doc_type, now),
         )
         conn.commit()
         row = conn.execute(

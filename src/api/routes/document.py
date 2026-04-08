@@ -7,7 +7,8 @@ from pathlib import Path
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from src.api.schemas import DocInfo, MessageResponse
-from src.core.indexing import index_document, delete_document, SUPPORTED_EXTS
+from src.core.indexing import index_document, delete_document
+from src.parsers import SUPPORTED_EXTS
 from src.storage.document_store import DocumentStore
 from src.storage.vector_store import VectorStore
 
@@ -34,6 +35,7 @@ async def upload_document(
     chunk_size: int = Form(default=256),
     chunk_overlap_ratio: float = Form(default=0.2),
     enable_cleaning: bool = Form(default=False),
+    doc_type: str = Form(default="plain_text"),
 ):
     """上传文档并入库。"""
     if not _ds.get_kb(kb_name):
@@ -59,8 +61,10 @@ async def upload_document(
             chunk_size=chunk_size,
             chunk_overlap_ratio=chunk_overlap_ratio,
             enable_cleaning=enable_cleaning,
+            doc_type=doc_type,
             vector_store=_vs,
             doc_store=_ds,
+            original_filename=file.filename,
         )
         # 读取完整记录返回
         doc = _ds.get_document(result["doc_id"])

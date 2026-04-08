@@ -27,6 +27,7 @@ class DocInfo(BaseModel):
     file_size: int
     chunk_count: int
     chunk_size: int
+    doc_type: str = "plain_text"
     status: str
     created_at: str
 

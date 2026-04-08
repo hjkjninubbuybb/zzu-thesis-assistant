@@ -33,4 +33,3 @@ rag:
 server:
   api_host: "0.0.0.0"
   api_port: 8000
-  gradio_port: 7860

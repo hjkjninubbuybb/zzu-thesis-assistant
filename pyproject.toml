@@ -44,6 +44,10 @@ dependencies = [
 [tool.poetry]
 packages = [{include = "src"}]
 
+[tool.poetry.scripts]
+start = "src.main:run"
+dev = "src.main:dev"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

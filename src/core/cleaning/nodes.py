@@ -9,6 +9,7 @@ from .state import CleaningState
 from .prompts import (
     OPTIMIZER_SYSTEM_PROMPT,
     OPTIMIZER_RETRY_TEMPLATE,
+    TABLE_OPTIMIZER_SYSTEM_PROMPT,
     EVALUATOR_SYSTEM_PROMPT,
 )
 
@@ -51,6 +52,13 @@ def _get_llm() -> ChatTongyi:
 
 def optimizer_node(state: CleaningState) -> dict:
     llm = _get_llm()
+    content_type = state.get("content_type", "text")
+
+    # 按内容类型选择系统提示词
+    if content_type == "table":
+        system_prompt = TABLE_OPTIMIZER_SYSTEM_PROMPT
+    else:
+        system_prompt = OPTIMIZER_SYSTEM_PROMPT
 
     unusual = _detect_unusual_chars(state["original_content"])
     unusual_note = (
@@ -71,7 +79,7 @@ def optimizer_node(state: CleaningState) -> dict:
         user_content = OPTIMIZER_RETRY_TEMPLATE.format(history=history)
 
     messages = [
-        SystemMessage(content=OPTIMIZER_SYSTEM_PROMPT),
+        SystemMessage(content=system_prompt),
         HumanMessage(content=user_content),
     ]
     response = llm.invoke(messages)

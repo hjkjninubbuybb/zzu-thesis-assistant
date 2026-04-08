@@ -27,8 +27,19 @@ def _build_graph():
 _graph = _build_graph()
 
 
-def clean_text(content: str) -> str:
-    """对给定文本内容执行 LLM 清洗，返回清洗后的文本。"""
+def clean_text(content: str, content_type: str = "text") -> str:
+    """对给定内容执行 LLM 清洗，返回清洗后的文本。
+
+    Args:
+        content:      待清洗的文本内容。
+        content_type: 内容类型，取值 "text" | "table" | "image"。
+                      - "text":  使用标准清洗 prompt（现有行为）。
+                      - "table": 使用表格专用清洗 prompt。
+                      - "image": 图片描述块，跳过清洗直接返回原文。
+    """
+    if content_type == "image":
+        return content
+
     initial_state: CleaningState = {
         "original_content": content,
         "current_content": "",
@@ -36,6 +47,7 @@ def clean_text(content: str) -> str:
         "feedback_history": [],
         "retry_count": 0,
         "status": "FAIL",
+        "content_type": content_type,
     }
     final_state = _graph.invoke(initial_state)
     return final_state["current_content"]

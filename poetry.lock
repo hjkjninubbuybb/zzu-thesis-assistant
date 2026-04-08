@@ -2043,6 +2043,22 @@ typing-inspect = ">=0.8.0"
 wrapt = "*"
 
 [[package]]
+name = "llama-index-embeddings-dashscope"
+version = "0.5.0"
+description = "llama-index embeddings dashscope integration"
+optional = false
+python-versions = "<4.0,>=3.10"
+groups = ["main"]
+files = [
+    {file = "llama_index_embeddings_dashscope-0.5.0-py3-none-any.whl", hash = "sha256:44e836e3b76ccc4d1659e0f48c715cd209504d1101696c1577bfeec0b7284c84"},
+    {file = "llama_index_embeddings_dashscope-0.5.0.tar.gz", hash = "sha256:f846304616a8812267cd1901af209d2d189d3fb7507409da7e6cb77e8b2595ce"},
+]
+
+[package.dependencies]
+dashscope = ">1.10.0"
+llama-index-core = ">=0.13.0,<0.15"
+
+[[package]]
 name = "llama-index-instrumentation"
 version = "0.5.0"
 description = "Instrumentation and Observability for LlamaIndex"
@@ -5403,4 +5419,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "6aa040dae5bc3bbac4d4f8ddb30a8eae94d059887c36d3f986e2281cdec0210c"
+content-hash = "2521700a95cb9a3db1c8e89baf93c86e3df0f0ad9d23c7d96379cebe45a9950a"

@@ -48,14 +48,18 @@ REFORMULATE_SYSTEM = """\
 """
 
 GENERATE_SYSTEM = """\
-你是一个专业的问答助手。基于提供的参考资料回答用户的问题。
+你是一个已经毕业的学长/学姐，正在帮学弟学妹答疑。你熟悉郑州大学本科毕业设计（论文）的所有流程和要求。回答会以 Markdown 格式渲染展示。
 
-规则：
-1. 只基于参考资料中的内容回答，不要编造信息
-2. 在回答中使用 [来源N] 标记引用来源，N 对应参考资料的编号
-3. 如果参考资料不足以回答问题，明确说明哪些部分无法从资料中找到答案
-4. 使用清晰、专业的中文回答
-5. 回答要有条理，必要时使用列表或分点
+回答风格：
+- 口语、自然、亲切，适当用 emoji（比如 ✅ ⚠️ 📅 📝 😅）
+- 不要用"根据资料""参考文件"这种措辞，直接说结论
+- 简单问题一两句话搞定，不需要列表
+- 步骤或多个要点用 Markdown 无序列表（`-`），需要强调顺序时用有序列表（`1.`）
+- 重要日期、关键词用 **加粗** 标注
+- 重要提醒可以单独一行加 > 引用块
+- 数字（周次、比例、截止时间）要说准确
+
+如果参考资料里真没有，就说"这个我也不太清楚，建议直接问指导老师 😅"。
 """
 
 # ── State ─────────────────────────────────────────────────────────────────
@@ -122,52 +126,32 @@ def reformulate_query_node(state: RAGState) -> dict:
 
 def generate_node(state: RAGState) -> dict:
     llm = _get_llm(model="qwen-max")
-    context_parts = []
-    for i, node in enumerate(state["graded_nodes"], 1):
-        source = node.get("source_file", "未知来源")
-        context_parts.append(f"[来源{i}]（文件：{source}）\n{node['text']}")
+    context_parts = [f"[{i+1}] {node['text']}" for i, node in enumerate(state["graded_nodes"])]
     context = "\n\n".join(context_parts) if context_parts else "未找到相关参考资料。"
 
     response = llm.invoke([
         SystemMessage(content=GENERATE_SYSTEM),
-        HumanMessage(content=f"问题：{state['query']}\n\n参考资料：\n{context}\n\n请基于以上参考资料回答问题。"),
+        HumanMessage(content=f"同学的问题：{state['query']}\n\n参考资料：\n{context}"),
     ])
     return {"generation": response.content.strip()}
 
 
 # ── Graph ─────────────────────────────────────────────────────────────────
 
-def _should_generate_or_reformulate(state: RAGState) -> str:
-    if state["grading_sufficient"]:
-        return "generate"
-    if state["reformulation_count"] >= state["max_reformulations"]:
-        return "generate"
-    return "reformulate_query"
-
-
 def build_rag_graph(retriever_fn):
     """构建 RAG 图，retriever_fn(query) -> list[dict]。"""
 
     def retrieve_node(state: RAGState) -> dict:
-        nodes = retriever_fn(state["current_query"])
-        return {"retrieved_nodes": nodes}
+        # 直接用原始 query 检索，reranker 已保证质量
+        nodes = retriever_fn(state["query"])
+        return {"retrieved_nodes": nodes, "graded_nodes": nodes, "current_query": state["query"]}
 
     g = StateGraph(RAGState)
-    g.add_node("transform_query", transform_query_node)
     g.add_node("retrieve", retrieve_node)
-    g.add_node("grade_documents", grade_documents_node)
-    g.add_node("reformulate_query", reformulate_query_node)
     g.add_node("generate", generate_node)
 
-    g.add_edge(START, "transform_query")
-    g.add_edge("transform_query", "retrieve")
-    g.add_edge("retrieve", "grade_documents")
-    g.add_conditional_edges(
-        "grade_documents",
-        _should_generate_or_reformulate,
-        {"generate": "generate", "reformulate_query": "reformulate_query"},
-    )
-    g.add_edge("reformulate_query", "retrieve")
+    g.add_edge(START, "retrieve")
+    g.add_edge("retrieve", "generate")
     g.add_edge("generate", END)
 
     return g.compile()

@@ -9,3 +9,4 @@ class CleaningState(TypedDict):
     feedback_history: list[str]
     retry_count: int
     status: Literal["PASS", "FAIL"]
+    content_type: str  # "text" | "table" | "image"，默认 "text"
