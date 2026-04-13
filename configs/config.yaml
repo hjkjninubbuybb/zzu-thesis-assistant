@@ -1,35 +1,33 @@
-# RAG 1.0 全局配置
-
 qdrant:
   url: ${QDRANT_URL:-http://localhost:6333}
   timeout: 30
-
 embedding:
   model: text-embedding-v3
   dimension: 1024
   embed_batch_size: 10
-
 llm:
-  model: qwen-plus
-
+  model: qwen-plus       # 主模型：对话生成、文档清洗改写
+  fast_model: qwen-turbo # 快速模型：简单判断任务（如清洗质量评估）
+vlm:
+  model: qwen-vl-plus    # 图文模式：VLM 批量图片描述（batch=8 最优）
 splitter:
   chunk_size: 256
   chunk_overlap_ratio: 0.2
-  separators: "chinese_markdown"
-
+  separators: chinese_markdown
 retrieval:
   vector_top_k: 10
   bm25_top_k: 10
   hybrid_top_k: 15
   rrf_k: 60
-
 reranker:
   model: gte-rerank
   top_n: 5
-
 rag:
   max_reformulations: 2
-
+  agent_recursion_limit: 6
 server:
-  api_host: "0.0.0.0"
+  api_host: 0.0.0.0
   api_port: 8000
+academic:
+  spring_start: "02-24"   # 爬取失败时的兜底开学日（MM-DD）
+  autumn_start: "09-01"

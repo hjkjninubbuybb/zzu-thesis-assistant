@@ -1,4 +1,4 @@
-export type DocType = 'plain_text' | 'multimodal' | 'table_heavy'
+export type DocType = 'policy' | 'manual' | 'form'
 export type SplitterType = 'recursive' | 'token' | 'sentence' | 'semantic' | 'table_aware'
 
 export interface KBInfo {
@@ -47,12 +47,67 @@ export interface SourceItem {
   score: number
 }
 
+export interface FileItem {
+  file_name: string
+  url: string
+  size_kb: number
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   sources?: SourceItem[]
+  files?: FileItem[]
   status?: 'loading' | 'done' | 'error'
+}
+
+// ── FAQ ───────────────────────────────────────────────────
+
+export interface FAQItem {
+  id: number
+  kb_name: string
+  question: string
+  answer: string
+  category: string
+  sort_order: number
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface FAQCreate {
+  question: string
+  answer: string
+  category: string
+  sort_order: number
+}
+
+export interface FAQUpdate {
+  question?: string
+  answer?: string
+  category?: string
+  sort_order?: number
+  enabled?: boolean
+}
+
+export interface FAQSearchResponse {
+  rewritten_query: string
+  items: FAQItem[]
+}
+
+export interface FAQImportError {
+  row: number
+  question: string
+  reason: string
+}
+
+export interface FAQImportResult {
+  total: number
+  success: number
+  skipped: number
+  failed: number
+  errors: FAQImportError[]
 }
 
 // ── 系统配置 ──────────────────────────────────────────────

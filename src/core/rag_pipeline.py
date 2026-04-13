@@ -1,177 +1,215 @@
-"""LangGraph RAG 工作流：查询改写 → 检索 → 文档评分 → 生成。"""
+"""LangGraph Agentic RAG — ReAct Agent with Tools
+
+Agent 拥有四个工具：
+  - search_knowledge_base : 混合检索 + Reranking（核心）
+  - list_kb_documents     : 查看知识库内有哪些文档
+  - get_academic_calendar : 获取当前日期/学期周次
+  - web_search            : 联网搜索最新通知（需配置 EXA_API_KEY）
+
+Agent 自主决定调用哪些工具、调用几次，直到能给出完整回答。
+"""
 
 import json
 import logging
 import os
-from typing import AsyncGenerator
+from collections.abc import Generator
 
 from langchain_community.chat_models import ChatTongyi
-from langchain_core.messages import SystemMessage, HumanMessage
-from langgraph.graph import StateGraph, START, END
-from typing_extensions import TypedDict
+from langchain_core.messages import AIMessageChunk, HumanMessage, SystemMessage
+from langgraph.prebuilt import create_react_agent  # langgraph 版，非 langchain 旧版
+
+from src.config import get_config
+from src.core.tools import (
+    get_academic_calendar,
+    list_kb_documents,
+    make_search_kb_tool,
+    make_get_document_link_tool,
+)
 
 logger = logging.getLogger(__name__)
 
-# ── Prompts ───────────────────────────────────────────────────────────────
+# ── System Prompt ──────────────────────────────────────────────────────────
 
-TRANSFORM_QUERY_SYSTEM = """\
-你是一个查询优化专家。将用户的问句转换为更适合向量检索的形式。
+SYSTEM_PROMPT = """\
+你是郑州大学本科毕业设计智能问答助手，负责解答学生关于毕业设计（论文）的相关问题。
+当前使用的知识库是：{kb_name}
 
-规则：
-1. 将疑问句转为陈述句或关键词短语
-2. 补充同义词和相关术语
-3. 保留核心语义，去除口语化表达
-4. 直接输出转换后的查询文本，不要加任何前缀或解释
-"""
+工具调用规则（严格遵守，按顺序判断）：
+1. 问题含"第几周""今天""几号""几天""截止""剩余""多久" → 必须先调用 get_academic_calendar
+2. 任何问题都应先调用 search_knowledge_base 检索知识库；首次结果明显不足时才可换一个更精确的关键词再搜一次（最多一次）
+3. 不清楚知识库里有哪些文档 → 先调用 list_kb_documents
+4. 用户提到想获取某个文件、模板、表格，或需要下载某文档 → 必须调用 get_document_link 获取下载链接
+5. 回答中提及具体文件（任务书/开题报告/论文格式/审批表等）且该文件可能存在于知识库中 → 主动调用 get_document_link，将链接附在回答末尾
 
-GRADE_DOCUMENT_SYSTEM = """\
-你是一个文档相关性评估专家。判断给定文档片段是否与用户查询相关。
-
-规则：
-1. 只判断相关性，不需要判断文档质量
-2. 如果文档包含能帮助回答查询的信息，判为相关
-3. 严格以 JSON 格式输出，不要输出其他内容
-
-输出格式：
-{"relevant": true, "reason": "简短说明"}
-或
-{"relevant": false, "reason": "简短说明"}
-"""
-
-REFORMULATE_SYSTEM = """\
-你是一个查询改写专家。当前检索结果不理想，需要换一个角度改写查询。
-
-规则：
-1. 保持原始查询的核心意图
-2. 使用不同的关键词和表述方式
-3. 直接输出改写后的查询文本，不要加前缀或解释
-"""
-
-GENERATE_SYSTEM = """\
-你是一个已经毕业的学长/学姐，正在帮学弟学妹答疑。你熟悉郑州大学本科毕业设计（论文）的所有流程和要求。回答会以 Markdown 格式渲染展示。
+工具说明：
+- get_academic_calendar：返回今天日期、星期、本学期第几周
+- search_knowledge_base(query)：混合检索知识库，可多次调用换关键词
+- list_kb_documents(kb_name)：列出知识库中所有文档名
+- get_document_link(file_hint)：根据文件名关键词返回 Markdown 格式下载链接，直接插入回答即可
 
 回答风格：
-- 口语、自然、亲切，适当用 emoji（比如 ✅ ⚠️ 📅 📝 😅）
-- 不要用"根据资料""参考文件"这种措辞，直接说结论
-- 简单问题一两句话搞定，不需要列表
-- 步骤或多个要点用 Markdown 无序列表（`-`），需要强调顺序时用有序列表（`1.`）
-- 重要日期、关键词用 **加粗** 标注
-- 重要提醒可以单独一行加 > 引用块
-- 数字（周次、比例、截止时间）要说准确
-
-如果参考资料里真没有，就说"这个我也不太清楚，建议直接问指导老师 😅"。
+- 语言专业、清晰，语气平和自然，适当使用 emoji（✅ ⚠️ 📅 📝）
+- 直接给出结论，不要说"根据资料""参考文件"等引导语
+- 简单问题一两句话回答，复杂问题用 Markdown 列表分点说明
+- 重要日期、关键数字用 **加粗**，重要提醒用 > 引用块
+- 数字（周次、比例、截止时间）必须准确
+- 知识库中确实没有相关内容时，明确说明"暂无相关信息，建议咨询指导教师或教务部门 📋"
 """
 
-# ── State ─────────────────────────────────────────────────────────────────
 
-class RAGState(TypedDict):
-    query: str
-    current_query: str
-    retrieved_nodes: list[dict]
-    graded_nodes: list[dict]
-    generation: str
-    reformulation_count: int
-    max_reformulations: int
-    grading_sufficient: bool
+# ── Agent builder ──────────────────────────────────────────────────────────
+
+def _get_llm(model: str | None = None) -> ChatTongyi:
+    if model is None:
+        model = get_config()["llm"]["model"]
+    return ChatTongyi(model=model, streaming=True, api_key=os.environ.get("DASHSCOPE_API_KEY"))
 
 
-# ── Nodes ─────────────────────────────────────────────────────────────────
+def build_rag_agent(
+    retriever_fn,
+    captured_nodes: list,
+    kb_name: str = "",
+    file_events: list | None = None,
+):
+    """构建 ReAct Agent。
 
-def _get_llm(model: str = "qwen-plus") -> ChatTongyi:
-    return ChatTongyi(model=model, api_key=os.environ.get("DASHSCOPE_API_KEY"))
-
-
-def transform_query_node(state: RAGState) -> dict:
+    Args:
+        retriever_fn   : (query: str) -> list[dict]，混合检索 + rerank
+        captured_nodes : 可变列表，用于收集检索节点（来源展示）
+        kb_name        : 知识库名称，用于绑定文件下载工具
+        file_events    : 可变列表，get_document_link 找到文件时 append 文件信息
+    """
     llm = _get_llm()
-    response = llm.invoke([
-        SystemMessage(content=TRANSFORM_QUERY_SYSTEM),
-        HumanMessage(content=f"请将以下查询转换为检索优化形式：\n\n{state['query']}"),
-    ])
-    return {"current_query": response.content.strip()}
+    _file_events = file_events if file_events is not None else []
+    tools = [
+        make_search_kb_tool(retriever_fn, captured_nodes),
+        list_kb_documents,
+        get_academic_calendar,
+        make_get_document_link_tool(kb_name, _file_events),
+    ]
+    # system prompt 在 invoke 时通过 messages[0]=SystemMessage 注入
+    return create_react_agent(llm, tools)
 
 
-def grade_documents_node(state: RAGState) -> dict:
-    llm = _get_llm()
-    graded: list[dict] = []
-    for node in state["retrieved_nodes"]:
-        response = llm.invoke([
-            SystemMessage(content=GRADE_DOCUMENT_SYSTEM),
-            HumanMessage(content=f"查询：{state['current_query']}\n\n文档片段：\n{node['text']}"),
-        ])
-        try:
-            result = json.loads(response.content.strip())
-            if result.get("relevant", False):
-                graded.append(node)
-        except (json.JSONDecodeError, KeyError):
-            graded.append(node)
-
-    return {"graded_nodes": graded, "grading_sufficient": len(graded) >= 1}
-
-
-def reformulate_query_node(state: RAGState) -> dict:
-    llm = _get_llm()
-    response = llm.invoke([
-        SystemMessage(content=REFORMULATE_SYSTEM),
-        HumanMessage(content=(
-            f"原始查询：{state['query']}\n"
-            f"当前查询：{state['current_query']}\n"
-            "本次检索未找到足够相关内容，请换一个角度改写查询。"
-        )),
-    ])
-    return {
-        "current_query": response.content.strip(),
-        "reformulation_count": state["reformulation_count"] + 1,
-    }
-
-
-def generate_node(state: RAGState) -> dict:
-    llm = _get_llm(model="qwen-max")
-    context_parts = [f"[{i+1}] {node['text']}" for i, node in enumerate(state["graded_nodes"])]
-    context = "\n\n".join(context_parts) if context_parts else "未找到相关参考资料。"
-
-    response = llm.invoke([
-        SystemMessage(content=GENERATE_SYSTEM),
-        HumanMessage(content=f"同学的问题：{state['query']}\n\n参考资料：\n{context}"),
-    ])
-    return {"generation": response.content.strip()}
-
-
-# ── Graph ─────────────────────────────────────────────────────────────────
-
-def build_rag_graph(retriever_fn):
-    """构建 RAG 图，retriever_fn(query) -> list[dict]。"""
-
-    def retrieve_node(state: RAGState) -> dict:
-        # 直接用原始 query 检索，reranker 已保证质量
-        nodes = retriever_fn(state["query"])
-        return {"retrieved_nodes": nodes, "graded_nodes": nodes, "current_query": state["query"]}
-
-    g = StateGraph(RAGState)
-    g.add_node("retrieve", retrieve_node)
-    g.add_node("generate", generate_node)
-
-    g.add_edge(START, "retrieve")
-    g.add_edge("retrieve", "generate")
-    g.add_edge("generate", END)
-
-    return g.compile()
-
+# ── Public API ─────────────────────────────────────────────────────────────
 
 def run_rag(
     query: str,
     retriever_fn,
-    max_reformulations: int = 2,
+    kb_name: str = "",
 ) -> dict:
-    """同步运行 RAG，返回最终 state。"""
-    graph = build_rag_graph(retriever_fn)
-    initial: RAGState = {
-        "query": query,
-        "current_query": "",
-        "retrieved_nodes": [],
-        "graded_nodes": [],
-        "generation": "",
-        "reformulation_count": 0,
-        "max_reformulations": max_reformulations,
-        "grading_sufficient": False,
+    """运行 Agentic RAG，返回 generation 和 graded_nodes。
+
+    Returns:
+        {
+            "generation"  : str,        最终回答
+            "graded_nodes": list[dict], 检索到的节点（用于来源展示）
+        }
+    """
+    captured_nodes: list[dict] = []
+    agent = build_rag_agent(retriever_fn, captured_nodes, kb_name=kb_name)
+
+    cfg = get_config()
+    recursion_limit: int = cfg.get("rag", {}).get("agent_recursion_limit", 6)
+    system_msg = SystemMessage(content=SYSTEM_PROMPT.format(kb_name=kb_name or "默认"))
+    try:
+        result = agent.invoke(
+            {"messages": [system_msg, HumanMessage(content=query)]},
+            config={"recursion_limit": recursion_limit},
+        )
+        messages = result.get("messages", [])
+        if not messages:
+            raise ValueError("Agent 返回了空消息列表")
+        last = messages[-1]
+        generation = last.content if hasattr(last, "content") else str(last)
+    except Exception as e:
+        logger.error("[run_rag] Agent 调用失败: %s", e)
+        generation = "抱歉，服务暂时不可用，请稍后重试 😅"
+
+    logger.info("[run_rag] 完成，共检索节点 %d 个", len(captured_nodes))
+    return {
+        "generation": generation,
+        "graded_nodes": captured_nodes,
     }
-    return graph.invoke(initial)
+
+
+def stream_rag(
+    query: str,
+    retriever_fn,
+    kb_name: str = "",
+) -> Generator[dict, None, None]:
+    """Agentic RAG 流式版本，逐 token yield 答案片段，并实时上报 Agent 动作。
+
+    Yields:
+        {"type": "agent_action", "tool": str, "input": str}  — 工具调用开始
+        {"type": "token",        "content": str}             — 答案文字片段
+        {"type": "sources",      "nodes": list}              — 检索节点（结束时）
+        {"type": "error",        "message": str}             — 发生异常时
+    """
+    captured_nodes: list[dict] = []
+    file_events: list[dict] = []
+    agent = build_rag_agent(retriever_fn, captured_nodes, kb_name=kb_name, file_events=file_events)
+    cfg = get_config()
+    recursion_limit: int = cfg.get("rag", {}).get("agent_recursion_limit", 6)
+
+    system_msg = SystemMessage(content=SYSTEM_PROMPT.format(kb_name=kb_name or "默认"))
+    input_messages = {"messages": [system_msg, HumanMessage(content=query)]}
+
+    # 追踪当前正在组装的工具调用：{index: {name, args, emitted}}
+    pending_calls: dict[int, dict] = {}
+
+    try:
+        for mode, data in agent.stream(
+            input_messages,
+            config={"recursion_limit": recursion_limit},
+            stream_mode=["messages", "values"],
+        ):
+            if mode != "messages":
+                continue
+            chunk, metadata = data
+            if not (isinstance(chunk, AIMessageChunk) and metadata.get("langgraph_node") == "agent"):
+                continue
+
+            if chunk.tool_call_chunks:
+                # Agent 正在调用工具
+                for tc in chunk.tool_call_chunks:
+                    idx = tc.get("index", 0)
+                    if idx not in pending_calls:
+                        pending_calls[idx] = {"name": "", "args": "", "emitted": False}
+                    if tc.get("name"):
+                        pending_calls[idx]["name"] = tc["name"]
+                    pending_calls[idx]["args"] += tc.get("args") or ""
+
+                    # 有了工具名就立即上报（无需等 args 完整）
+                    call = pending_calls[idx]
+                    if call["name"] and not call["emitted"]:
+                        call["emitted"] = True
+                        yield {"type": "agent_action", "tool": call["name"], "input": ""}
+
+                    # 尝试从累积的 args 里解析出第一个字符串值作为 input 摘要
+                    if call["emitted"] and call["args"]:
+                        try:
+                            parsed = json.loads(call["args"])
+                            first_val = next(
+                                (str(v) for v in parsed.values() if v), ""
+                            )
+                            if first_val:
+                                yield {"type": "agent_action", "tool": call["name"], "input": first_val}
+                                call["args"] = ""  # 避免重复 yield
+                        except (json.JSONDecodeError, StopIteration):
+                            pass  # args 还没完整，下一个 chunk 再试
+
+            elif isinstance(chunk.content, str) and chunk.content:
+                # Agent 正在生成最终回答
+                pending_calls.clear()
+                yield {"type": "token", "content": chunk.content}
+
+    except Exception as e:
+        logger.error("[stream_rag] Agent 流式调用失败: %s", e)
+        yield {"type": "error", "message": "服务暂时不可用，请稍后重试 😅"}
+        return
+
+    logger.info("[stream_rag] 完成，共检索节点 %d 个，文件事件 %d 个", len(captured_nodes), len(file_events))
+    for fe in file_events:
+        yield {"type": "file", **fe}
+    yield {"type": "sources", "nodes": captured_nodes}

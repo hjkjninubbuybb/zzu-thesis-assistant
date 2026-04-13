@@ -43,8 +43,57 @@ class IndexRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     kb_name: str
-    query: str = Field(..., min_length=1)
-    max_reformulations: int = Field(default=2, ge=0, le=5)
+    query: str = Field(..., min_length=1, max_length=2000)
+
+
+# ── FAQ ───────────────────────────────────────────────────
+
+class FAQCreate(BaseModel):
+    question: str = Field(..., min_length=1, max_length=500)
+    answer: str = Field(..., min_length=1, max_length=2000)
+    category: str = Field(default="", max_length=64)
+    sort_order: int = Field(default=0, ge=0)
+
+
+class FAQUpdate(BaseModel):
+    question: str | None = Field(default=None, min_length=1, max_length=500)
+    answer: str | None = Field(default=None, min_length=1, max_length=2000)
+    category: str | None = Field(default=None, max_length=64)
+    sort_order: int | None = Field(default=None, ge=0)
+    enabled: bool | None = None
+
+
+class FAQItem(BaseModel):
+    id: int
+    kb_name: str
+    question: str
+    answer: str
+    category: str
+    sort_order: int
+    enabled: bool
+    created_at: str
+    updated_at: str
+
+
+class FAQSearchResponse(BaseModel):
+    rewritten_query: str
+    items: list[FAQItem]
+
+
+# ── FAQ 导入/导出 ──────────────────────────────────────────
+
+class FAQImportError(BaseModel):
+    row: int
+    question: str
+    reason: str
+
+
+class FAQImportResult(BaseModel):
+    total: int
+    success: int
+    skipped: int
+    failed: int
+    errors: list[FAQImportError]
 
 
 # ── 通用 ─────────────────────────────────────────────────

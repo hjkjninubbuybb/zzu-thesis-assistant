@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { KBInfo, KBCreate, DocInfo, UploadParams, SystemConfig, ConfigUpdate } from '@/types/api'
+import type { KBInfo, KBCreate, DocInfo, UploadParams, SystemConfig, ConfigUpdate, FAQItem, FAQCreate, FAQUpdate, FAQSearchResponse, FAQImportResult } from '@/types/api'
 
 const client = axios.create({
   baseURL: '/api',
@@ -54,4 +54,32 @@ export const documentApi = {
 export const configApi = {
   get: () => client.get<SystemConfig>('/config').then(r => r.data),
   update: (body: ConfigUpdate) => client.post<SystemConfig>('/config', body).then(r => r.data),
+}
+
+export const faqApi = {
+  list:   (kbName: string) =>
+    client.get<FAQItem[]>(`/faq/${kbName}`).then(r => r.data),
+  search: (kbName: string, q: string) =>
+    client.get<FAQSearchResponse>(`/faq/${kbName}/search`, { params: { q } }).then(r => r.data),
+  create: (kbName: string, body: FAQCreate) =>
+    client.post<FAQItem>(`/faq/${kbName}`, body).then(r => r.data),
+  update: (kbName: string, id: number, body: FAQUpdate) =>
+    client.put<FAQItem>(`/faq/${kbName}/${id}`, body).then(r => r.data),
+  delete: (kbName: string, id: number) =>
+    client.delete<{ message: string }>(`/faq/${kbName}/${id}`).then(r => r.data),
+  downloadTemplate: (kbName: string) => {
+    window.location.href = `/api/faq/${kbName}/template`
+  },
+  exportExcel: (kbName: string) => {
+    window.location.href = `/api/faq/${kbName}/export`
+  },
+  importExcel: (kbName: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('skip_duplicates', 'true')
+    return client.post<FAQImportResult>(`/faq/${kbName}/import`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120_000,
+    }).then(r => r.data)
+  },
 }

@@ -17,14 +17,14 @@ function formatDate(iso: string) {
 }
 
 const DOC_TYPE_LABELS: Record<DocType, string> = {
-  plain_text: '纯文本',
-  multimodal: '图文混合',
-  table_heavy: '表格密集',
+  policy: '政策文件',
+  manual: '操作手册',
+  form:   '填报模板',
 }
 const DOC_TYPE_COLORS: Record<DocType, string> = {
-  plain_text: 'bg-blue-50 text-blue-700',
-  multimodal: 'bg-purple-50 text-purple-700',
-  table_heavy: 'bg-amber-50 text-amber-700',
+  policy: 'bg-blue-50 text-blue-700',
+  manual: 'bg-purple-50 text-purple-700',
+  form:   'bg-amber-50 text-amber-700',
 }
 
 function Badge({ docType }: { docType: DocType }) {
@@ -49,7 +49,7 @@ const DEFAULT_PARAMS: UploadParams = {
   chunk_size: 256,
   chunk_overlap_ratio: 0.1,
   enable_cleaning: false,
-  doc_type: 'plain_text',
+  doc_type: 'policy',
 }
 
 // ── 队列项类型 ─────────────────────────────────────────────

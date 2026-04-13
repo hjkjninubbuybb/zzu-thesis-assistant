@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   Database,
-  FileText,
   MessageSquareQuote,
   Users,
   MessagesSquare,
@@ -11,50 +10,79 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const navItems = [
+const mainNavItems = [
   { to: '/', label: '概览', icon: LayoutDashboard, end: true },
   { to: '/knowledge', label: '知识库', icon: Database },
-  { to: '/documents', label: '文档', icon: FileText },
   { to: '/faq', label: 'FAQ 管理', icon: MessageSquareQuote },
   { to: '/students', label: '学生账号', icon: Users },
   { to: '/conversations', label: '对话记录', icon: MessagesSquare },
   { to: '/analytics', label: '使用统计', icon: BarChart2 },
-  { to: '/settings', label: '系统配置', icon: Settings },
 ]
+
+function NavItem({
+  to,
+  label,
+  icon: Icon,
+  end,
+}: {
+  to: string
+  label: string
+  icon: React.ElementType
+  end?: boolean
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        cn(
+          'w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 text-sm',
+          isActive
+            ? 'bg-[#1A1A1A] text-white shadow-sm'
+            : 'text-[#9A9A9A] hover:bg-[#F2EFE9] hover:text-[#1A1A1A] active:scale-95'
+        )
+      }
+    >
+      <Icon size={17} strokeWidth={1.8} className="shrink-0" />
+      <span className="font-medium">{label}</span>
+    </NavLink>
+  )
+}
 
 export default function Sidebar() {
   return (
-    <aside className="w-56 shrink-0 border-r border-border bg-card flex flex-col h-full">
+    <aside className="w-48 shrink-0 flex flex-col bg-white rounded-2xl shadow-sm">
       {/* Logo */}
-      <div className="h-14 flex items-center px-4 border-b border-border">
-        <span className="font-semibold text-foreground text-sm">答辩助手管理端</span>
+      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+        <div className="w-9 h-9 bg-[#1A1A1A] rounded-xl flex items-center justify-center shadow-sm shrink-0">
+          <span className="text-white text-xs font-bold tracking-tight">R</span>
+        </div>
+        <span className="text-sm font-semibold text-[#1A1A1A] tracking-tight">RAG 1.0</span>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-                isActive
-                  ? 'bg-primary text-primary-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              )
-            }
-          >
-            <Icon size={16} />
-            {label}
-          </NavLink>
+      {/* Divider */}
+      <div className="mx-3 h-px bg-[#F0EDE8]" />
+
+      {/* Main Navigation */}
+      <nav className="flex-1 flex flex-col px-2 py-4 gap-0.5">
+        {mainNavItems.map((item) => (
+          <NavItem key={item.to} {...item} />
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-border">
-        <p className="text-xs text-muted-foreground">RAG 1.0</p>
+      {/* Bottom: Settings + Avatar */}
+      <div className="flex flex-col px-2 pb-4 gap-0.5">
+        <div className="mx-1 mb-2 h-px bg-[#F0EDE8]" />
+        <NavItem to="/settings" label="系统配置" icon={Settings} />
+        <div className="flex items-center gap-3 px-3 py-2 mt-1">
+          <div
+            title="管理员"
+            className="w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center text-[11px] font-semibold text-white select-none shrink-0"
+          >
+            管
+          </div>
+          <span className="text-xs text-[#9A9A9A] font-medium">管理员</span>
+        </div>
       </div>
     </aside>
   )

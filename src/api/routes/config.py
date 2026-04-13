@@ -1,11 +1,10 @@
 """系统配置读写接口。"""
 
 import logging
-from pathlib import Path
 
 import yaml
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.config import get_config, ROOT_DIR
 
@@ -14,13 +13,18 @@ logger = logging.getLogger(__name__)
 
 CONFIG_PATH = ROOT_DIR / "configs" / "config.yaml"
 
+# 允许写入的模型名枚举（防止写入无效模型名导致运行时报错）
+_ALLOWED_LLM_MODELS = {"qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext"}
+_ALLOWED_EMBED_MODELS = {"text-embedding-v2", "text-embedding-v3"}
+_ALLOWED_RERANKER_MODELS = {"gte-rerank", "gte-rerank-hybrid"}
+
 
 # ── Pydantic 模型 ─────────────────────────────────────────
 
 class SplitterConfig(BaseModel):
-    strategy: str = "recursive"
-    chunk_size: int | None = None
-    chunk_overlap_ratio: float | None = None
+    strategy: str = Field(default="recursive", pattern=r"^(recursive|token|sentence)$")
+    chunk_size: int | None = Field(default=None, ge=64, le=1024)
+    chunk_overlap_ratio: float | None = Field(default=None, ge=0.0, le=0.5)
     buffer_size: int | None = None
     breakpoint_percentile_threshold: int | None = None
 
@@ -29,13 +33,13 @@ class ConfigUpdate(BaseModel):
     llm_model: str | None = None
     embedding_model: str | None = None
     splitter: SplitterConfig | None = None
-    vector_top_k: int | None = None
-    bm25_top_k: int | None = None
-    hybrid_top_k: int | None = None
-    rrf_k: int | None = None
+    vector_top_k: int | None = Field(default=None, ge=1, le=50)
+    bm25_top_k: int | None = Field(default=None, ge=1, le=50)
+    hybrid_top_k: int | None = Field(default=None, ge=1, le=50)
+    rrf_k: int | None = Field(default=None, ge=1, le=200)
     reranker_model: str | None = None
-    reranker_top_n: int | None = None
-    max_reformulations: int | None = None
+    reranker_top_n: int | None = Field(default=None, ge=1, le=20)
+    max_reformulations: int | None = Field(default=None, ge=0, le=5)
 
 
 # ── 接口 ─────────────────────────────────────────────────
@@ -50,16 +54,32 @@ def read_config() -> dict:
 def update_config(body: ConfigUpdate) -> dict:
     """
     更新 config.yaml 并清除缓存。
-    只修改请求中非 None 的字段。
+    只修改请求中非 None 的字段，写入前校验模型名是否合法。
     """
-    # 读取原始 yaml（保留原有结构，但注释会丢失）
+    # 模型名枚举校验
+    if body.llm_model is not None and body.llm_model not in _ALLOWED_LLM_MODELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的 LLM 模型 '{body.llm_model}'，可选: {sorted(_ALLOWED_LLM_MODELS)}",
+        )
+    if body.embedding_model is not None and body.embedding_model not in _ALLOWED_EMBED_MODELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的 Embedding 模型 '{body.embedding_model}'，可选: {sorted(_ALLOWED_EMBED_MODELS)}",
+        )
+    if body.reranker_model is not None and body.reranker_model not in _ALLOWED_RERANKER_MODELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的 Reranker 模型 '{body.reranker_model}'，可选: {sorted(_ALLOWED_RERANKER_MODELS)}",
+        )
+
+    # 读取原始 yaml
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         raw: dict = yaml.safe_load(f) or {}
 
     # 逐字段 merge
     if body.llm_model is not None:
         raw.setdefault("llm", {})["model"] = body.llm_model
-
     if body.embedding_model is not None:
         raw.setdefault("embedding", {})["model"] = body.embedding_model
 
@@ -96,11 +116,9 @@ def update_config(body: ConfigUpdate) -> dict:
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             yaml.dump(raw, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"写入配置失败: {e}")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail="写入配置失败，请检查文件权限") from e
 
-    # 清除 lru_cache，下次调用 get_config() 会重新读取文件
     get_config.cache_clear()
     logger.info("config.yaml 已更新并清除缓存")
-
     return get_config()

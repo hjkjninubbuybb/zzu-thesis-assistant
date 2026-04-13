@@ -1,12 +1,15 @@
 """知识库 CRUD 接口。"""
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from src.api.schemas import KBCreate, KBInfo, MessageResponse
 from src.storage.document_store import DocumentStore
-from src.storage.vector_store import VectorStore
+from src.storage.vector_store import VectorStore, VectorStoreError
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
+logger = logging.getLogger(__name__)
 
 _vs = VectorStore()
 _ds = DocumentStore()
@@ -52,7 +55,8 @@ def delete_kb(kb_name: str):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
     try:
         _vs.delete_collection(kb_name)
-    except Exception:
-        pass  # Qdrant 中可能已不存在
+    except VectorStoreError as e:
+        # 向量删除失败时记录警告，仍然删除元数据（避免孤儿元数据）
+        logger.warning("[delete_kb] Qdrant 删除失败，继续删除元数据: %s", e)
     _ds.delete_kb(kb_name)
     return MessageResponse(message=f"知识库 '{kb_name}' 已删除")

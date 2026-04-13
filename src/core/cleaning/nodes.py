@@ -1,17 +1,22 @@
 import json
+import logging
 import os
 
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import SystemMessage, HumanMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
+from src.config import get_config
 from .state import CleaningState
 from .prompts import (
     OPTIMIZER_SYSTEM_PROMPT,
     OPTIMIZER_RETRY_TEMPLATE,
     TABLE_OPTIMIZER_SYSTEM_PROMPT,
+    FORM_TABLE_EXTRACTOR_PROMPT,
     EVALUATOR_SYSTEM_PROMPT,
 )
+
+logger = logging.getLogger(__name__)
 
 _COMMON_SPECIAL = set(
     "，。！？；：""''（）【】《》、·…—～"
@@ -43,20 +48,20 @@ class EvaluatorOutput(BaseModel):
     feedback: str
 
 
-def _get_llm() -> ChatTongyi:
-    return ChatTongyi(
-        model="qwen-plus",
-        api_key=os.environ.get("DASHSCOPE_API_KEY"),
-    )
+def _get_llm(fast: bool = False) -> ChatTongyi:
+    cfg = get_config()["llm"]
+    model = cfg["fast_model"] if fast else cfg["model"]
+    return ChatTongyi(model=model, api_key=os.environ.get("DASHSCOPE_API_KEY"))
 
 
 def optimizer_node(state: CleaningState) -> dict:
     llm = _get_llm()
     content_type = state.get("content_type", "text")
 
-    # 按内容类型选择系统提示词
     if content_type == "table":
         system_prompt = TABLE_OPTIMIZER_SYSTEM_PROMPT
+    elif content_type == "form_table":
+        system_prompt = FORM_TABLE_EXTRACTOR_PROMPT
     else:
         system_prompt = OPTIMIZER_SYSTEM_PROMPT
 
@@ -82,8 +87,13 @@ def optimizer_node(state: CleaningState) -> dict:
         SystemMessage(content=system_prompt),
         HumanMessage(content=user_content),
     ]
-    response = llm.invoke(messages)
-    cleaned = response.content.strip()
+    try:
+        response = llm.invoke(messages)
+        cleaned = response.content.strip()
+    except Exception as e:
+        logger.warning("[optimizer_node] LLM 调用失败，保留上次结果: %s", e)
+        # 失败时保留上次结果（或原始内容）
+        cleaned = state.get("current_content") or state["original_content"]
 
     return {
         "current_content": cleaned,
@@ -92,7 +102,7 @@ def optimizer_node(state: CleaningState) -> dict:
 
 
 def evaluator_node(state: CleaningState) -> dict:
-    llm = _get_llm()
+    llm = _get_llm(fast=True)  # PASS/FAIL 判断，用快速模型
 
     user_content = (
         f"## 原始文档\n\n{state['original_content']}\n\n"
@@ -102,12 +112,16 @@ def evaluator_node(state: CleaningState) -> dict:
         SystemMessage(content=EVALUATOR_SYSTEM_PROMPT),
         HumanMessage(content=user_content),
     ]
-    response = llm.invoke(messages)
-
     try:
-        output = EvaluatorOutput(**json.loads(response.content.strip()))
-    except Exception:
-        output = EvaluatorOutput(status="FAIL", feedback=response.content.strip())
+        response = llm.invoke(messages)
+        try:
+            output = EvaluatorOutput(**json.loads(response.content.strip()))
+        except (json.JSONDecodeError, ValidationError, KeyError):
+            logger.warning("[evaluator_node] 解析评估结果失败，标记为 FAIL")
+            output = EvaluatorOutput(status="FAIL", feedback=response.content.strip())
+    except Exception as e:
+        logger.warning("[evaluator_node] LLM 调用失败，标记为 FAIL: %s", e)
+        output = EvaluatorOutput(status="FAIL", feedback=str(e))
 
     return {
         "status": output.status,
