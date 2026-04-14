@@ -1,15 +1,23 @@
 """FastAPI 应用入口。"""
 
+import sqlite3
+from contextlib import closing
+from datetime import date, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from src.api.auth import ensure_default_admin, require_teacher_or_admin
 from src.api.routes import knowledge, document, chat
+from src.api.routes.auth import router as auth_router
 from src.api.routes.config import router as config_router
+from src.api.routes.conversation import router as conversation_router
 from src.api.routes.faq import router as faq_router
+from src.api.routes.user import router as user_router
+from src.config import ROOT_DIR
 
 app = FastAPI(title="RAG 1.0 API", version="1.0.0")
 
@@ -25,12 +33,93 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+@app.on_event("startup")
+def startup_event() -> None:
+    ensure_default_admin()
+
+
 # API 路由（必须在 SPA fallback 之前注册）
+app.include_router(auth_router)
+app.include_router(user_router)
 app.include_router(knowledge.router)
 app.include_router(document.router)
 app.include_router(chat.router)
 app.include_router(config_router)
+app.include_router(conversation_router)
 app.include_router(faq_router)
+
+
+# ── 使用统计端点（内联，避免 import 缓存问题）────────────────
+
+_DB_PATH = ROOT_DIR / "data" / "metadata.db"
+
+
+def _analytics_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+@app.get("/api/analytics/summary", tags=["analytics"])
+def analytics_summary(_user: dict = Depends(require_teacher_or_admin)) -> dict:
+    """返回系统使用统计汇总。"""
+    with closing(_analytics_conn()) as conn:
+        total_questions: int = conn.execute(
+            "SELECT COUNT(*) FROM conversation_messages WHERE role = 'user'"
+        ).fetchone()[0]
+
+        today_str = date.today().isoformat()
+        today_questions: int = conn.execute(
+            "SELECT COUNT(*) FROM conversation_messages WHERE role = 'user' AND DATE(created_at) = ?",
+            (today_str,),
+        ).fetchone()[0]
+
+        week_rows = conn.execute(
+            "SELECT DATE(created_at) AS day, COUNT(*) AS cnt "
+            "FROM conversation_messages WHERE role = 'user' AND DATE(created_at) >= ? "
+            "GROUP BY DATE(created_at) ORDER BY day",
+            ((date.today() - timedelta(days=6)).isoformat(),),
+        ).fetchall()
+        day_map = {row[0]: row[1] for row in week_rows}
+        week_data = [
+            {"day": (date.today() - timedelta(days=6 - i)).isoformat(),
+             "count": day_map.get((date.today() - timedelta(days=6 - i)).isoformat(), 0)}
+            for i in range(7)
+        ]
+
+        total_conversations: int = conn.execute(
+            "SELECT COUNT(*) FROM conversations"
+        ).fetchone()[0]
+
+        feedback_rows = conn.execute(
+            "SELECT rating, COUNT(*) AS cnt FROM message_feedback GROUP BY rating"
+        ).fetchall()
+        feedback_map = {row[0]: row[1] for row in feedback_rows}
+
+        kb_count: int  = conn.execute("SELECT COUNT(*) FROM knowledge_bases").fetchone()[0]
+        doc_count: int = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+        faq_count: int = conn.execute("SELECT COUNT(*) FROM faqs WHERE enabled = 1").fetchone()[0]
+
+        recent_rows = conn.execute(
+            "SELECT cm.content, cm.created_at, c.kb_name "
+            "FROM conversation_messages cm "
+            "JOIN conversations c ON cm.conversation_id = c.id "
+            "WHERE cm.role = 'user' "
+            "ORDER BY cm.created_at DESC LIMIT 10",
+        ).fetchall()
+
+    return {
+        "total_questions":     total_questions,
+        "today_questions":     today_questions,
+        "total_conversations": total_conversations,
+        "week_data":           week_data,
+        "feedback_up":         feedback_map.get("up", 0),
+        "feedback_down":       feedback_map.get("down", 0),
+        "kb_count":            kb_count,
+        "doc_count":           doc_count,
+        "faq_count":           faq_count,
+        "recent_questions":    [{"content": r[0], "created_at": r[1], "kb_name": r[2]} for r in recent_rows],
+    }
 
 
 @app.get("/health")
