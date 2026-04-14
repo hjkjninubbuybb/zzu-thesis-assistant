@@ -1,12 +1,12 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
   Upload, Trash2, Loader2, X, ChevronDown, ChevronUp, FileText,
-  CheckCircle, AlertCircle, Clock,
+  CheckCircle, AlertCircle, Clock, RotateCcw,
 } from 'lucide-react'
 import { knowledgeApi, documentApi, extractError } from '@/lib/api'
-import type { DocType, SplitterType, UploadParams } from '@/types/api'
+import type { DocType, UploadParams } from '@/types/api'
 
 function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -26,14 +26,12 @@ const DOC_TYPE_COLORS: Record<DocType, string> = {
   manual: 'bg-purple-50 text-purple-700',
   form:   'bg-amber-50 text-amber-700',
 }
-
-function Badge({ docType }: { docType: DocType }) {
-  return (
-    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${DOC_TYPE_COLORS[docType]}`}>
-      {DOC_TYPE_LABELS[docType]}
-    </span>
-  )
+const DOC_TYPE_BAR_COLORS: Record<DocType, string> = {
+  policy: 'bg-blue-500',
+  manual: 'bg-purple-500',
+  form:   'bg-amber-500',
 }
+
 
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
@@ -107,7 +105,10 @@ export default function DocumentPage() {
       status: 'pending',
       progress: 0,
     }))
-    setQueue(prev => [...prev, ...items])
+    setQueue(prev => [
+      ...prev.filter(q => q.status !== 'error'),
+      ...items,
+    ])
   }, [])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -175,11 +176,42 @@ export default function DocumentPage() {
     }
   }
 
+  const retrySingle = async (id: string) => {
+    const item = queue.find(q => q.id === id)
+    if (!item || uploading) return
+    setQueue(prev => prev.map(q => q.id === id ? { ...q, status: 'pending', error: undefined, progress: 0 } : q))
+    setUploading(true)
+    try {
+      const doc = await documentApi.upload(
+        selectedKb,
+        item.file,
+        params,
+        (pct) => setQueue(prev => prev.map(q => q.id === id ? { ...q, progress: pct } : q)),
+      )
+      setQueue(prev => prev.map(q => q.id === id ? { ...q, status: 'done', progress: 100, chunks: doc.chunk_count } : q))
+      qc.invalidateQueries({ queryKey: ['documents', selectedKb] })
+      qc.invalidateQueries({ queryKey: ['knowledge-bases'] })
+      showToast('重传成功', 'success')
+    } catch (e) {
+      setQueue(prev => prev.map(q => q.id === id ? { ...q, status: 'error', error: extractError(e) } : q))
+      showToast(extractError(e), 'error')
+    }
+    setUploading(false)
+  }
+
+  const docGroups = useMemo(() => {
+    if (!docs?.length) return []
+    const order: DocType[] = ['policy', 'manual', 'form']
+    return order
+      .map(type => ({ type, items: docs.filter(d => d.doc_type === type) }))
+      .filter(g => g.items.length > 0)
+  }, [docs])
+
   const pendingCount = queue.filter(q => q.status === 'pending').length
   const hasDone = queue.some(q => q.status === 'done')
 
   return (
-    <div className="p-6 max-w-5xl">
+    <div className="p-6 max-w-5xl flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">文档</h1>
         <p className="mt-1 text-sm text-gray-500">上传与管理知识库中的文档</p>
@@ -243,7 +275,23 @@ export default function DocumentPage() {
                       <span className="text-xs text-emerald-600 shrink-0">{item.chunks} chunks</span>
                     )}
                     {item.status === 'error' && (
-                      <span className="text-xs text-red-500 shrink-0 max-w-32 truncate" title={item.error}>{item.error}</span>
+                      <>
+                        <span className="text-xs text-red-500 shrink-0 max-w-32 truncate" title={item.error}>{item.error}</span>
+                        <button
+                          onClick={() => retrySingle(item.id)}
+                          title="重试"
+                          disabled={uploading}
+                          className="p-1 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors shrink-0 disabled:opacity-40"
+                        >
+                          <RotateCcw size={13} />
+                        </button>
+                        <button
+                          onClick={() => removeFromQueue(item.id)}
+                          className="text-gray-400 hover:text-gray-600 shrink-0"
+                        >
+                          <X size={12} />
+                        </button>
+                      </>
                     )}
                     {item.status === 'pending' && (
                       <button
@@ -284,42 +332,63 @@ export default function DocumentPage() {
             </button>
 
             {advancedOpen && (
-              <div className="mt-3 grid grid-cols-2 gap-4 border-t border-gray-100 pt-3">
+              <div className="mt-3 border-t border-gray-100 pt-3 space-y-4">
+                {/* 切分策略 */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">切分策略</label>
-                  <select
-                    value={params.splitter_type}
-                    onChange={e => setParams(p => ({ ...p, splitter_type: e.target.value as SplitterType }))}
-                    className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-                  >
-                    <option value="recursive">Recursive（推荐）</option>
-                    <option value="token">Token</option>
-                    <option value="sentence">Sentence</option>
-                  </select>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">切分策略</label>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { value: 'recursive', label: 'Recursive', ndcg: 0.85, desc: '按标点和 Markdown 递归分割' },
+                      { value: 'sentence', label: 'Sentence', ndcg: 0.81, desc: '按句子边界分割' },
+                      { value: 'token', label: 'Token', ndcg: 0.81, desc: '固定 Token 数分割' },
+                    ] as const).map(s => (
+                      <button
+                        key={s.value}
+                        onClick={() => setParams(p => ({ ...p, splitter_type: s.value }))}
+                        title={s.desc}
+                        className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
+                          params.splitter_type === s.value
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {s.label}
+                        <span className={`ml-1.5 opacity-75 ${params.splitter_type === s.value ? 'text-blue-100' : 'text-gray-400'}`}>
+                          NDCG {s.ndcg}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Chunk 大小 <span className="text-gray-400">{params.chunk_size}</span>
-                  </label>
-                  <input
-                    type="range" min={64} max={1024} step={64}
-                    value={params.chunk_size}
-                    onChange={e => setParams(p => ({ ...p, chunk_size: Number(e.target.value) }))}
-                    className="w-full"
-                  />
+
+                {/* Chunk 参数 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Chunk 大小 <span className="text-gray-400 font-normal">{params.chunk_size} tokens</span>
+                    </label>
+                    <input
+                      type="range" min={64} max={1024} step={64}
+                      value={params.chunk_size}
+                      onChange={e => setParams(p => ({ ...p, chunk_size: Number(e.target.value) }))}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Overlap 比例 <span className="text-gray-400 font-normal">{params.chunk_overlap_ratio.toFixed(2)}</span>
+                    </label>
+                    <input
+                      type="range" min={0} max={0.5} step={0.05}
+                      value={params.chunk_overlap_ratio}
+                      onChange={e => setParams(p => ({ ...p, chunk_overlap_ratio: Number(e.target.value) }))}
+                      className="w-full"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Overlap 比例 <span className="text-gray-400">{params.chunk_overlap_ratio.toFixed(2)}</span>
-                  </label>
-                  <input
-                    type="range" min={0} max={0.5} step={0.05}
-                    value={params.chunk_overlap_ratio}
-                    onChange={e => setParams(p => ({ ...p, chunk_overlap_ratio: Number(e.target.value) }))}
-                    className="w-full"
-                  />
-                </div>
-                <div className="flex items-center gap-2 mt-4">
+
+                {/* LLM 清洗 */}
+                <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     id="cleaning"
@@ -328,7 +397,7 @@ export default function DocumentPage() {
                     className="rounded"
                   />
                   <label htmlFor="cleaning" className="text-sm text-gray-600 cursor-pointer">
-                    启用 LLM 清洗 <span className="text-xs text-gray-400">（较慢）</span>
+                    启用 LLM 清洗 <span className="text-xs text-gray-400">（较慢，适合格式杂乱的文档）</span>
                   </label>
                 </div>
               </div>
@@ -371,12 +440,11 @@ export default function DocumentPage() {
               <div className="text-sm text-gray-400 py-10 text-center">暂无文档，请上传</div>
             )}
 
-            {docs && docs.length > 0 && (
+            {docGroups.length > 0 && (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="text-left px-4 py-3 text-gray-600 font-medium">文件名</th>
-                    <th className="text-left px-4 py-3 text-gray-600 font-medium">类型</th>
                     <th className="text-center px-4 py-3 text-gray-600 font-medium">大小</th>
                     <th className="text-center px-4 py-3 text-gray-600 font-medium">Chunks</th>
                     <th className="text-left px-4 py-3 text-gray-600 font-medium">上传时间</th>
@@ -384,37 +452,53 @@ export default function DocumentPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {docs.map(doc => (
-                    <tr key={doc.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-900 font-medium max-w-xs truncate">{doc.file_name}</td>
-                      <td className="px-4 py-3"><Badge docType={doc.doc_type as DocType} /></td>
-                      <td className="px-4 py-3 text-center text-gray-500">{formatSize(doc.file_size)}</td>
-                      <td className="px-4 py-3 text-center text-gray-700">{doc.chunk_count}</td>
-                      <td className="px-4 py-3 text-gray-500">{formatDate(doc.created_at)}</td>
-                      <td className="px-4 py-3 text-right">
-                        {deleteId === doc.id ? (
-                          <div className="flex items-center gap-2 justify-end">
-                            <span className="text-xs text-gray-500">确认删除？</span>
-                            <button
-                              onClick={() => deleteMutation.mutate(doc.id)}
-                              disabled={deleteMutation.isPending}
-                              className="text-xs px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-1"
-                            >
-                              {deleteMutation.isPending && <Loader2 size={10} className="animate-spin" />}
-                              确认
-                            </button>
-                            <button onClick={() => setDeleteId(null)} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">取消</button>
+                  {docGroups.map(group => (
+                    <>
+                      {/* 分组标题行 */}
+                      <tr key={`group-${group.type}`} className="bg-[#F8F6F2]">
+                        <td colSpan={5} className="px-0 py-0">
+                          <div className="flex items-center gap-3 py-2 px-4">
+                            <div className={`w-1 h-4 rounded-full shrink-0 ${DOC_TYPE_BAR_COLORS[group.type]}`} />
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${DOC_TYPE_COLORS[group.type]}`}>
+                              {DOC_TYPE_LABELS[group.type]}
+                            </span>
+                            <span className="text-xs text-gray-400">{group.items.length} 个文档</span>
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteId(doc.id)}
-                            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                      {/* 文档行 */}
+                      {group.items.map(doc => (
+                        <tr key={doc.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                          <td className="px-4 py-3 text-gray-900 font-medium max-w-xs truncate">{doc.file_name}</td>
+                          <td className="px-4 py-3 text-center text-gray-500">{formatSize(doc.file_size)}</td>
+                          <td className="px-4 py-3 text-center text-gray-700">{doc.chunk_count}</td>
+                          <td className="px-4 py-3 text-gray-500">{formatDate(doc.created_at)}</td>
+                          <td className="px-4 py-3 text-right">
+                            {deleteId === doc.id ? (
+                              <div className="flex items-center gap-2 justify-end">
+                                <span className="text-xs text-gray-500">确认删除？</span>
+                                <button
+                                  onClick={() => deleteMutation.mutate(doc.id)}
+                                  disabled={deleteMutation.isPending}
+                                  className="text-xs px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-1"
+                                >
+                                  {deleteMutation.isPending && <Loader2 size={10} className="animate-spin" />}
+                                  确认
+                                </button>
+                                <button onClick={() => setDeleteId(null)} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">取消</button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setDeleteId(doc.id)}
+                                className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   ))}
                 </tbody>
               </table>

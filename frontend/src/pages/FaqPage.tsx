@@ -579,7 +579,7 @@ export default function FaqPage() {
   const enabledCount = faqs.filter(f => f.enabled).length
 
   return (
-    <div className="px-8 py-8 min-h-full">
+    <div className="px-8 py-8 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
 
       {/* ── 标题栏 ── */}
       <div className="flex items-start justify-between mb-6">

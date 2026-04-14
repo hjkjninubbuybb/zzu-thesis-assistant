@@ -638,7 +638,7 @@ export default function OverviewPage() {
   })
 
   return (
-    <div className="p-7 min-h-full">
+    <div className="p-7 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
       {/* ── Header ── */}
       <div className="mb-7" style={cardStyle(0)}>
         <h1 className="text-[28px] font-semibold text-[#1A1A1A] tracking-tight leading-tight">

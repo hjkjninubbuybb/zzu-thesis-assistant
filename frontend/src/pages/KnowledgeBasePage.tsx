@@ -15,8 +15,8 @@ const KB_COLORS = ['#E85D4A', '#F0C040', '#5EE67A', '#60A5FA', '#C084FC', '#FB92
 const DEFAULT_PARAMS: UploadParams = {
   splitter_type: 'recursive',
   chunk_size: 256,
-  chunk_overlap_ratio: 0.1,
-  enable_cleaning: false,
+  chunk_overlap_ratio: 0.2,
+  enable_cleaning: true,
   doc_type: 'policy',
 }
 
