@@ -2,12 +2,29 @@
 
 ## 项目概览
 
-郑州大学本科毕业设计 Q&A 系统（Agentic RAG）。
+郑州大学本科毕业设计 Q&A 助手（Agentic RAG）。面向学生和导师，解答毕业设计全流程问题。
+
 - **后端**: FastAPI + LangGraph ReAct Agent
 - **检索**: Qdrant 向量库 + BM25，RRF 融合 + DashScope Rerank
 - **LLM/Embedding**: DashScope（通义千问系列）
 - **前端**: React + TypeScript + Vite（构建产物由 FastAPI 静态托管）
-- **存储**: Qdrant（向量）+ SQLite（文档元数据）
+- **存储**: Qdrant（向量）+ SQLite（`data/metadata.db`，文档/FAQ/对话/用户元数据）
+- **认证**: JWT（python-jose + passlib/bcrypt），三种角色：admin / teacher / student
+
+### 双层问答架构
+
+- **第一层（FAQ 防线）**：语义向量匹配 FAQ 库，超过阈值直接返回标准答案（快、稳定、省 Token）
+- **第二层（RAG 核心）**：未命中时启动混合检索 → Rerank → LangGraph ReAct Agent → LLM 生成
+
+### 角色权限
+
+| 角色 | 可访问页面 |
+|------|-----------|
+| admin | 全部（知识库/文档/FAQ/学生账号/统计/设置 + 对话） |
+| teacher | 同 admin |
+| student | 仅对话页 |
+
+默认管理员：`admin` / `admin123`（首次启动自动创建）
 
 ### 启动方式
 
@@ -24,17 +41,23 @@ $env:PYTHONUTF8=1; poetry run start
 ```
 
 ```bash
-# Git Bash / Linux / macOS
+# Git Bash
 PYTHONUTF8=1 poetry run dev
 ```
 
-4. 前端改动后需重新构建（开发模式也需要）：
+4. 前端改动后需重新构建：
 
 ```bash
 cd frontend && npm run build
 ```
 
 访问地址：http://localhost:8000
+
+> ⚠️ **Windows 多进程注意**：uvicorn reload 在 Windows 上不可靠，新建文件后务必完全重启。
+> 重启前先清理残留进程：
+> ```powershell
+> Get-NetTCPConnection -LocalPort 8000 -State Listen | ForEach-Object { taskkill /F /T /PID $_.OwningProcess }
+> ```
 
 ---
 
@@ -199,14 +222,53 @@ final_state = await asyncio.to_thread(run_rag, query=..., retriever_fn=...)
 
 ## 四、FastAPI 规范
 
-- 路由按资源拆文件：`chat.py` / `knowledge.py` / `document.py` / `config.py`
+- 路由按资源拆文件：`chat.py` / `knowledge.py` / `document.py` / `config.py` / `conversation.py` / `user.py` / `auth.py`
 - 请求体用 Pydantic `BaseModel`，**字段加 `Field(...)` 做校验**（`min_length`, `ge`, `le`, `pattern`）
 - 业务异常用 `HTTPException(status_code=4xx, detail="...")`，不要直接返回 500
 - SSE 路由用 `EventSourceResponse`，每个阶段 yield `status` 事件，结束 yield `done`
+- **所有需要登录的路由必须加 `Depends(get_current_user)`**，管理接口用 `Depends(require_teacher_or_admin)`
+
+### 认证依赖使用
+
+```python
+# ✅ 普通登录校验
+@router.get("/xxx")
+def my_route(current_user: dict = Depends(get_current_user)):
+    ...
+
+# ✅ 仅 admin/teacher 可访问
+@router.get("/admin-only")
+def admin_route(current_user: dict = Depends(require_teacher_or_admin)):
+    ...
+```
 
 ---
 
-## 五、禁止事项
+## 五、前端规范
+
+### 设计语言（Dashboard 风格）
+
+- 外层背景：`hsl(38 22% 91%)` 暖米色，白色 `rounded-2xl` 卡片浮在上面，`p-3 gap-3`
+- 侧边栏：64px 窄图标栏（`w-16`），激活态黑色填充，hover `scale-110`
+- 动画类：`fadeSlideUp`（入场）、`hover-lift`（悬浮），定义在 `index.css`
+- 深色对比卡（`#1A1A1A` 背景）用于系统状态、统计等高对比场景
+- 空状态要有友好提示，不要显示报错或空白
+
+### API 调用
+
+- 所有请求通过 `frontend/src/lib/api.ts` 的 axios client，含自动 refresh 拦截器
+- 接口响应类型统一在 `frontend/src/types/api.ts` 定义
+- 用 `@tanstack/react-query` 管理服务端状态，不要用 `useEffect + useState` 手动 fetch
+
+### 路由守卫
+
+- 未登录 → `/login`
+- 已登录但角色不匹配 → `/`（首页）
+- student 角色默认落地页：`/conversations`
+
+---
+
+## 六、禁止事项
 
 - **禁止** 在 `core/` 层直接 import `FastAPI`、`Request` 等框架对象
 - **禁止** 把 API key 硬编码进代码，统一从 `os.environ.get(...)` 读取
@@ -214,3 +276,4 @@ final_state = await asyncio.to_thread(run_rag, query=..., retriever_fn=...)
 - **禁止** 在 `build_rag_graph` / `build_rag_agent` 内部构造 `HybridRetriever`（职责属于调用层）
 - **禁止** 写完节点不接入图就提交（检查：每个 `add_node` 都要有对应的 edge）
 - **禁止** 向 git 提交 `.env` 文件
+- **禁止** 新增路由时忘记加认证依赖（默认所有路由都需要登录）
