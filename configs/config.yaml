@@ -28,6 +28,21 @@ rag:
 server:
   api_host: 0.0.0.0
   api_port: 8000
+database:
+  host: ${MYSQL_HOST:-localhost}
+  port: 3306
+  user: ${MYSQL_USER:-rag_user}
+  password: ${MYSQL_PASSWORD:-rag_pass_123}
+  database: rag_db
+  pool_size: 5
+  pool_recycle: 3600
+auth:
+  secret_key: ${AUTH_SECRET_KEY:-change-me-in-production-please}
+  algorithm: HS256
+  access_token_expire_minutes: 480   # 8小时
+  refresh_token_expire_days: 30
+  default_admin_username: admin
+  default_admin_password: admin123
 academic:
   spring_start: "02-24"   # 爬取失败时的兜底开学日（MM-DD）
   autumn_start: "09-01"

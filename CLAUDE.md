@@ -6,10 +6,35 @@
 - **后端**: FastAPI + LangGraph ReAct Agent
 - **检索**: Qdrant 向量库 + BM25，RRF 融合 + DashScope Rerank
 - **LLM/Embedding**: DashScope（通义千问系列）
-- **前端**: Gradio 6.x
+- **前端**: React + TypeScript + Vite（构建产物由 FastAPI 静态托管）
 - **存储**: Qdrant（向量）+ SQLite（文档元数据）
 
-启动：`PYTHONUTF8=1 python main.py`
+### 启动方式
+
+1. 启动 Qdrant：`docker-compose up -d`
+2. 确认 `.env` 中已填写 `DASHSCOPE_API_KEY`
+3. 启动后端：
+
+```powershell
+# PowerShell（开发模式，热重载）
+$env:PYTHONUTF8=1; poetry run dev
+
+# PowerShell（生产模式）
+$env:PYTHONUTF8=1; poetry run start
+```
+
+```bash
+# Git Bash / Linux / macOS
+PYTHONUTF8=1 poetry run dev
+```
+
+4. 前端改动后需重新构建（开发模式也需要）：
+
+```bash
+cd frontend && npm run build
+```
+
+访问地址：http://localhost:8000
 
 ---
 
