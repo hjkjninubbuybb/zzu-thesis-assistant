@@ -1,9 +1,36 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowUp, Loader2, ChevronDown, ChevronUp, Trash2, AlertCircle, MessageSquare, Download } from 'lucide-react'
-import { knowledgeApi, faqApi } from '@/lib/api'
-import type { ChatMessage, FileItem, SourceItem } from '@/types/api'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  ArrowUp, Loader2, ChevronDown, ChevronUp, Trash2, AlertCircle,
+  MessageSquare, Download, Plus, ThumbsUp, ThumbsDown,
+} from 'lucide-react'
+import { knowledgeApi, faqApi, conversationApi } from '@/lib/api'
+import type { ChatMessage, FileItem, HistoryMessage, SourceItem, ConversationInfo } from '@/types/api'
+
+// ── 历史记录构建 ──────────────────────────────────────────
+
+const MAX_HISTORY_TURNS = 10
+const MAX_MSG_LENGTH = 1500
+
+function buildHistory(messages: ChatMessage[]): HistoryMessage[] {
+  const pairs: HistoryMessage[] = []
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i]
+    const next = messages[i + 1]
+    if (m.role === 'user' && next?.role === 'assistant' && next?.status === 'done') {
+      pairs.push({ role: 'user', content: m.content })
+      pairs.push({
+        role: 'assistant',
+        content: next.content.length > MAX_MSG_LENGTH
+          ? next.content.slice(0, MAX_MSG_LENGTH) + '\n...(内容已截断)'
+          : next.content,
+      })
+      i++ // 跳过已处理的 assistant 消息
+    }
+  }
+  return pairs.slice(-MAX_HISTORY_TURNS * 2)
+}
 
 // ── SSE 流式对话 ──────────────────────────────────────────
 
@@ -11,6 +38,7 @@ async function streamChat(
   kb_name: string,
   query: string,
   max_reformulations: number,
+  history: HistoryMessage[],
   signal: AbortSignal,
   onStatus: (step: string) => void,
   onAnswer: (text: string) => void,
@@ -19,11 +47,16 @@ async function streamChat(
   onToken?: (text: string) => void,
   onAgentAction?: (tool: string, input: string) => void,
   onFile?: (file: FileItem) => void,
+  onSuggestions?: (items: string[]) => void,
 ) {
+  const token = localStorage.getItem('rag_access_token')
   const resp = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ kb_name, query, max_reformulations }),
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ kb_name, query, max_reformulations, history }),
     signal,
   })
   if (!resp.ok) {
@@ -58,6 +91,7 @@ async function streamChat(
           else if (currentEvent === 'answer') onAnswer(data.text)
           else if (currentEvent === 'sources') onSources(data.sources)
           else if (currentEvent === 'file') onFile?.(data as FileItem)
+          else if (currentEvent === 'suggestions') onSuggestions?.(data.items)
           else if (currentEvent === 'error') onError(data.message)
         } catch { /* 忽略解析错误 */ }
       }
@@ -68,14 +102,9 @@ async function streamChat(
 // ── 文件卡片 ──────────────────────────────────────────────
 
 const EXT_COLORS: Record<string, string> = {
-  pdf: 'bg-red-500',
-  docx: 'bg-blue-500',
-  doc: 'bg-blue-500',
-  xlsx: 'bg-green-600',
-  xls: 'bg-green-600',
-  pptx: 'bg-orange-500',
-  ppt: 'bg-orange-500',
-  txt: 'bg-gray-500',
+  pdf: 'bg-red-500', docx: 'bg-blue-500', doc: 'bg-blue-500',
+  xlsx: 'bg-green-600', xls: 'bg-green-600',
+  pptx: 'bg-orange-500', ppt: 'bg-orange-500', txt: 'bg-gray-500',
 }
 
 function FileCard({ file }: { file: FileItem }) {
@@ -130,9 +159,57 @@ function SourcesPanel({ sources }: { sources: SourceItem[] }) {
   )
 }
 
+// ── 反馈按钮 ──────────────────────────────────────────────
+
+function FeedbackButtons({
+  dbMessageId,
+  feedback,
+  onFeedback,
+}: {
+  dbMessageId?: number
+  feedback?: 'up' | 'down' | null
+  onFeedback: (rating: 'up' | 'down') => void
+}) {
+  if (!dbMessageId) return null
+  return (
+    <div className="flex items-center gap-1 mt-2">
+      <button
+        onClick={() => onFeedback('up')}
+        className={`p-1 rounded-md transition-colors ${
+          feedback === 'up'
+            ? 'text-green-600 bg-green-50'
+            : 'text-gray-300 hover:text-gray-500 hover:bg-gray-50'
+        }`}
+        title="有帮助"
+      >
+        <ThumbsUp size={13} />
+      </button>
+      <button
+        onClick={() => onFeedback('down')}
+        className={`p-1 rounded-md transition-colors ${
+          feedback === 'down'
+            ? 'text-red-500 bg-red-50'
+            : 'text-gray-300 hover:text-gray-500 hover:bg-gray-50'
+        }`}
+        title="没帮助"
+      >
+        <ThumbsDown size={13} />
+      </button>
+    </div>
+  )
+}
+
 // ── 消息气泡 ──────────────────────────────────────────────
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+function MessageBubble({
+  msg,
+  onFeedback,
+  onSuggestionClick,
+}: {
+  msg: ChatMessage
+  onFeedback: (msgId: number, rating: 'up' | 'down') => void
+  onSuggestionClick?: (text: string) => void
+}) {
   if (msg.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -145,41 +222,168 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[80%] bg-white border border-gray-200 text-gray-800 text-sm px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm">
-        {msg.status === 'loading' ? (
-          msg.content ? (
-            // 正在流式输出：渲染 Markdown + 闪烁光标
-            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-strong:text-gray-900">
-              <ReactMarkdown>{msg.content}</ReactMarkdown>
-              <span className="inline-block w-1.5 h-4 bg-gray-400 opacity-70 animate-pulse ml-0.5 align-middle rounded-sm" />
+      <div className="max-w-[80%]">
+        <div className="bg-white border border-gray-200 text-gray-800 text-sm px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm">
+          {msg.status === 'loading' ? (
+            msg.content ? (
+              <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-strong:text-gray-900">
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <span className="inline-block w-1.5 h-4 bg-gray-400 opacity-70 animate-pulse ml-0.5 align-middle rounded-sm" />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-gray-400">
+                <Loader2 size={14} className="animate-spin" />
+                <span>思考中...</span>
+              </div>
+            )
+          ) : msg.status === 'error' ? (
+            <div className="flex items-center gap-2 text-red-500">
+              <AlertCircle size={14} />
+              <span>{msg.content}</span>
             </div>
           ) : (
-            // 等待第一个 token：显示 spinner
-            <div className="flex items-center gap-2 text-gray-400">
-              <Loader2 size={14} className="animate-spin" />
-              <span>思考中...</span>
-            </div>
-          )
-        ) : msg.status === 'error' ? (
-          <div className="flex items-center gap-2 text-red-500">
-            <AlertCircle size={14} />
-            <span>{msg.content}</span>
-          </div>
-        ) : (
-          <>
-            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-strong:text-gray-900">
-              <ReactMarkdown>{msg.content}</ReactMarkdown>
-            </div>
-            {msg.files && msg.files.length > 0 && (
-              <div className="mt-3 flex flex-col gap-2">
-                {msg.files.map((f, i) => <FileCard key={i} file={f} />)}
+            <>
+              <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-strong:text-gray-900">
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
               </div>
-            )}
-            {msg.sources && msg.sources.length > 0 && (
-              <SourcesPanel sources={msg.sources} />
-            )}
-          </>
+              {msg.files && msg.files.length > 0 && (
+                <div className="mt-3 flex flex-col gap-2">
+                  {msg.files.map((f, i) => <FileCard key={i} file={f} />)}
+                </div>
+              )}
+              {msg.sources && msg.sources.length > 0 && (
+                <SourcesPanel sources={msg.sources} />
+              )}
+              <FeedbackButtons
+                dbMessageId={msg.dbMessageId}
+                feedback={msg.feedback}
+                onFeedback={(rating) => msg.dbMessageId && onFeedback(msg.dbMessageId, rating)}
+              />
+            </>
+          )}
+        </div>
+        {/* 追问建议 */}
+        {msg.status === 'done' && msg.suggestions && msg.suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2 ml-1">
+            {msg.suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => onSuggestionClick?.(s)}
+                className="text-xs px-3 py-1.5 rounded-full border border-[#E8E4DC] bg-[#FAFAF8] text-gray-600 hover:bg-[#F2EFE9] hover:text-[#1A1A1A] transition-colors text-left"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── 左侧对话列表 ─────────────────────────────────────────
+
+function groupByDate(conversations: ConversationInfo[]) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const weekAgo = new Date(today)
+  weekAgo.setDate(weekAgo.getDate() - 7)
+
+  const groups: { label: string; items: ConversationInfo[] }[] = [
+    { label: '今天', items: [] },
+    { label: '昨天', items: [] },
+    { label: '最近7天', items: [] },
+    { label: '更早', items: [] },
+  ]
+
+  for (const conv of conversations) {
+    const d = new Date(conv.updated_at)
+    if (d >= today) groups[0].items.push(conv)
+    else if (d >= yesterday) groups[1].items.push(conv)
+    else if (d >= weekAgo) groups[2].items.push(conv)
+    else groups[3].items.push(conv)
+  }
+
+  return groups.filter(g => g.items.length > 0)
+}
+
+function ConversationSidebar({
+  conversations,
+  activeId,
+  selectedKb,
+  kbs,
+  onSelect,
+  onNew,
+  onDelete,
+  onKbChange,
+}: {
+  conversations: ConversationInfo[]
+  activeId: number | null
+  selectedKb: string
+  kbs: { id: number; name: string }[]
+  onSelect: (id: number) => void
+  onNew: () => void
+  onDelete: (id: number) => void
+  onKbChange: (kb: string) => void
+}) {
+  const groups = groupByDate(conversations)
+  return (
+    <div className="w-64 shrink-0 flex flex-col bg-white rounded-2xl border border-[#F0EDE8] shadow-sm overflow-hidden">
+      {/* KB 选择 + 新建 */}
+      <div className="p-3 space-y-2 border-b border-[#F0EDE8]">
+        <select
+          value={selectedKb}
+          onChange={e => onKbChange(e.target.value)}
+          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-gray-300 bg-white"
+        >
+          <option value="">全部知识库</option>
+          {kbs.map(kb => <option key={kb.id} value={kb.name}>{kb.name}</option>)}
+        </select>
+        <button
+          onClick={onNew}
+          disabled={!selectedKb}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-[#1A1A1A] text-white hover:bg-[#333] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <Plus size={15} />
+          新建对话
+        </button>
+      </div>
+
+      {/* 对话列表 */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-3">
+        {conversations.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-8">
+            {selectedKb ? '暂无对话记录' : '请选择知识库'}
+          </p>
+        )}
+        {groups.map(group => (
+          <div key={group.label}>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">{group.label}</p>
+            <div className="space-y-0.5">
+              {group.items.map(conv => (
+                <div
+                  key={conv.id}
+                  onClick={() => onSelect(conv.id)}
+                  className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
+                    conv.id === activeId
+                      ? 'bg-white shadow-sm border border-[#E8E4DC] text-gray-900'
+                      : 'text-gray-600 hover:bg-white/70'
+                  }`}
+                >
+                  <span className="flex-1 truncate">{conv.title}</span>
+                  <button
+                    onClick={e => { e.stopPropagation(); onDelete(conv.id) }}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 transition-all"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -200,8 +404,10 @@ const TOOL_LABELS: Record<string, string> = {
 }
 
 export default function ConversationsPage() {
+  const queryClient = useQueryClient()
   const [selectedKb, setSelectedKb] = useState('')
-  const [maxRef, setMaxRef] = useState(2)
+  const [activeConvId, setActiveConvId] = useState<number | null>(null)
+  const [maxRef] = useState(2)
   const [query, setQuery] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
@@ -211,6 +417,10 @@ export default function ConversationsPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const { data: kbs } = useQuery({ queryKey: ['knowledge-bases'], queryFn: knowledgeApi.list })
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['conversations', selectedKb || '__all__'],
+    queryFn: () => conversationApi.list(selectedKb || undefined),
+  })
   const { data: faqs } = useQuery({
     queryKey: ['faqs', selectedKb],
     queryFn: () => faqApi.list(selectedKb),
@@ -218,20 +428,102 @@ export default function ConversationsPage() {
     select: (data) => data.filter(f => f.enabled).slice(0, 6),
   })
 
+  // 当前活跃对话对应的 kb_name
+  const activeConv = conversations.find(c => c.id === activeConvId)
+  const chatKb = activeConv?.kb_name ?? selectedKb
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // 加载对话消息
+  const loadConversation = useCallback(async (convId: number) => {
+    setActiveConvId(convId)
+    try {
+      const { conversation, messages: msgs } = await conversationApi.get(convId)
+      setSelectedKb(conversation.kb_name)
+      setMessages(msgs.map(m => ({
+        id: crypto.randomUUID(),
+        role: m.role,
+        content: m.content,
+        sources: m.sources ?? undefined,
+        files: m.files ?? undefined,
+        status: 'done' as const,
+        dbMessageId: m.id,
+        feedback: m.feedback ?? undefined,
+      })))
+    } catch {
+      setMessages([])
+    }
+  }, [])
+
+  // 新建对话
+  const handleNewConversation = useCallback(async () => {
+    if (!selectedKb) return
+    const conv = await conversationApi.create(selectedKb)
+    setActiveConvId(conv.id)
+    setMessages([])
+    queryClient.invalidateQueries({ queryKey: ['conversations'] })
+  }, [selectedKb, queryClient])
+
+  // 删除对话
+  const handleDeleteConversation = useCallback(async (convId: number) => {
+    await conversationApi.delete(convId)
+    if (convId === activeConvId) {
+      setActiveConvId(null)
+      setMessages([])
+    }
+    queryClient.invalidateQueries({ queryKey: ['conversations'] })
+  }, [activeConvId, queryClient])
+
+  // 反馈
+  const handleFeedback = useCallback(async (msgId: number, rating: 'up' | 'down') => {
+    try {
+      await conversationApi.submitFeedback(msgId, rating)
+      setMessages(prev => prev.map(m =>
+        m.dbMessageId === msgId ? { ...m, feedback: m.feedback === rating ? null : rating } : m
+      ))
+    } catch { /* 静默失败 */ }
+  }, [])
+
+  // 发送消息
   const sendMessage = useCallback(async (directText?: string) => {
     const q = directText !== undefined ? directText.trim() : query.trim()
-    if (!q || !selectedKb || isStreaming) return
+    if (!q || !chatKb || isStreaming) return
     if (directText === undefined) setQuery('')
 
     abortRef.current?.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
 
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: q }
+    const history = buildHistory(messages)
+
+    // 自动创建对话（如果还没有 activeConvId）
+    let convId = activeConvId
+    if (!convId) {
+      try {
+        const conv = await conversationApi.create(chatKb, q.slice(0, 50))
+        convId = conv.id
+        setActiveConvId(conv.id)
+        queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      } catch {
+        return
+      }
+    }
+
+    // 保存用户消息到后端
+    let userDbMsg: { id: number } | null = null
+    try {
+      userDbMsg = await conversationApi.addMessage(convId, { role: 'user', content: q })
+    } catch { /* 继续发送，不阻塞 */ }
+
+    // 如果是第一条消息，更新对话标题
+    if (messages.length === 0) {
+      conversationApi.updateTitle(convId, q.slice(0, 50)).catch(() => {})
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    }
+
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: q, dbMessageId: userDbMsg?.id }
     const assistantId = crypto.randomUUID()
     const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', content: '', status: 'loading' }
 
@@ -240,25 +532,31 @@ export default function ConversationsPage() {
     setStatusText('正在检索...')
 
     let accumulatedText = ''
+    let finalSources: SourceItem[] = []
+    let finalFiles: FileItem[] = []
+    let finalSuggestions: string[] = []
+    const currentConvId = convId
+
     try {
       await streamChat(
-        selectedKb, q, maxRef, ctrl.signal,
+        chatKb, q, maxRef, history, ctrl.signal,
         (step) => setStatusText(STATUS_TEXT[step] ?? '处理中...'),
         (text) => {
-          // answer 事件：用完整文本兜底（token 全部累积后的最终版）
           accumulatedText = text
           setMessages(prev => prev.map(m =>
             m.id === assistantId ? { ...m, content: text, status: 'loading' } : m
           ))
         },
-        (sources) => setMessages(prev => prev.map(m =>
-          m.id === assistantId ? { ...m, sources, status: 'done' } : m
-        )),
+        (sources) => {
+          finalSources = sources
+          setMessages(prev => prev.map(m =>
+            m.id === assistantId ? { ...m, sources, status: 'done' } : m
+          ))
+        },
         (errMsg) => setMessages(prev => prev.map(m =>
           m.id === assistantId ? { ...m, content: errMsg, status: 'error' } : m
         )),
         (tokenText) => {
-          // token 事件：逐字累积，实时更新气泡内容
           accumulatedText += tokenText
           const snapshot = accumulatedText
           setMessages(prev => prev.map(m =>
@@ -266,7 +564,6 @@ export default function ConversationsPage() {
           ))
         },
         (tool, input) => {
-          // agent_action 事件：实时显示工具调用状态
           const label = TOOL_LABELS[tool] ?? `⚙️ 正在调用 ${tool}...`
           const statusMsg = (input && tool === 'search_knowledge_base')
             ? `${label}：${input}`
@@ -274,18 +571,35 @@ export default function ConversationsPage() {
           setStatusText(statusMsg)
         },
         (file) => {
-          // file 事件：将文件卡片追加到助手消息
+          finalFiles.push(file)
           setMessages(prev => prev.map(m =>
             m.id === assistantId
               ? { ...m, files: [...(m.files ?? []), file] }
               : m
           ))
         },
+        (items) => { finalSuggestions = items },
       )
-      // 确保最终状态是 done
+
+      // 保存助手消息到后端
+      let assistantDbId: number | undefined
+      try {
+        const saved = await conversationApi.addMessage(currentConvId, {
+          role: 'assistant',
+          content: accumulatedText,
+          sources: finalSources.length > 0 ? finalSources : null,
+          files: finalFiles.length > 0 ? finalFiles : null,
+        })
+        assistantDbId = saved.id
+      } catch { /* 静默失败 */ }
+
+      // 最终更新消息状态
       setMessages(prev => prev.map(m =>
-        m.id === assistantId && m.status === 'loading' ? { ...m, status: 'done' } : m
+        m.id === assistantId
+          ? { ...m, status: 'done', dbMessageId: assistantDbId, suggestions: finalSuggestions }
+          : m
       ))
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
     } catch (e) {
       if ((e as Error).name === 'AbortError') return
       setMessages(prev => prev.map(m =>
@@ -295,7 +609,7 @@ export default function ConversationsPage() {
       setIsStreaming(false)
       setStatusText('')
     }
-  }, [query, selectedKb, maxRef, isStreaming])
+  }, [query, chatKb, maxRef, isStreaming, messages, activeConvId, queryClient])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -314,109 +628,113 @@ export default function ConversationsPage() {
   useEffect(() => { autoResize() }, [query])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* 顶部配置栏 */}
-      <div className="flex items-center gap-4 px-6 py-3 border-b border-[#F0EDE8] bg-white shrink-0">
-        <h1 className="text-base font-semibold text-gray-900 mr-2">问答测试</h1>
+    <div className="flex flex-1 min-h-0 gap-3">
+      {/* 左侧对话列表 */}
+      <ConversationSidebar
+        conversations={conversations}
+        activeId={activeConvId}
+        selectedKb={selectedKb}
+        kbs={kbs ?? []}
+        onSelect={loadConversation}
+        onNew={handleNewConversation}
+        onDelete={handleDeleteConversation}
+        onKbChange={(kb) => {
+          setSelectedKb(kb)
+          setActiveConvId(null)
+          setMessages([])
+        }}
+      />
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">知识库</label>
-          <select
-            value={selectedKb}
-            onChange={e => setSelectedKb(e.target.value)}
-            className="border border-gray-300 rounded-md px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">— 请选择 —</option>
-            {kbs?.map(kb => <option key={kb.id} value={kb.name}>{kb.name}</option>)}
-          </select>
+      {/* 右侧聊天区 */}
+      <div className="flex-1 flex flex-col bg-white rounded-2xl border border-[#F0EDE8] shadow-sm overflow-hidden">
+        {/* 顶部信息栏 */}
+        <div className="flex items-center gap-3 px-6 py-3 border-b border-[#F0EDE8] shrink-0">
+          <h1 className="text-base font-semibold text-gray-900">
+            {activeConv ? activeConv.title : '问答对话'}
+          </h1>
+          {chatKb && (
+            <span className="text-xs text-gray-400 bg-[#F7F5F1] px-2 py-0.5 rounded-md">{chatKb}</span>
+          )}
+          {messages.length > 0 && (
+            <button
+              onClick={() => { setMessages([]); setActiveConvId(null) }}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50"
+            >
+              <Plus size={12} />新对话
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600 whitespace-nowrap">改写次数</label>
-          <div className="flex border border-gray-300 rounded-md overflow-hidden text-sm">
-            {[0, 1, 2, 3, 4, 5].map(n => (
-              <button
-                key={n}
-                onClick={() => setMaxRef(n)}
-                className={`px-2.5 py-1 ${maxRef === n ? 'bg-[#1A1A1A] text-white' : 'text-gray-700 hover:bg-[#F2EFE9]'}`}
-              >
-                {n}
-              </button>
+        {/* 消息区 */}
+        <div className="flex-1 overflow-y-auto py-5">
+          <div className="max-w-2xl mx-auto w-full px-4 space-y-4 h-full flex flex-col">
+            {messages.length === 0 && (
+              <div className="flex flex-col items-center justify-center flex-1 gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#F2EFE9] flex items-center justify-center">
+                  <MessageSquare size={22} className="text-[#1A1A1A]" strokeWidth={1.6} />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-semibold text-gray-800">开始提问</p>
+                  <p className="text-xs text-gray-400">
+                    {!chatKb ? '请先在左侧选择知识库，然后新建对话' : '在下方输入框中输入问题，按回车发送'}
+                  </p>
+                </div>
+                {chatKb && faqs && faqs.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2 mt-1 max-w-lg">
+                    {faqs.map(faq => (
+                      <button
+                        key={faq.id}
+                        onClick={() => sendMessage(faq.question)}
+                        className="text-xs px-3 py-1.5 rounded-full border border-[#F0EDE8] bg-white text-gray-600 hover:bg-[#F2EFE9] hover:text-[#1A1A1A] transition-colors text-left"
+                      >
+                        {faq.question}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {messages.map(msg => (
+              <MessageBubble
+                key={msg.id}
+                msg={msg}
+                onFeedback={handleFeedback}
+                onSuggestionClick={(text) => sendMessage(text)}
+              />
             ))}
+            {isStreaming && statusText && (
+              <div className="flex items-center gap-2 text-xs text-gray-400 pl-2">
+                <Loader2 size={12} className="animate-spin" />
+                {statusText}
+              </div>
+            )}
+            <div ref={bottomRef} />
           </div>
         </div>
 
-        <button
-          onClick={() => setMessages([])}
-          disabled={messages.length === 0}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
-        >
-          <Trash2 size={12} />清空对话
-        </button>
-      </div>
-
-      {/* 消息区 */}
-      <div className="flex-1 overflow-y-auto py-5 bg-white">
-        <div className="max-w-2xl mx-auto w-full px-4 space-y-4 h-full flex flex-col">
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center flex-1 gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#F2EFE9] flex items-center justify-center">
-                <MessageSquare size={22} className="text-[#1A1A1A]" strokeWidth={1.6} />
-              </div>
-              <div className="text-center space-y-1">
-                <p className="text-sm font-semibold text-gray-800">开始提问</p>
-                <p className="text-xs text-gray-400">
-                  {!selectedKb ? '请先在顶部选择知识库，然后输入问题' : '在下方输入框中输入问题，按回车发送'}
-                </p>
-              </div>
-              {selectedKb && faqs && faqs.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-2 mt-1 max-w-lg">
-                  {faqs.map(faq => (
-                    <button
-                      key={faq.id}
-                      onClick={() => sendMessage(faq.question)}
-                      className="text-xs px-3 py-1.5 rounded-full border border-[#F0EDE8] bg-white text-gray-600 hover:bg-[#F2EFE9] hover:text-[#1A1A1A] transition-colors text-left"
-                    >
-                      {faq.question}
-                    </button>
-                  ))}
-                </div>
-              )}
+        {/* 输入区 */}
+        <div className="shrink-0 px-4 pb-4 pt-2">
+          <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm px-4 pt-3 pb-3 flex flex-col gap-2 max-w-2xl mx-auto w-full">
+            <textarea
+              ref={textareaRef}
+              value={query}
+              onChange={e => { setQuery(e.target.value) }}
+              onKeyDown={handleKeyDown}
+              disabled={isStreaming || !chatKb}
+              placeholder={chatKb ? '有问题，尽管问' : '请先选择知识库并新建对话'}
+              rows={1}
+              className="w-full resize-none outline-none text-sm text-gray-800 placeholder:text-gray-400 bg-transparent overflow-y-auto disabled:text-gray-400"
+              style={{ minHeight: '1.5rem', maxHeight: '10rem' }}
+            />
+            <div className="flex items-center justify-end">
+              <button
+                onClick={() => sendMessage(undefined)}
+                disabled={!query.trim() || !chatKb || isStreaming}
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-900 text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-gray-700 disabled:hover:bg-gray-200"
+              >
+                {isStreaming ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={15} />}
+              </button>
             </div>
-          )}
-          {messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)}
-          {isStreaming && statusText && (
-            <div className="flex items-center gap-2 text-xs text-gray-400 pl-2">
-              <Loader2 size={12} className="animate-spin" />
-              {statusText}
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-      </div>
-
-      {/* 输入区 */}
-      <div className="shrink-0 px-4 pb-4 pt-2">
-        <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm px-4 pt-3 pb-3 flex flex-col gap-2 max-w-2xl mx-auto w-full">
-          <textarea
-            ref={textareaRef}
-            value={query}
-            onChange={e => { setQuery(e.target.value) }}
-            onKeyDown={handleKeyDown}
-            disabled={isStreaming || !selectedKb}
-            placeholder={selectedKb ? '有问题，尽管问' : '请先在左侧选择知识库'}
-            rows={1}
-            className="w-full resize-none outline-none text-sm text-gray-800 placeholder:text-gray-400 bg-transparent overflow-y-auto disabled:text-gray-400"
-            style={{ minHeight: '1.5rem', maxHeight: '10rem' }}
-          />
-          <div className="flex items-center justify-end">
-            <button
-              onClick={() => sendMessage(undefined)}
-              disabled={!query.trim() || !selectedKb || isStreaming}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-900 text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-gray-700 disabled:hover:bg-gray-200"
-            >
-              {isStreaming ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={15} />}
-            </button>
           </div>
         </div>
       </div>

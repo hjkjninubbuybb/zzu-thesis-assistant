@@ -15,7 +15,7 @@ import os
 from collections.abc import Generator
 
 from langchain_community.chat_models import ChatTongyi
-from langchain_core.messages import AIMessageChunk, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage
 from langgraph.prebuilt import create_react_agent  # langgraph 版，非 langchain 旧版
 
 from src.config import get_config
@@ -40,6 +40,11 @@ SYSTEM_PROMPT = """\
 3. 不清楚知识库里有哪些文档 → 先调用 list_kb_documents
 4. 用户提到想获取某个文件、模板、表格，或需要下载某文档 → 必须调用 get_document_link 获取下载链接
 5. 回答中提及具体文件（任务书/开题报告/论文格式/审批表等）且该文件可能存在于知识库中 → 主动调用 get_document_link，将链接附在回答末尾
+
+多轮对话规则：
+- 你可以看到之前的对话历史，用户可能会追问或使用指代词（"它""那个""这个要求"）
+- 调用 search_knowledge_base 时，必须将指代词替换为具体实体构造完整检索词；例如用户先问了"开题报告要求"再追问"截止时间呢"，应搜索"开题报告截止时间"而非"截止时间"
+- 如果上一轮已检索过相同主题且信息充足，可直接基于已有知识回答，无需重复检索
 
 工具说明：
 - get_academic_calendar：返回今天日期、星期、本学期第几周
@@ -93,10 +98,26 @@ def build_rag_agent(
 
 # ── Public API ─────────────────────────────────────────────────────────────
 
+def _build_history_messages(history: list | None) -> list:
+    """将 history 列表转换为 LangChain 消息对象。"""
+    if not history:
+        return []
+    msgs = []
+    for h in history:
+        role = h.role if hasattr(h, "role") else h.get("role", "")
+        content = h.content if hasattr(h, "content") else h.get("content", "")
+        if role == "user":
+            msgs.append(HumanMessage(content=content))
+        elif role == "assistant":
+            msgs.append(AIMessage(content=content))
+    return msgs
+
+
 def run_rag(
     query: str,
     retriever_fn,
     kb_name: str = "",
+    history: list | None = None,
 ) -> dict:
     """运行 Agentic RAG，返回 generation 和 graded_nodes。
 
@@ -112,9 +133,10 @@ def run_rag(
     cfg = get_config()
     recursion_limit: int = cfg.get("rag", {}).get("agent_recursion_limit", 6)
     system_msg = SystemMessage(content=SYSTEM_PROMPT.format(kb_name=kb_name or "默认"))
+    history_msgs = _build_history_messages(history)
     try:
         result = agent.invoke(
-            {"messages": [system_msg, HumanMessage(content=query)]},
+            {"messages": [system_msg, *history_msgs, HumanMessage(content=query)]},
             config={"recursion_limit": recursion_limit},
         )
         messages = result.get("messages", [])
@@ -137,6 +159,7 @@ def stream_rag(
     query: str,
     retriever_fn,
     kb_name: str = "",
+    history: list | None = None,
 ) -> Generator[dict, None, None]:
     """Agentic RAG 流式版本，逐 token yield 答案片段，并实时上报 Agent 动作。
 
@@ -153,7 +176,8 @@ def stream_rag(
     recursion_limit: int = cfg.get("rag", {}).get("agent_recursion_limit", 6)
 
     system_msg = SystemMessage(content=SYSTEM_PROMPT.format(kb_name=kb_name or "默认"))
-    input_messages = {"messages": [system_msg, HumanMessage(content=query)]}
+    history_msgs = _build_history_messages(history)
+    input_messages = {"messages": [system_msg, *history_msgs, HumanMessage(content=query)]}
 
     # 追踪当前正在组装的工具调用：{index: {name, args, emitted}}
     pending_calls: dict[int, dict] = {}
@@ -213,3 +237,21 @@ def stream_rag(
     for fe in file_events:
         yield {"type": "file", **fe}
     yield {"type": "sources", "nodes": captured_nodes}
+
+    # ── 生成推荐追问 ──────────────────────────────────────
+    try:
+        # 收集已 yield 的 token 拼成完整回答
+        # （token 内容已经通过 chunk.content yield 出去了，这里需要重建）
+        # 用轻量 LLM 调用生成追问建议
+        llm = _get_llm()
+        suggestions_resp = llm.invoke(
+            f"基于以下问答，生成2-3个用户可能想继续追问的简短问题（每行一个，不要编号，不要解释）：\n"
+            f"问：{query}\n"
+            f"答：（已回答完毕，请根据问题主题推测追问方向）"
+        )
+        raw = suggestions_resp.content if hasattr(suggestions_resp, "content") else str(suggestions_resp)
+        suggestions = [s.strip() for s in raw.strip().split('\n') if s.strip()][:3]
+        if suggestions:
+            yield {"type": "suggestions", "items": suggestions}
+    except Exception as e:
+        logger.warning("[stream_rag] 生成追问建议失败: %s", e)
