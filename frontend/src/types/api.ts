@@ -34,10 +34,16 @@ export interface UploadParams {
   doc_type: DocType
 }
 
+export interface HistoryMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export interface ChatRequest {
   kb_name: string
   query: string
   max_reformulations: number
+  history: HistoryMessage[]
 }
 
 export interface SourceItem {
@@ -59,7 +65,31 @@ export interface ChatMessage {
   content: string
   sources?: SourceItem[]
   files?: FileItem[]
+  suggestions?: string[]
   status?: 'loading' | 'done' | 'error'
+  dbMessageId?: number
+  feedback?: 'up' | 'down' | null
+}
+
+// ── 对话历史 ─────────────────────────────────────────────
+
+export interface ConversationInfo {
+  id: number
+  kb_name: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationMessage {
+  id: number
+  conversation_id: number
+  role: 'user' | 'assistant'
+  content: string
+  sources?: SourceItem[] | null
+  files?: FileItem[] | null
+  feedback?: 'up' | 'down' | null
+  created_at: string
 }
 
 // ── FAQ ───────────────────────────────────────────────────
@@ -110,6 +140,75 @@ export interface FAQImportResult {
   errors: FAQImportError[]
 }
 
+// ── 用户认证 ──────────────────────────────────────────────
+
+export type UserRole = 'admin' | 'teacher' | 'student'
+
+export interface StudentProfile {
+  user_id: number
+  student_id: string
+  grade: string
+  major: string
+  class_name: string
+}
+
+export interface TeacherProfile {
+  user_id: number
+  employee_id: string
+  department: string
+  title: string
+}
+
+export interface UserInfo {
+  id: number
+  username: string
+  display_name: string
+  role: UserRole
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  profile?: StudentProfile | TeacherProfile | null
+}
+
+export interface LoginResponse {
+  access_token: string
+  refresh_token: string
+  token_type: string
+  user: UserInfo
+}
+
+export interface UserCreate {
+  username: string
+  password: string
+  display_name: string
+  role: UserRole
+}
+
+export interface UserUpdate {
+  display_name?: string
+  is_active?: boolean
+}
+
+export interface StudentProfileCreate {
+  student_id: string
+  grade: string
+  major: string
+  class_name: string
+}
+
+export interface TeacherProfileCreate {
+  employee_id: string
+  department: string
+  title: string
+}
+
+export interface PaginatedUsers {
+  items: UserInfo[]
+  total: number
+  page: number
+  page_size: number
+}
+
 // ── 系统配置 ──────────────────────────────────────────────
 
 export interface SystemConfig {
@@ -137,6 +236,7 @@ export interface SplitterConfigUpdate {
 
 export interface ConfigUpdate {
   llm_model?: string
+  llm_fast_model?: string
   embedding_model?: string
   splitter?: SplitterConfigUpdate
   vector_top_k?: number
@@ -146,4 +246,35 @@ export interface ConfigUpdate {
   reranker_model?: string
   reranker_top_n?: number
   max_reformulations?: number
+}
+
+export interface ApiKeyInfo {
+  has_key: boolean
+  masked_key: string
+}
+
+// ── 使用统计 ──────────────────────────────────────────────
+
+export interface WeekDataPoint {
+  day: string    // YYYY-MM-DD
+  count: number
+}
+
+export interface RecentQuestion {
+  content: string
+  created_at: string
+  kb_name: string
+}
+
+export interface AnalyticsSummary {
+  total_questions: number
+  today_questions: number
+  total_conversations: number
+  week_data: WeekDataPoint[]
+  feedback_up: number
+  feedback_down: number
+  kb_count: number
+  doc_count: number
+  faq_count: number
+  recent_questions: RecentQuestion[]
 }

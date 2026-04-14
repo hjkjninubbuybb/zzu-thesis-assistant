@@ -4,9 +4,10 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
+from src.api.auth import get_current_user
 from src.api.schemas import ChatRequest
 from src.config import get_config
 from src.core.retrieval import HybridRetriever, fetch_corpus
@@ -23,7 +24,7 @@ _vs = VectorStore()
 
 
 @router.post("")
-async def chat(body: ChatRequest):
+async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)):
     """RAG 对话（SSE 流式）。"""
     if not _ds.get_kb(body.kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{body.kb_name}' 不存在")
@@ -66,6 +67,7 @@ async def chat(body: ChatRequest):
                         query=body.query,
                         retriever_fn=retriever_fn,
                         kb_name=body.kb_name,
+                        history=body.history,
                     ):
                         loop.call_soon_threadsafe(queue.put_nowait, item)
                 except Exception as e:
@@ -104,6 +106,10 @@ async def chat(body: ChatRequest):
                     )}
                 elif item_type == "sources":
                     sources_nodes = item.get("nodes", [])
+                elif item_type == "suggestions":
+                    yield {"event": "suggestions", "data": json.dumps(
+                        {"items": item.get("items", [])}, ensure_ascii=False,
+                    )}
                 elif item_type == "error":
                     yield {"event": "error", "data": json.dumps({"message": item["message"]}, ensure_ascii=False)}
                     return

@@ -8,8 +8,10 @@ import urllib.parse
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, File, Form, HTTPException, Query as QueryParam, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query as QueryParam, UploadFile
 from fastapi.responses import StreamingResponse
+
+from src.api.auth import get_current_user, require_teacher_or_admin
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import HumanMessage, SystemMessage
 from openpyxl import Workbook, load_workbook
@@ -62,14 +64,14 @@ def _upsert_faq_vector(
 
 
 @router.get("/{kb_name}", response_model=list[FAQItem])
-async def list_faqs(kb_name: str) -> list[dict]:
+async def list_faqs(kb_name: str, current_user: dict = Depends(get_current_user)) -> list[dict]:
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
     return _doc_store.list_faqs(kb_name)
 
 
 @router.post("/{kb_name}", response_model=FAQItem)
-async def create_faq(kb_name: str, body: FAQCreate) -> dict:
+async def create_faq(kb_name: str, body: FAQCreate, current_user: dict = Depends(require_teacher_or_admin)) -> dict:
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
 
@@ -98,7 +100,7 @@ async def create_faq(kb_name: str, body: FAQCreate) -> dict:
 
 
 @router.put("/{kb_name}/{faq_id}", response_model=FAQItem)
-async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate) -> dict:
+async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate, current_user: dict = Depends(require_teacher_or_admin)) -> dict:
     existing = _doc_store.get_faq(faq_id)
     if not existing or existing["kb_name"] != kb_name:
         raise HTTPException(status_code=404, detail="FAQ 不存在")
@@ -181,6 +183,7 @@ def _rewrite_query(raw: str) -> str:
 async def search_faqs(
     kb_name: str,
     q: str = QueryParam(..., min_length=1, description="搜索词，LLM 改写后语义向量检索"),
+    current_user: dict = Depends(get_current_user),
 ) -> dict:
     """LLM 改写查询 + 语义向量检索 FAQ（仅返回已启用的条目）。"""
     if not _doc_store.get_kb(kb_name):
@@ -227,7 +230,7 @@ async def search_faqs(
 
 
 @router.delete("/{kb_name}/{faq_id}", response_model=MessageResponse)
-async def delete_faq(kb_name: str, faq_id: int) -> dict:
+async def delete_faq(kb_name: str, faq_id: int, current_user: dict = Depends(require_teacher_or_admin)) -> dict:
     existing = _doc_store.get_faq(faq_id)
     if not existing or existing["kb_name"] != kb_name:
         raise HTTPException(status_code=404, detail="FAQ 不存在")
@@ -423,7 +426,7 @@ def _make_xlsx_response(wb: Workbook, filename: str) -> StreamingResponse:
 # ── Excel 导入/导出端点 ────────────────────────────────────
 
 @router.get("/{kb_name}/template")
-async def download_faq_template(kb_name: str) -> StreamingResponse:
+async def download_faq_template(kb_name: str, current_user: dict = Depends(require_teacher_or_admin)) -> StreamingResponse:
     """下载 FAQ Excel 导入模板（含表头和示例行）。"""
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
@@ -432,7 +435,7 @@ async def download_faq_template(kb_name: str) -> StreamingResponse:
 
 
 @router.get("/{kb_name}/export")
-async def export_faqs_excel(kb_name: str) -> StreamingResponse:
+async def export_faqs_excel(kb_name: str, current_user: dict = Depends(require_teacher_or_admin)) -> StreamingResponse:
     """导出知识库所有 FAQ 为 Excel 文件。"""
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
@@ -447,6 +450,7 @@ async def import_faqs_excel(
     kb_name: str,
     file: UploadFile = File(...),
     skip_duplicates: bool = Form(default=True),
+    current_user: dict = Depends(require_teacher_or_admin),
 ) -> dict:
     """从 Excel 文件批量导入 FAQ（含自动向量化）。"""
     if not _doc_store.get_kb(kb_name):

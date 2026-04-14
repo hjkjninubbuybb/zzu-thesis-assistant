@@ -1,20 +1,23 @@
 """系统配置读写接口。"""
 
 import logging
+import os
 
 import yaml
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from src.config import get_config, ROOT_DIR
+from src.api.auth import require_admin
+from src.config import ROOT_DIR, get_config
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 logger = logging.getLogger(__name__)
 
 CONFIG_PATH = ROOT_DIR / "configs" / "config.yaml"
+ENV_PATH = ROOT_DIR / ".env"
 
 # 允许写入的模型名枚举（防止写入无效模型名导致运行时报错）
-_ALLOWED_LLM_MODELS = {"qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext"}
+_ALLOWED_LLM_MODELS = {"qwen-turbo", "qwen-plus", "qwen-max", "qwen-long"}
 _ALLOWED_EMBED_MODELS = {"text-embedding-v2", "text-embedding-v3"}
 _ALLOWED_RERANKER_MODELS = {"gte-rerank", "gte-rerank-hybrid"}
 
@@ -31,6 +34,7 @@ class SplitterConfig(BaseModel):
 
 class ConfigUpdate(BaseModel):
     llm_model: str | None = None
+    llm_fast_model: str | None = None
     embedding_model: str | None = None
     splitter: SplitterConfig | None = None
     vector_top_k: int | None = Field(default=None, ge=1, le=50)
@@ -42,16 +46,80 @@ class ConfigUpdate(BaseModel):
     max_reformulations: int | None = Field(default=None, ge=0, le=5)
 
 
-# ── 接口 ─────────────────────────────────────────────────
+class ApiKeyUpdate(BaseModel):
+    api_key: str = Field(..., min_length=1, max_length=200)
+
+
+# ── API 密钥接口 ─────────────────────────────────────────
+
+@router.get("/api-key")
+def get_api_key(current_user: dict = Depends(require_admin)) -> dict:
+    """获取已配置的 API Key（脱敏显示）。"""
+    key = os.environ.get("DASHSCOPE_API_KEY", "")
+    if not key:
+        return {"has_key": False, "masked_key": ""}
+    masked = key[:3] + "****" + key[-4:] if len(key) > 7 else "****"
+    return {"has_key": True, "masked_key": masked}
+
+
+@router.put("/api-key")
+def update_api_key(body: ApiKeyUpdate, current_user: dict = Depends(require_admin)) -> dict:
+    """更新 DashScope API Key（写入 .env 并更新进程环境变量）。"""
+    lines: list[str] = []
+    found = False
+    if ENV_PATH.exists():
+        with open(ENV_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("DASHSCOPE_API_KEY="):
+                    lines.append(f"DASHSCOPE_API_KEY={body.api_key}\n")
+                    found = True
+                else:
+                    lines.append(line)
+    if not found:
+        lines.append(f"DASHSCOPE_API_KEY={body.api_key}\n")
+
+    try:
+        with open(ENV_PATH, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+    except OSError as e:
+        raise HTTPException(status_code=500, detail="写入 .env 失败，请检查文件权限") from e
+
+    os.environ["DASHSCOPE_API_KEY"] = body.api_key
+    logger.info("DashScope API Key 已更新")
+    return {"message": "API Key 已更新", "has_key": True}
+
+
+@router.post("/api-key/test")
+def test_api_key(current_user: dict = Depends(require_admin)) -> dict:
+    """测试当前 DashScope API Key 是否有效（发送一次轻量 Embedding 请求）。"""
+    key = os.environ.get("DASHSCOPE_API_KEY", "")
+    if not key:
+        return {"ok": False, "message": "未配置 API Key"}
+    try:
+        import dashscope
+        dashscope.api_key = key
+        resp = dashscope.TextEmbedding.call(
+            model="text-embedding-v3",
+            input="connection test",
+        )
+        if resp.status_code == 200:
+            return {"ok": True, "message": "连接成功"}
+        return {"ok": False, "message": f"API 返回错误: {resp.message}"}
+    except Exception as e:
+        logger.warning("[api-key/test] 连接测试失败: %s", e)
+        return {"ok": False, "message": f"连接失败: {e}"}
+
+
+# ── 配置接口 ─────────────────────────────────────────────
 
 @router.get("")
-def read_config() -> dict:
-    """返回当前配置（已解析环境变量）。"""
+def read_config(current_user: dict = Depends(require_admin)) -> dict:
+    """返回当前配置（已解析环境变量，管理员专用）。"""
     return get_config()
 
 
 @router.post("")
-def update_config(body: ConfigUpdate) -> dict:
+def update_config(body: ConfigUpdate, current_user: dict = Depends(require_admin)) -> dict:
     """
     更新 config.yaml 并清除缓存。
     只修改请求中非 None 的字段，写入前校验模型名是否合法。
@@ -61,6 +129,11 @@ def update_config(body: ConfigUpdate) -> dict:
         raise HTTPException(
             status_code=400,
             detail=f"不支持的 LLM 模型 '{body.llm_model}'，可选: {sorted(_ALLOWED_LLM_MODELS)}",
+        )
+    if body.llm_fast_model is not None and body.llm_fast_model not in _ALLOWED_LLM_MODELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的快速模型 '{body.llm_fast_model}'，可选: {sorted(_ALLOWED_LLM_MODELS)}",
         )
     if body.embedding_model is not None and body.embedding_model not in _ALLOWED_EMBED_MODELS:
         raise HTTPException(
@@ -80,6 +153,8 @@ def update_config(body: ConfigUpdate) -> dict:
     # 逐字段 merge
     if body.llm_model is not None:
         raw.setdefault("llm", {})["model"] = body.llm_model
+    if body.llm_fast_model is not None:
+        raw.setdefault("llm", {})["fast_model"] = body.llm_fast_model
     if body.embedding_model is not None:
         raw.setdefault("embedding", {})["model"] = body.embedding_model
 

@@ -1,0 +1,311 @@
+"""用户管理路由（管理员/教师用）：学生账号 CRUD、档案管理。"""
+
+import io
+import logging
+import secrets
+import string
+import urllib.parse
+from datetime import date
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+
+from src.api.auth import hash_password, require_admin, require_teacher_or_admin
+from src.api.schemas import (
+    MessageResponse,
+    PaginatedUsers,
+    ResetPasswordRequest,
+    StudentProfileCreate,
+    TeacherProfileCreate,
+    UpdateProfileRequest,
+    UserCreate,
+    UserInfo,
+    UserUpdate,
+)
+from src.storage.user_store import UserStore
+
+router = APIRouter(prefix="/api/users", tags=["users"])
+logger = logging.getLogger(__name__)
+
+_us = UserStore()
+
+
+def _to_user_info(user: dict, profile: dict | None = None) -> dict:
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "display_name": user["display_name"],
+        "role": user["role"],
+        "is_active": bool(user["is_active"]),
+        "created_at": user["created_at"],
+        "updated_at": user["updated_at"],
+        "profile": profile,
+    }
+
+
+def _get_profile(user: dict) -> dict | None:
+    role = user["role"]
+    uid = user["id"]
+    if role == "student":
+        return _us.get_student_profile(uid)
+    if role in ("teacher", "admin"):
+        return _us.get_teacher_profile(uid)
+    return None
+
+
+@router.get("", response_model=PaginatedUsers)
+def list_users(
+    role: str | None = Query(default=None, pattern=r"^(admin|teacher|student)$"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    current_user: dict = Depends(require_teacher_or_admin),
+):
+    """列出用户（分页）。教师只能看学生；管理员看所有。"""
+    # 教师只能查看 student
+    effective_role = role
+    if current_user["role"] == "teacher":
+        if role not in (None, "student"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="教师只能查看学生账号")
+        effective_role = "student"
+
+    items, total = _us.list_users(role=effective_role, page=page, page_size=page_size)
+    return {
+        "items": [_to_user_info(u, _get_profile(u)) for u in items],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.post("", response_model=UserInfo, status_code=status.HTTP_201_CREATED)
+def create_user(body: UserCreate, current_user: dict = Depends(require_admin)):
+    """创建用户（管理员专用）。"""
+    if _us.get_user_by_username(body.username):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"用户名 '{body.username}' 已存在")
+    user = _us.create_user(
+        username=body.username,
+        hashed_pwd=hash_password(body.password),
+        display_name=body.display_name,
+        role=body.role,
+    )
+    return _to_user_info(user)
+
+
+@router.get("/{user_id}", response_model=UserInfo)
+def get_user(user_id: int, current_user: dict = Depends(require_teacher_or_admin)):
+    """获取用户详情（含档案）。"""
+    user = _us.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    return _to_user_info(user, _get_profile(user))
+
+
+@router.put("/{user_id}", response_model=UserInfo)
+def update_user(user_id: int, body: UserUpdate, current_user: dict = Depends(require_admin)):
+    """更新用户基本信息（管理员专用）。"""
+    user = _us.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    updates = body.model_dump(exclude_none=True)
+    if updates:
+        user = _us.update_user(user_id, **updates)
+    return _to_user_info(user, _get_profile(user))
+
+
+@router.put("/{user_id}/profile")
+def update_profile(
+    user_id: int,
+    body: UpdateProfileRequest,
+    current_user: dict = Depends(require_teacher_or_admin),
+):
+    """更新用户档案（学生档案或教师档案）。"""
+    user = _us.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+
+    if user["role"] == "student" and body.student_profile:
+        sp = body.student_profile
+        profile = _us.upsert_student_profile(user_id, sp.student_id, sp.grade, sp.major, sp.class_name)
+        return {"message": "学生档案更新成功", "profile": profile}
+
+    if user["role"] in ("teacher", "admin") and body.teacher_profile:
+        tp = body.teacher_profile
+        profile = _us.upsert_teacher_profile(user_id, tp.employee_id, tp.department, tp.title)
+        return {"message": "教师档案更新成功", "profile": profile}
+
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="档案类型与用户角色不匹配")
+
+
+@router.delete("/{user_id}", response_model=MessageResponse)
+def delete_user(user_id: int, current_user: dict = Depends(require_admin)):
+    """删除用户（管理员专用，不能删除自己）。"""
+    if user_id == current_user["id"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能删除自己的账号")
+    user = _us.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    _us.delete_user(user_id)
+    return {"message": f"用户 '{user['username']}' 已删除"}
+
+
+@router.put("/{user_id}/reset-password", response_model=MessageResponse)
+def reset_password(user_id: int, body: ResetPasswordRequest, current_user: dict = Depends(require_admin)):
+    """重置用户密码（管理员专用）。"""
+    user = _us.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    _us.update_user(user_id, hashed_pwd=hash_password(body.new_password))
+    return {"message": "密码重置成功"}
+
+
+# ── Excel 导入/导出 ───────────────────────────────────────────
+
+_COLS = ["用户名*", "姓名", "学号*", "年级", "专业", "班级", "初始密码（留空自动生成）"]
+_COL_WIDTH = [18, 14, 18, 10, 22, 14, 28]
+
+
+def _build_student_workbook(rows: list[dict] | None) -> Workbook:
+    """构建学生账号 Excel 工作簿（rows=None 时只含表头示例行）。"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "学生账号"
+
+    # 表头样式
+    header_fill = PatternFill("solid", fgColor="1A1A1A")
+    header_font = Font(color="FFFFFF", bold=True, size=10)
+    for ci, (col, width) in enumerate(_COLS, 1):
+        cell = ws.cell(row=1, column=ci, value=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.column_dimensions[cell.column_letter].width = _COL_WIDTH[ci - 1]
+    ws.row_dimensions[1].height = 22
+
+    if rows is None:
+        # 示例行
+        ws.append(["zhangsan", "张三", "202201001", "2022", "计算机科学与技术", "计科一班", ""])
+    else:
+        for r in rows:
+            ws.append([
+                r.get("username", ""),
+                r.get("display_name", ""),
+                r.get("student_id", ""),
+                r.get("grade", ""),
+                r.get("major", ""),
+                r.get("class_name", ""),
+                "",  # 密码列导出时留空
+            ])
+
+    return wb
+
+
+def _make_xlsx_response(wb: Workbook, filename: str) -> StreamingResponse:
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    encoded = urllib.parse.quote(filename)
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
+    )
+
+
+def _random_password(length: int = 10) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+@router.get("/students/template")
+def download_student_template(current_user: dict = Depends(require_teacher_or_admin)):
+    """下载学生批量导入模板。"""
+    wb = _build_student_workbook(rows=None)
+    return _make_xlsx_response(wb, "学生账号导入模板.xlsx")
+
+
+@router.get("/students/export")
+def export_students_excel(current_user: dict = Depends(require_teacher_or_admin)):
+    """导出所有学生账号为 Excel。"""
+    items, _ = _us.list_users(role="student", page=1, page_size=10000)
+    rows = []
+    for u in items:
+        profile = _us.get_student_profile(u["id"]) or {}
+        rows.append({
+            "username": u["username"],
+            "display_name": u["display_name"],
+            "student_id": profile.get("student_id", ""),
+            "grade": profile.get("grade", ""),
+            "major": profile.get("major", ""),
+            "class_name": profile.get("class_name", ""),
+        })
+    filename = f"学生账号_{date.today().strftime('%Y%m%d')}.xlsx"
+    return _make_xlsx_response(_build_student_workbook(rows), filename)
+
+
+@router.post("/students/import")
+async def import_students_excel(
+    file: UploadFile = File(...),
+    default_password: str = Form(default=""),
+    current_user: dict = Depends(require_admin),
+) -> dict:
+    """从 Excel 批量导入学生账号（管理员专用）。
+
+    - 用户名或学号已存在的行自动跳过
+    - 密码列留空时使用 default_password 参数，仍为空则随机生成 10 位
+    """
+    if not (file.filename or "").lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式")
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件过大，请控制在 5MB 以内")
+
+    try:
+        wb = load_workbook(io.BytesIO(content), data_only=True)
+        ws = wb.active
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Excel 解析失败：{e}") from e
+
+    success, skipped, failed = 0, 0, []
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not row or not row[0]:
+            continue
+        username = str(row[0]).strip()
+        display_name = str(row[1]).strip() if row[1] else ""
+        student_id = str(row[2]).strip() if row[2] else ""
+        grade = str(row[3]).strip() if row[3] else ""
+        major = str(row[4]).strip() if row[4] else ""
+        class_name = str(row[5]).strip() if row[5] else ""
+        password = str(row[6]).strip() if len(row) > 6 and row[6] else (default_password or _random_password())
+
+        if not username or not student_id:
+            failed.append({"row": row_idx, "username": username, "reason": "用户名和学号不能为空"})
+            continue
+
+        # 跳过已存在
+        if _us.get_user_by_username(username) or _us.get_user_by_student_id(student_id):
+            skipped += 1
+            continue
+
+        try:
+            user = _us.create_user(
+                username=username,
+                hashed_pwd=hash_password(password),
+                display_name=display_name,
+                role="student",
+            )
+            _us.upsert_student_profile(user["id"], student_id, grade, major, class_name)
+            success += 1
+        except Exception as e:
+            logger.warning("[student import] 第 %d 行导入失败: %s", row_idx, e)
+            failed.append({"row": row_idx, "username": username, "reason": str(e)})
+
+    return {
+        "total": success + skipped + len(failed),
+        "success": success,
+        "skipped": skipped,
+        "failed": len(failed),
+        "errors": failed,
+    }
