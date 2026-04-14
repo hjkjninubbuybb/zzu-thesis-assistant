@@ -83,7 +83,14 @@ def index_document(
 
     # 1. 解析文档（多模态 PDF 走独立分支）
     if doc_type == "manual" and file_path.suffix.lower() == ".pdf":
-        raw_text = _parse_multimodal_pdf_with_kb(kb_name, file_path, file_name)
+        try:
+            raw_text = _parse_multimodal_pdf_with_kb(kb_name, file_path, file_name)
+        except Exception as e:
+            logger.warning(
+                "[%s] 多模态 PDF 解析失败，回退为纯文本模式: %s", kb_name, e
+            )
+            parser = get_parser(file_path.suffix.lower())
+            raw_text = parser.parse(file_path).all_text()
     else:
         logger.info("[%s] 解析文档...", kb_name)
         parser = get_parser(file_path.suffix.lower())
@@ -251,7 +258,11 @@ def _embed_and_store(
     logger.info("[%s] 生成 Embedding (%d nodes)...", kb_name, len(nodes))
     embed_model = get_embed_model(text_type="document")
     texts = [n.get_content() for n in nodes]
-    vectors = embed_model.get_text_embedding_batch(texts)
+    try:
+        vectors = embed_model.get_text_embedding_batch(texts)
+    except Exception as e:
+        logger.error("[%s] Embedding 失败 (%d chunks): %s", kb_name, len(texts), e)
+        raise RuntimeError(f"向量化失败（{len(texts)} 个 chunk）：{e}") from e
 
     # 存入 Qdrant
     logger.info("[%s] 写入 Qdrant collection '%s'...", kb_name, kb_name)
@@ -299,17 +310,36 @@ def _embed_and_store(
 def _parse_multimodal_pdf_with_kb(
     kb_name: str, file_path: Path, file_name: str
 ) -> str:
-    """解析多模态 PDF，图片写入按知识库+文件名组织的缓存目录。"""
+    """解析多模态 PDF，图片写入按知识库+文件名组织的缓存目录。
+
+    将临时文件复制为以原始文件名命名的副本再传给 pymupdf4llm，
+    避免图片文件名包含随机临时文件名前缀导致后续找不到图片。
+    """
+    import shutil
+    import tempfile
+
     image_dir = _get_image_dir(kb_name, file_name)
-    extractor = PdfTextExtractor()
-    chunks = extractor.extract_multimodal(file_path, image_dir)
+
+    # pymupdf4llm 用输入 PDF 的文件名生成图片名；临时文件名是随机的，
+    # 需先复制为原始文件名，确保图片名可预期。
+    safe_stem = re.sub(r"[^\w\-.]", "_", Path(file_name).stem)[:64]
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        named_pdf = Path(tmp_dir) / f"{safe_stem}.pdf"
+        shutil.copy2(file_path, named_pdf)
+        extractor = PdfTextExtractor()
+        chunks = extractor.extract_multimodal(named_pdf, image_dir)
+
     return "\n\n".join(c.content for c in chunks)
 
 
 def _get_image_dir(kb_name: str, file_name: str) -> Path:
-    """按 kb_name / file_stem 组织图片缓存目录。"""
-    stem = Path(file_name).stem
-    return _IMAGE_CACHE_DIR / kb_name / stem
+    """按 kb_name / MD5(file_name) 组织图片缓存目录。
+
+    使用 MD5 hash 而非原始文件名，避免中文/特殊字符路径在 Windows 上导致 MuPDF 无法写入图片。
+    """
+    import hashlib
+    dir_name = hashlib.md5(file_name.encode()).hexdigest()[:16]
+    return _IMAGE_CACHE_DIR / kb_name / dir_name
 
 
 def delete_document(

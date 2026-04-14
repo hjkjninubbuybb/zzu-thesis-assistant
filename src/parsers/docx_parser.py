@@ -49,7 +49,7 @@ class DocxParser:
 
             if tag == "p":
                 # 段落
-                text = "".join(run.text for run in child.iter(qn("w:t")))
+                text = "".join(run.text or "" for run in child.iter(qn("w:t")))
                 text = text.strip()
                 if text:
                     doc.chunks.append(
