@@ -23,7 +23,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
   useEffect(() => {
     if (!user) return
     if (isStudent && user.role === 'student') {
-      navigate('/s', { replace: true })
+      navigate('/student', { replace: true })
     } else if (!isStudent && (user.role === 'admin' || user.role === 'teacher')) {
       navigate('/admin', { replace: true })
     } else {
@@ -40,7 +40,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
     try {
       await login(username.trim(), password)
       const storedUser = getStoredUser()
-      navigate(storedUser?.role === 'student' ? '/s' : '/admin', { replace: true })
+      navigate(storedUser?.role === 'student' ? '/student' : '/admin', { replace: true })
     } catch (err) {
       setError(extractError(err))
     } finally {
@@ -48,13 +48,17 @@ export default function LoginPage({ variant }: LoginPageProps) {
     }
   }
 
+  const settle = (d: number): React.CSSProperties => ({
+    animation: `appleSettleIn 0.8s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
+  })
+
   if (isStudent) {
     return (
       <div
         className="flex-1 flex items-center justify-center p-4 flex-col gap-6"
         style={{ background: 'hsl(215, 25%, 94%)' }}
       >
-        <div className="w-full max-w-sm bg-white rounded-2xl border border-[#D9DEE5] shadow-sm p-8">
+        <div className="w-full max-w-sm bg-white rounded-2xl border border-[#D9DEE5] shadow-sm p-8" style={settle(0)}>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-[#2563EB] rounded-xl flex items-center justify-center shadow-sm shrink-0">
@@ -114,6 +118,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
         <Link
           to="/admin/login"
           className="text-xs text-[#6E7787] hover:text-[#2563EB] transition-colors"
+          style={settle(150)}
         >
           教师 / 管理员登录 →
         </Link>
@@ -127,7 +132,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
       className="flex-1 flex items-center justify-center p-4 flex-col gap-6"
       style={{ background: 'hsl(38, 22%, 91%)' }}
     >
-      <div className="w-full max-w-sm bg-white rounded-2xl border border-[#F0EDE8] shadow-sm p-8">
+      <div className="w-full max-w-sm bg-white rounded-2xl border border-[#F0EDE8] shadow-sm p-8" style={settle(0)}>
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 bg-[#1A1A1A] rounded-xl flex items-center justify-center shadow-sm shrink-0">
@@ -185,8 +190,9 @@ export default function LoginPage({ variant }: LoginPageProps) {
       </div>
 
       <Link
-        to="/s/login"
+        to="/student/login"
         className="text-xs text-[#9A9A9A] hover:text-[#1A1A1A] transition-colors"
+        style={settle(150)}
       >
         学生登录 →
       </Link>

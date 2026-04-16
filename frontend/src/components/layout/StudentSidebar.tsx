@@ -10,10 +10,10 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 
 const STUDENT_NAV = [
-  { to: '/s', label: '首页', icon: Home, end: true },
-  { to: '/s/chat', label: '智能问答', icon: MessagesSquare },
-  { to: '/s/faq', label: '常见问题', icon: HelpCircle },
-  { to: '/s/profile', label: '我的', icon: User },
+  { to: '/student', label: '首页', icon: Home, end: true },
+  { to: '/student/chat', label: '智能问答', icon: MessagesSquare },
+  { to: '/student/faq', label: '常见问题', icon: HelpCircle },
+  { to: '/student/profile', label: '我的', icon: User },
 ]
 
 function NavItem({
@@ -36,7 +36,7 @@ function NavItem({
           'w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 text-sm',
           isActive
             ? 'bg-[#2563EB] text-white shadow-sm'
-            : 'text-[#6E7787] hover:bg-[#EEF2FF] hover:text-[#2563EB] active:scale-95'
+            : 'text-[#6E7787] hover:bg-[#EEF2FF] hover:text-[#2563EB] active:scale-[0.97]'
         )
       }
     >
@@ -52,7 +52,7 @@ export default function StudentSidebar() {
 
   const handleLogout = () => {
     logout()
-    navigate('/s/login', { replace: true })
+    navigate('/student/login', { replace: true })
   }
 
   const displayName = user?.display_name || user?.username || '同学'

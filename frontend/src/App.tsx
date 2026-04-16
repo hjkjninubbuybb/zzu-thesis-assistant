@@ -20,7 +20,7 @@ import { useAuth } from '@/hooks/useAuth'
 function RoleRedirect() {
   const { user } = useAuth()
   if (!user) return <Navigate to="/login" replace />
-  return <Navigate to={user.role === 'student' ? '/s' : '/admin'} replace />
+  return <Navigate to={user.role === 'student' ? '/student' : '/admin'} replace />
 }
 
 export default function App() {
@@ -30,7 +30,7 @@ export default function App() {
         <Routes>
           {/* 登录路由 */}
           <Route path="/admin/login" element={<LoginPage variant="admin" />} />
-          <Route path="/s/login" element={<LoginPage variant="student" />} />
+          <Route path="/student/login" element={<LoginPage variant="student" />} />
           {/* 兜底：旧 /login 重定向到管理端登录 */}
           <Route path="/login" element={<Navigate to="/admin/login" replace />} />
 
@@ -51,10 +51,10 @@ export default function App() {
           {/* 学生端 */}
           <Route element={<RouteGuard allowedRoles={['student']} />}>
             <Route element={<StudentLayout />}>
-              <Route path="s" element={<StudentHomePage />} />
-              <Route path="s/chat" element={<ConversationsPage />} />
-              <Route path="s/faq" element={<StudentFaqPage />} />
-              <Route path="s/profile" element={<StudentProfilePage />} />
+              <Route path="student" element={<StudentHomePage />} />
+              <Route path="student/chat" element={<ConversationsPage />} />
+              <Route path="student/faq" element={<StudentFaqPage />} />
+              <Route path="student/profile" element={<StudentProfilePage />} />
             </Route>
           </Route>
 

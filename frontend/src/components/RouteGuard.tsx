@@ -8,7 +8,7 @@ interface RouteGuardProps {
 
 /**
  * 路由守卫：
- * - 未登录 → 按路径前缀跳对应登录页（/s/* → /s/login，其他 → /admin/login）
+ * - 未登录 → 按路径前缀跳对应登录页（/student/* → /student/login，其他 → /admin/login）
  * - 已登录但角色不匹配 → 跳到自己的首页
  * - 通过 → 渲染子路由
  */
@@ -17,16 +17,16 @@ export default function RouteGuard({ allowedRoles }: RouteGuardProps) {
   const { pathname } = useLocation()
 
   if (!user) {
-    const loginPath = pathname.startsWith('/s') ? '/s/login' : '/admin/login'
+    const loginPath = pathname.startsWith('/student') ? '/student/login' : '/admin/login'
     return <Navigate to={loginPath} replace />
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // 学生访问管理端 → 引导到管理员登录页（LoginPage 会自动清除 student 会话）
     // 管理员访问学生端 → 引导到管理员首页
-    const target = user.role === 'student' && !pathname.startsWith('/s')
+    const target = user.role === 'student' && !pathname.startsWith('/student')
       ? '/admin/login'
-      : user.role === 'student' ? '/s' : '/admin'
+      : user.role === 'student' ? '/student' : '/admin'
     return <Navigate to={target} replace />
   }
 
