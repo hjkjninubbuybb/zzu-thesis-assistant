@@ -27,6 +27,8 @@ class KBInfo(BaseModel):
     name: str
     description: str
     doc_count: int
+    is_active: bool = False        # 是否为学生当前使用的知识库
+    is_admin_active: bool = False  # 是否为管理端当前使用的知识库
     splitter_type: str = "recursive"
     chunk_size: int = 256
     chunk_overlap_ratio: float = 0.1
@@ -62,9 +64,19 @@ class HistoryMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    kb_name: str
+    kb_name: str = Field(default="")  # 学生角色由后端覆盖，此字段可为空
     query: str = Field(..., min_length=1, max_length=2000)
     history: list[HistoryMessage] = Field(default_factory=list, max_length=20)
+
+
+class SetActiveKBRequest(BaseModel):
+    kb_name: str = Field(..., min_length=1, max_length=64)
+
+
+class ActiveKBResponse(BaseModel):
+    kb_name: str
+    description: str
+    doc_count: int
 
 
 # ── FAQ ───────────────────────────────────────────────────
