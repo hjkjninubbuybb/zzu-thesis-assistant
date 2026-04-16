@@ -3,9 +3,11 @@ import ReactMarkdown from 'react-markdown'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowUp, Loader2, ChevronDown, ChevronUp, Trash2, AlertCircle,
-  MessageSquare, Download, Plus, ThumbsUp, ThumbsDown,
+  MessageSquare, Download, Plus, ThumbsUp, ThumbsDown, BookOpen, ShieldAlert,
 } from 'lucide-react'
 import { knowledgeApi, faqApi, conversationApi } from '@/lib/api'
+
+import { useAuth } from '@/hooks/useAuth'
 import type { ChatMessage, FileItem, HistoryMessage, SourceItem, ConversationInfo } from '@/types/api'
 
 // ── 历史记录构建 ──────────────────────────────────────────
@@ -26,7 +28,7 @@ function buildHistory(messages: ChatMessage[]): HistoryMessage[] {
           ? next.content.slice(0, MAX_MSG_LENGTH) + '\n...(内容已截断)'
           : next.content,
       })
-      i++ // 跳过已处理的 assistant 消息
+      i++
     }
   }
   return pairs.slice(-MAX_HISTORY_TURNS * 2)
@@ -205,15 +207,17 @@ function MessageBubble({
   msg,
   onFeedback,
   onSuggestionClick,
+  isStudent,
 }: {
   msg: ChatMessage
   onFeedback: (msgId: number, rating: 'up' | 'down') => void
   onSuggestionClick?: (text: string) => void
+  isStudent?: boolean
 }) {
   if (msg.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[75%] bg-[#1A1A1A] text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm">
+        <div className={`max-w-[75%] text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm ${isStudent ? 'bg-[#2563EB]' : 'bg-[#1A1A1A]'}`}>
           {msg.content}
         </div>
       </div>
@@ -262,14 +266,13 @@ function MessageBubble({
             </>
           )}
         </div>
-        {/* 追问建议 */}
         {msg.status === 'done' && msg.suggestions && msg.suggestions.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2 ml-1">
             {msg.suggestions.map((s, i) => (
               <button
                 key={i}
                 onClick={() => onSuggestionClick?.(s)}
-                className="text-xs px-3 py-1.5 rounded-full border border-[#E8E4DC] bg-[#FAFAF8] text-gray-600 hover:bg-[#F2EFE9] hover:text-[#1A1A1A] transition-colors text-left"
+                className={`text-xs px-3 py-1.5 rounded-full border border-[#E8E4DC] bg-[#FAFAF8] text-gray-600 hover:bg-[#F2EFE9] hover:text-[#1A1A1A] transition-colors text-left ${isStudent ? 'border-[#D9DEE5] hover:bg-[#EEF2FF] hover:text-[#2563EB]' : ''}`}
               >
                 {s}
               </button>
@@ -281,7 +284,7 @@ function MessageBubble({
   )
 }
 
-// ── 左侧对话列表 ─────────────────────────────────────────
+// ── 对话列表分组 ─────────────────────────────────────────
 
 function groupByDate(conversations: ConversationInfo[]) {
   const today = new Date()
@@ -309,53 +312,56 @@ function groupByDate(conversations: ConversationInfo[]) {
   return groups.filter(g => g.items.length > 0)
 }
 
-function ConversationSidebar({
+// ── 管理端侧边栏（展示预设知识库，无下拉选择）─────────────
+
+function AdminConversationSidebar({
   conversations,
   activeId,
-  selectedKb,
-  kbs,
+  adminKbName,
   onSelect,
   onNew,
   onDelete,
-  onKbChange,
 }: {
   conversations: ConversationInfo[]
   activeId: number | null
-  selectedKb: string
-  kbs: { id: number; name: string }[]
+  adminKbName: string | null
   onSelect: (id: number) => void
   onNew: () => void
   onDelete: (id: number) => void
-  onKbChange: (kb: string) => void
 }) {
   const groups = groupByDate(conversations)
   return (
-    <div className="w-64 shrink-0 flex flex-col bg-white rounded-2xl border border-[#F0EDE8] shadow-sm overflow-hidden">
-      {/* KB 选择 + 新建 */}
-      <div className="p-3 space-y-2 border-b border-[#F0EDE8]">
-        <select
-          value={selectedKb}
-          onChange={e => onKbChange(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-gray-300 bg-white"
-        >
-          <option value="">全部知识库</option>
-          {kbs.map(kb => <option key={kb.id} value={kb.name}>{kb.name}</option>)}
-        </select>
+    <div className="w-64 shrink-0 flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden border border-[#F0EDE8]">
+      <div className="p-3 border-b border-[#F0EDE8]">
+        {adminKbName ? (
+          <div className="flex items-center gap-2.5 px-3 py-2.5 bg-emerald-50 rounded-xl mb-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+              <BookOpen size={14} className="text-emerald-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium text-emerald-700 leading-none mb-0.5">当前知识库</p>
+              <p className="text-sm font-semibold text-emerald-900 truncate">{adminKbName}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 rounded-xl mb-2">
+            <ShieldAlert size={14} className="text-amber-500 shrink-0" />
+            <p className="text-xs text-amber-700">请在知识库页面选择管理端知识库</p>
+          </div>
+        )}
         <button
           onClick={onNew}
-          disabled={!selectedKb}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-[#1A1A1A] text-white hover:bg-[#333] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          disabled={!adminKbName}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-[#1A1A1A] hover:bg-[#333]"
         >
           <Plus size={15} />
           新建对话
         </button>
       </div>
-
-      {/* 对话列表 */}
       <div className="flex-1 overflow-y-auto p-2 space-y-3">
         {conversations.length === 0 && (
           <p className="text-xs text-gray-400 text-center py-8">
-            {selectedKb ? '暂无对话记录' : '请选择知识库'}
+            {adminKbName ? '暂无对话记录' : '等待知识库配置'}
           </p>
         )}
         {groups.map(group => (
@@ -369,6 +375,92 @@ function ConversationSidebar({
                   className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
                     conv.id === activeId
                       ? 'bg-white shadow-sm border border-[#E8E4DC] text-gray-900'
+                      : 'text-gray-600 hover:bg-white/70'
+                  }`}
+                >
+                  <span className="flex-1 truncate">{conv.title}</span>
+                  <button
+                    onClick={e => { e.stopPropagation(); onDelete(conv.id) }}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 transition-all"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── 学生端侧边栏（无知识库选择，仅展示分配信息）───────────
+
+function StudentConversationSidebar({
+  conversations,
+  activeId,
+  activeKbName,
+  onSelect,
+  onNew,
+  onDelete,
+}: {
+  conversations: ConversationInfo[]
+  activeId: number | null
+  activeKbName: string | null
+  onSelect: (id: number) => void
+  onNew: () => void
+  onDelete: (id: number) => void
+}) {
+  const groups = groupByDate(conversations)
+  return (
+    <div className="w-64 shrink-0 flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden border border-[#D9DEE5]">
+      {/* 知识库信息卡 */}
+      <div className="p-3 border-b border-[#EEF2FF]">
+        {activeKbName ? (
+          <div className="flex items-center gap-2.5 px-3 py-2.5 bg-[#EEF2FF] rounded-xl">
+            <div className="w-7 h-7 rounded-lg bg-[#4F46E5]/10 flex items-center justify-center shrink-0">
+              <BookOpen size={14} className="text-[#4F46E5]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium text-[#4338CA] leading-none mb-0.5">当前知识库</p>
+              <p className="text-sm font-semibold text-[#312E81] truncate">{activeKbName}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 rounded-xl">
+            <ShieldAlert size={14} className="text-amber-500 shrink-0" />
+            <p className="text-xs text-amber-700">管理员尚未分配知识库</p>
+          </div>
+        )}
+        <button
+          onClick={onNew}
+          disabled={!activeKbName}
+          className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-[#2563EB] hover:bg-[#1D4ED8]"
+        >
+          <Plus size={15} />
+          新建对话
+        </button>
+      </div>
+
+      {/* 对话列表 */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-3">
+        {conversations.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-8">
+            {activeKbName ? '暂无对话记录' : '等待知识库分配'}
+          </p>
+        )}
+        {groups.map(group => (
+          <div key={group.label}>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">{group.label}</p>
+            <div className="space-y-0.5">
+              {group.items.map(conv => (
+                <div
+                  key={conv.id}
+                  onClick={() => onSelect(conv.id)}
+                  className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
+                    conv.id === activeId
+                      ? 'bg-white shadow-sm border border-[#D9DEE5] text-gray-900'
                       : 'text-gray-600 hover:bg-white/70'
                   }`}
                 >
@@ -404,8 +496,9 @@ const TOOL_LABELS: Record<string, string> = {
 }
 
 export default function ConversationsPage() {
+  const { isStudent } = useAuth()
   const queryClient = useQueryClient()
-  const [selectedKb, setSelectedKb] = useState('')
+
   const [activeConvId, setActiveConvId] = useState<number | null>(null)
   const [maxRef] = useState(2)
   const [query, setQuery] = useState('')
@@ -416,32 +509,48 @@ export default function ConversationsPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const { data: kbs } = useQuery({ queryKey: ['knowledge-bases'], queryFn: knowledgeApi.list })
-  const { data: conversations = [] } = useQuery({
-    queryKey: ['conversations', selectedKb || '__all__'],
-    queryFn: () => conversationApi.list(selectedKb || undefined),
+  // 学生端：管理员分配的知识库
+  const { data: activeKbData } = useQuery({
+    queryKey: ['active-kb'],
+    queryFn: knowledgeApi.getActiveKb,
+    enabled: isStudent,
   })
+  const studentKb = activeKbData?.kb_name ?? null
+
+  // 管理端：管理员预设的知识库
+  const { data: adminKbData } = useQuery({
+    queryKey: ['admin-kb'],
+    queryFn: knowledgeApi.getAdminKb,
+    enabled: !isStudent,
+  })
+  const adminKb = adminKbData?.kb_name ?? null
+
+  // 当前生效的 kb_name
+  const effectiveKb = isStudent ? (studentKb ?? '') : (adminKb ?? '')
+
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['conversations', effectiveKb || '__all__'],
+    queryFn: () => conversationApi.list(effectiveKb || undefined),
+  })
+
   const { data: faqs } = useQuery({
-    queryKey: ['faqs', selectedKb],
-    queryFn: () => faqApi.list(selectedKb),
-    enabled: !!selectedKb,
+    queryKey: ['faqs', effectiveKb],
+    queryFn: () => faqApi.list(effectiveKb),
+    enabled: !!effectiveKb,
     select: (data) => data.filter(f => f.enabled).slice(0, 6),
   })
 
-  // 当前活跃对话对应的 kb_name
   const activeConv = conversations.find(c => c.id === activeConvId)
-  const chatKb = activeConv?.kb_name ?? selectedKb
+  const chatKb = activeConv?.kb_name ?? effectiveKb
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 加载对话消息
   const loadConversation = useCallback(async (convId: number) => {
     setActiveConvId(convId)
     try {
-      const { conversation, messages: msgs } = await conversationApi.get(convId)
-      setSelectedKb(conversation.kb_name)
+      const { conversation: _, messages: msgs } = await conversationApi.get(convId)
       setMessages(msgs.map(m => ({
         id: crypto.randomUUID(),
         role: m.role,
@@ -455,18 +564,16 @@ export default function ConversationsPage() {
     } catch {
       setMessages([])
     }
-  }, [])
+  }, [isStudent])
 
-  // 新建对话
   const handleNewConversation = useCallback(async () => {
-    if (!selectedKb) return
-    const conv = await conversationApi.create(selectedKb)
+    if (!effectiveKb) return
+    const conv = await conversationApi.create(effectiveKb)
     setActiveConvId(conv.id)
     setMessages([])
     queryClient.invalidateQueries({ queryKey: ['conversations'] })
-  }, [selectedKb, queryClient])
+  }, [effectiveKb, queryClient])
 
-  // 删除对话
   const handleDeleteConversation = useCallback(async (convId: number) => {
     await conversationApi.delete(convId)
     if (convId === activeConvId) {
@@ -476,7 +583,6 @@ export default function ConversationsPage() {
     queryClient.invalidateQueries({ queryKey: ['conversations'] })
   }, [activeConvId, queryClient])
 
-  // 反馈
   const handleFeedback = useCallback(async (msgId: number, rating: 'up' | 'down') => {
     try {
       await conversationApi.submitFeedback(msgId, rating)
@@ -486,10 +592,9 @@ export default function ConversationsPage() {
     } catch { /* 静默失败 */ }
   }, [])
 
-  // 发送消息
   const sendMessage = useCallback(async (directText?: string) => {
     const q = directText !== undefined ? directText.trim() : query.trim()
-    if (!q || !chatKb || isStreaming) return
+    if (!q || !effectiveKb || isStreaming) return
     if (directText === undefined) setQuery('')
 
     abortRef.current?.abort()
@@ -498,7 +603,6 @@ export default function ConversationsPage() {
 
     const history = buildHistory(messages)
 
-    // 自动创建对话（如果还没有 activeConvId）
     let convId = activeConvId
     if (!convId) {
       try {
@@ -511,13 +615,11 @@ export default function ConversationsPage() {
       }
     }
 
-    // 保存用户消息到后端
     let userDbMsg: { id: number } | null = null
     try {
       userDbMsg = await conversationApi.addMessage(convId, { role: 'user', content: q })
     } catch { /* 继续发送，不阻塞 */ }
 
-    // 如果是第一条消息，更新对话标题
     if (messages.length === 0) {
       conversationApi.updateTitle(convId, q.slice(0, 50)).catch(() => {})
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
@@ -581,7 +683,6 @@ export default function ConversationsPage() {
         (items) => { finalSuggestions = items },
       )
 
-      // 保存助手消息到后端
       let assistantDbId: number | undefined
       try {
         const saved = await conversationApi.addMessage(currentConvId, {
@@ -593,7 +694,6 @@ export default function ConversationsPage() {
         assistantDbId = saved.id
       } catch { /* 静默失败 */ }
 
-      // 最终更新消息状态
       setMessages(prev => prev.map(m =>
         m.id === assistantId
           ? { ...m, status: 'done', dbMessageId: assistantDbId, suggestions: finalSuggestions }
@@ -630,23 +730,28 @@ export default function ConversationsPage() {
   return (
     <div className="flex flex-1 min-h-0 gap-3">
       {/* 左侧对话列表 */}
-      <ConversationSidebar
-        conversations={conversations}
-        activeId={activeConvId}
-        selectedKb={selectedKb}
-        kbs={kbs ?? []}
-        onSelect={loadConversation}
-        onNew={handleNewConversation}
-        onDelete={handleDeleteConversation}
-        onKbChange={(kb) => {
-          setSelectedKb(kb)
-          setActiveConvId(null)
-          setMessages([])
-        }}
-      />
+      {isStudent ? (
+        <StudentConversationSidebar
+          conversations={conversations}
+          activeId={activeConvId}
+          activeKbName={studentKb}
+          onSelect={loadConversation}
+          onNew={handleNewConversation}
+          onDelete={handleDeleteConversation}
+        />
+      ) : (
+        <AdminConversationSidebar
+          conversations={conversations}
+          activeId={activeConvId}
+          adminKbName={adminKb}
+          onSelect={loadConversation}
+          onNew={handleNewConversation}
+          onDelete={handleDeleteConversation}
+        />
+      )}
 
       {/* 右侧聊天区 */}
-      <div className="flex-1 flex flex-col bg-white rounded-2xl border border-[#F0EDE8] shadow-sm overflow-hidden">
+      <div className={`flex-1 flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden ${isStudent ? 'border border-[#D9DEE5]' : 'border border-[#F0EDE8]'}`}>
         {/* 顶部信息栏 */}
         <div className="flex items-center gap-3 px-6 py-3 border-b border-[#F0EDE8] shrink-0">
           <h1 className="text-base font-semibold text-gray-900">
@@ -670,27 +775,42 @@ export default function ConversationsPage() {
           <div className="max-w-2xl mx-auto w-full px-4 space-y-4 h-full flex flex-col">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center flex-1 gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#F2EFE9] flex items-center justify-center">
-                  <MessageSquare size={22} className="text-[#1A1A1A]" strokeWidth={1.6} />
-                </div>
-                <div className="text-center space-y-1">
-                  <p className="text-sm font-semibold text-gray-800">开始提问</p>
-                  <p className="text-xs text-gray-400">
-                    {!chatKb ? '请先在左侧选择知识库，然后新建对话' : '在下方输入框中输入问题，按回车发送'}
-                  </p>
-                </div>
-                {chatKb && faqs && faqs.length > 0 && (
-                  <div className="flex flex-wrap justify-center gap-2 mt-1 max-w-lg">
-                    {faqs.map(faq => (
-                      <button
-                        key={faq.id}
-                        onClick={() => sendMessage(faq.question)}
-                        className="text-xs px-3 py-1.5 rounded-full border border-[#F0EDE8] bg-white text-gray-600 hover:bg-[#F2EFE9] hover:text-[#1A1A1A] transition-colors text-left"
-                      >
-                        {faq.question}
-                      </button>
-                    ))}
+                {isStudent && !studentKb ? (
+                  // 学生：尚未分配知识库
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center">
+                      <ShieldAlert size={22} className="text-amber-500" strokeWidth={1.6} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-gray-800">暂无可用知识库</p>
+                      <p className="text-xs text-gray-400">请联系管理员为学生分配知识库后再使用</p>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isStudent ? 'bg-[#EEF2FF]' : 'bg-[#F2EFE9]'}`}>
+                      <MessageSquare size={22} className={isStudent ? 'text-[#2563EB]' : 'text-[#1A1A1A]'} strokeWidth={1.6} />
+                    </div>
+                    <div className="text-center space-y-1">
+                      <p className="text-sm font-semibold text-gray-800">开始提问</p>
+                      <p className="text-xs text-gray-400">
+                        {!chatKb ? '请先在知识库页面配置知识库，然后新建对话' : '在下方输入框中输入问题，按回车发送'}
+                      </p>
+                    </div>
+                    {chatKb && faqs && faqs.length > 0 && (
+                      <div className="flex flex-wrap justify-center gap-2 mt-1 max-w-lg">
+                        {faqs.map(faq => (
+                          <button
+                            key={faq.id}
+                            onClick={() => sendMessage(faq.question)}
+                            className={`text-xs px-3 py-1.5 rounded-full border bg-white text-gray-600 transition-colors text-left ${isStudent ? 'border-[#D9DEE5] hover:bg-[#EEF2FF] hover:text-[#2563EB]' : 'border-[#F0EDE8] hover:bg-[#F2EFE9] hover:text-[#1A1A1A]'}`}
+                          >
+                            {faq.question}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -700,6 +820,7 @@ export default function ConversationsPage() {
                 msg={msg}
                 onFeedback={handleFeedback}
                 onSuggestionClick={(text) => sendMessage(text)}
+                isStudent={isStudent}
               />
             ))}
             {isStreaming && statusText && (
@@ -720,8 +841,14 @@ export default function ConversationsPage() {
               value={query}
               onChange={e => { setQuery(e.target.value) }}
               onKeyDown={handleKeyDown}
-              disabled={isStreaming || !chatKb}
-              placeholder={chatKb ? '有问题，尽管问' : '请先选择知识库并新建对话'}
+              disabled={isStreaming || !effectiveKb}
+              placeholder={
+                isStudent && !studentKb
+                  ? '等待管理员分配知识库...'
+                  : effectiveKb
+                    ? '有问题，尽管问'
+                    : '请先在知识库页面配置知识库，然后新建对话'
+              }
               rows={1}
               className="w-full resize-none outline-none text-sm text-gray-800 placeholder:text-gray-400 bg-transparent overflow-y-auto disabled:text-gray-400"
               style={{ minHeight: '1.5rem', maxHeight: '10rem' }}
@@ -729,8 +856,8 @@ export default function ConversationsPage() {
             <div className="flex items-center justify-end">
               <button
                 onClick={() => sendMessage(undefined)}
-                disabled={!query.trim() || !chatKb || isStreaming}
-                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-900 text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-gray-700 disabled:hover:bg-gray-200"
+                disabled={!query.trim() || !effectiveKb || isStreaming}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-200 ${isStudent ? 'bg-[#2563EB] hover:bg-[#1D4ED8]' : 'bg-gray-900 hover:bg-gray-700'}`}
               >
                 {isStreaming ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={15} />}
               </button>
