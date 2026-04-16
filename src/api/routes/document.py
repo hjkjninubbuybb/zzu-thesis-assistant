@@ -7,9 +7,10 @@ import tempfile
 import urllib.parse
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
+from src.api.auth import require_teacher_or_admin
 from src.api.schemas import DocInfo, MessageResponse
 from src.core.indexing import index_document, delete_document
 from src.core.retrieval import invalidate_corpus_cache
@@ -32,7 +33,7 @@ _UPLOADS_DIR = Path(__file__).parents[3] / "data" / "uploads"
 
 
 @router.get("/{kb_name}", response_model=list[DocInfo])
-def list_documents(kb_name: str):
+def list_documents(kb_name: str, _: dict = Depends(require_teacher_or_admin)):
     """列出知识库下的所有文档。"""
     if not _ds.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
@@ -49,6 +50,7 @@ async def upload_document(
     chunk_overlap_ratio: float = Form(default=0.2, ge=0.0, le=0.5),
     enable_cleaning: bool = Form(default=False),
     doc_type: str = Form(default="policy"),
+    _: dict = Depends(require_teacher_or_admin),
 ):
     """上传文档并入库（最大 10 MB）。"""
     if not _ds.get_kb(kb_name):
@@ -120,7 +122,7 @@ async def upload_document(
 
 
 @router.get("/{kb_name}/download/{doc_id}")
-def download_document(kb_name: str, doc_id: int):
+def download_document(kb_name: str, doc_id: int, _: dict = Depends(require_teacher_or_admin)):
     """下载已上传的原始文件。"""
     doc = _ds.get_document(doc_id)
     if not doc or doc["kb_name"] != kb_name:
@@ -142,7 +144,7 @@ def download_document(kb_name: str, doc_id: int):
 
 
 @router.delete("/{kb_name}/{doc_id}", response_model=MessageResponse)
-def remove_document(kb_name: str, doc_id: int):
+def remove_document(kb_name: str, doc_id: int, _: dict = Depends(require_teacher_or_admin)):
     """删除文档。"""
     doc = _ds.get_document(doc_id)
     if not doc or doc["kb_name"] != kb_name:
