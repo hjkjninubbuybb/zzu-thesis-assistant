@@ -13,22 +13,17 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 
 const ADMIN_TEACHER_NAV = [
-  { to: '/', label: '概览', icon: LayoutDashboard, end: true },
-  { to: '/conversations', label: '对话', icon: MessagesSquare },
-  { to: '/knowledge', label: '知识库', icon: Database },
-  { to: '/faq', label: 'FAQ 管理', icon: MessageSquareQuote },
-  { to: '/students', label: '学生账号', icon: Users },
-  { to: '/analytics', label: '使用统计', icon: BarChart2 },
-]
-
-const STUDENT_NAV = [
-  { to: '/conversations', label: '对话', icon: MessagesSquare },
+  { to: '/admin', label: '概览', icon: LayoutDashboard, end: true },
+  { to: '/admin/conversations', label: '对话', icon: MessagesSquare },
+  { to: '/admin/knowledge', label: '知识库', icon: Database },
+  { to: '/admin/faq', label: 'FAQ 管理', icon: MessageSquareQuote },
+  { to: '/admin/students', label: '学生账号', icon: Users },
+  { to: '/admin/analytics', label: '使用统计', icon: BarChart2 },
 ]
 
 const ROLE_LABELS: Record<string, string> = {
   admin: '管理员',
   teacher: '教师',
-  student: '学生',
 }
 
 function NavItem({
@@ -64,11 +59,11 @@ function NavItem({
 export default function Sidebar() {
   const { user, isStudent, logout } = useAuth()
   const navigate = useNavigate()
-  const navItems = isStudent ? STUDENT_NAV : ADMIN_TEACHER_NAV
+  const navItems = ADMIN_TEACHER_NAV
 
   const handleLogout = () => {
     logout()
-    navigate('/login', { replace: true })
+    navigate('/admin/login', { replace: true })
   }
 
   // 显示名：优先 display_name，退而求其次 username
@@ -100,7 +95,7 @@ export default function Sidebar() {
       {/* Bottom: Settings + Avatar */}
       <div className="flex flex-col px-2 pb-4 gap-0.5">
         <div className="mx-1 mb-2 h-px bg-[#F0EDE8]" />
-        {!isStudent && <NavItem to="/settings" label="系统配置" icon={Settings} />}
+        {!isStudent && <NavItem to="/admin/settings" label="系统配置" icon={Settings} />}
 
         {/* 用户信息 + 退出 */}
         <div className="flex items-center gap-2 px-3 py-2 mt-1">
