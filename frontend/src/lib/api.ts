@@ -1,6 +1,6 @@
 import axios from 'axios'
 import type {
-  KBInfo, KBCreate, DocInfo, UploadParams, SystemConfig, ConfigUpdate,
+  KBInfo, KBCreate, ActiveKBInfo, DocInfo, UploadParams, SystemConfig, ConfigUpdate,
   FAQItem, FAQCreate, FAQUpdate, FAQSearchResponse, FAQImportResult,
   ConversationInfo, ConversationMessage,
   LoginResponse, UserInfo, UserCreate, UserUpdate, PaginatedUsers,
@@ -157,6 +157,18 @@ export const knowledgeApi = {
   list: () => client.get<KBInfo[]>('/knowledge').then(r => r.data),
   create: (body: KBCreate) => client.post<KBInfo>('/knowledge', body).then(r => r.data),
   delete: (name: string) => client.delete<{ message: string }>(`/knowledge/${name}`).then(r => r.data),
+  // 学生知识库分配
+  getActiveKb: () => client.get<ActiveKBInfo | null>('/knowledge/active').then(r => r.data),
+  setActiveKb: (kbName: string) =>
+    client.put<ActiveKBInfo>('/knowledge/active', { kb_name: kbName }).then(r => r.data),
+  clearActiveKb: () =>
+    client.delete<{ message: string }>('/knowledge/active').then(r => r.data),
+  // 管理端知识库分配
+  getAdminKb: () => client.get<ActiveKBInfo | null>('/knowledge/admin-active').then(r => r.data),
+  setAdminKb: (kbName: string) =>
+    client.put<ActiveKBInfo>('/knowledge/admin-active', { kb_name: kbName }).then(r => r.data),
+  clearAdminKb: () =>
+    client.delete<{ message: string }>('/knowledge/admin-active').then(r => r.data),
 }
 
 // ── 文档 API ──────────────────────────────────────────────

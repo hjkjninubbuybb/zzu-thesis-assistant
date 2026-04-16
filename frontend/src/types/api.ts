@@ -6,7 +6,15 @@ export interface KBInfo {
   name: string
   description: string
   doc_count: number
+  is_active: boolean        // 学生知识库
+  is_admin_active: boolean  // 管理端知识库
   created_at: string
+}
+
+export interface ActiveKBInfo {
+  kb_name: string
+  description: string
+  doc_count: number
 }
 
 export interface KBCreate {
