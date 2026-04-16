@@ -63,6 +63,11 @@ class DocumentStore:
                     updated_at TEXT NOT NULL,
                     FOREIGN KEY (kb_name) REFERENCES knowledge_bases(name) ON DELETE CASCADE
                 );
+
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
             """)
             conn.commit()
             # 兼容旧数据库：添加 doc_type 列（若不存在，忽略错误）
@@ -223,3 +228,25 @@ class DocumentStore:
                 conn.execute("DELETE FROM faqs WHERE id = ?", (faq_id,))
                 conn.commit()
         return dict(row) if row else None
+
+    # ── 系统设置 ──────────────────────────────────────────────
+
+    def get_setting(self, key: str) -> str | None:
+        with closing(self._get_conn()) as conn:
+            row = conn.execute(
+                "SELECT value FROM system_settings WHERE key = ?", (key,)
+            ).fetchone()
+        return row["value"] if row else None
+
+    def set_setting(self, key: str, value: str) -> None:
+        with closing(self._get_conn()) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
+                (key, value),
+            )
+            conn.commit()
+
+    def delete_setting(self, key: str) -> None:
+        with closing(self._get_conn()) as conn:
+            conn.execute("DELETE FROM system_settings WHERE key = ?", (key,))
+            conn.commit()
