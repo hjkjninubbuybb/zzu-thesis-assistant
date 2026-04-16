@@ -2,8 +2,10 @@
 
 import json
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from langchain_community.chat_models import ChatTongyi
 
 from src.api.auth import get_current_user
 from src.api.schemas import (
@@ -15,6 +17,7 @@ from src.api.schemas import (
     MessageResponse,
     SaveMessageRequest,
 )
+from src.config import get_config
 from src.storage.document_store import DocumentStore
 
 router = APIRouter(prefix="/api/conversation", tags=["conversation"])
@@ -62,13 +65,79 @@ def get_conversation(conv_id: int, current_user: dict = Depends(get_current_user
 
 @router.put("/{conv_id}/title", response_model=ConversationInfo)
 def update_title(conv_id: int, body: ConversationTitleUpdate, current_user: dict = Depends(get_current_user)):
-    """更新对话标题。"""
+    """更新对话标题（用户手动重命名）。"""
     conv = _ds.get_conversation(conv_id)
     if not conv:
         raise HTTPException(status_code=404, detail="对话不存在")
     if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
         raise HTTPException(status_code=403, detail="无权修改此对话")
-    row = _ds.update_conversation_title(conv_id, body.title)
+    row = _ds.update_conversation_title(conv_id, body.title.strip())
+    return row
+
+
+# ── 标题总结 ─────────────────────────────────────────────
+
+_TITLE_SYSTEM_PROMPT = """你是一个对话标题生成助手。你的任务是根据用户的第一轮提问和助手的回答，生成一个简短、精准、有辨识度的中文标题。
+
+要求：
+1. 标题 6-14 个汉字，概括核心话题，不要出现"关于"、"如何"、"问题"等冗余词
+2. 必须是陈述性名词短语，不能是完整句子，不能带标点符号
+3. 如果用户问题涉及具体文档/表格/流程/截止时间/学院/专业等关键信息，优先保留这些关键词
+4. 如果首轮只是寒暄（如"你好"、"在吗"），返回"闲聊"两个字
+5. 直接输出标题本身，不要加任何解释、引号、前后缀"""
+
+
+@router.post("/{conv_id}/summarize-title", response_model=ConversationInfo)
+def summarize_title(conv_id: int, current_user: dict = Depends(get_current_user)):
+    """基于首轮对话自动生成语义化标题（fast LLM）。"""
+    conv = _ds.get_conversation(conv_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="无权修改此对话")
+
+    messages = _ds.list_messages(conv_id)
+    if not messages:
+        raise HTTPException(status_code=400, detail="对话尚无消息，无法总结标题")
+
+    # 取首轮 user + assistant
+    first_user = next((m for m in messages if m["role"] == "user"), None)
+    first_assistant = next((m for m in messages if m["role"] == "assistant"), None)
+    if not first_user:
+        raise HTTPException(status_code=400, detail="对话缺少用户提问")
+
+    user_text = (first_user["content"] or "").strip()[:500]
+    assistant_text = ((first_assistant["content"] if first_assistant else "") or "").strip()[:500]
+
+    fast_model = get_config()["llm"].get("fast_model", "qwen-turbo")
+    api_key = os.environ.get("DASHSCOPE_API_KEY")
+    if not api_key:
+        logger.warning("[summarize_title] DASHSCOPE_API_KEY 未配置，跳过 LLM 调用")
+        return _ds.update_conversation_title(conv_id, user_text[:20] or "新对话")
+
+    try:
+        llm = ChatTongyi(model=fast_model, api_key=api_key, streaming=False)
+        prompt = (
+            f"{_TITLE_SYSTEM_PROMPT}\n\n"
+            f"【用户提问】\n{user_text}\n\n"
+            f"【助手回答】\n{assistant_text or '（尚无回答）'}\n\n"
+            f"请直接输出标题："
+        )
+        resp = llm.invoke(prompt)
+        title = (getattr(resp, "content", "") or "").strip()
+        # 清理：去引号、句号、换行
+        title = title.strip('"\'""''。 \n\t')
+        if not title:
+            title = user_text[:20] or "新对话"
+        # 兜底：超过 20 字截断
+        if len(title) > 20:
+            title = title[:20]
+    except Exception as e:
+        logger.warning("[summarize_title] LLM 调用失败: %s", e)
+        title = user_text[:20] or "新对话"
+
+    logger.info("[summarize_title] conv_id=%d title=%s", conv_id, title)
+    row = _ds.update_conversation_title(conv_id, title)
     return row
 
 

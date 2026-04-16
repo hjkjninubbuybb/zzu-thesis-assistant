@@ -77,6 +77,7 @@ export interface ChatMessage {
   status?: 'loading' | 'done' | 'error'
   dbMessageId?: number
   feedback?: 'up' | 'down' | null
+  isNew?: boolean
 }
 
 // ── 对话历史 ─────────────────────────────────────────────

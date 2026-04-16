@@ -1,5 +1,6 @@
 """SQLite 文档元数据存储。"""
 
+import json
 import sqlite3
 import logging
 from contextlib import closing
@@ -68,6 +69,33 @@ class DocumentStore:
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    kb_name TEXT NOT NULL,
+                    user_id INTEGER,
+                    title TEXT DEFAULT '新对话',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS conversation_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    conversation_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    sources TEXT,
+                    files TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS message_feedback (
+                    message_id INTEGER PRIMARY KEY,
+                    rating TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (message_id) REFERENCES conversation_messages(id) ON DELETE CASCADE
+                );
             """)
             conn.commit()
             # 兼容旧数据库：添加 doc_type 列（若不存在，忽略错误）
@@ -76,6 +104,19 @@ class DocumentStore:
                 conn.commit()
             except sqlite3.OperationalError:
                 pass  # 列已存在
+            # 兼容旧数据库：conversations 添加 user_id 列
+            try:
+                conn.execute("ALTER TABLE conversations ADD COLUMN user_id INTEGER")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass  # 列已存在
+            # 索引需要在 ALTER TABLE 后创建（确保 user_id 列已存在）
+            conn.executescript("""
+                CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_id);
+                CREATE INDEX IF NOT EXISTS idx_conv_kb ON conversations(kb_name);
+                CREATE INDEX IF NOT EXISTS idx_msg_conv ON conversation_messages(conversation_id);
+            """)
+            conn.commit()
 
     # ── 知识库操作 ────────────────────────────────────────
 
@@ -250,3 +291,143 @@ class DocumentStore:
         with closing(self._get_conn()) as conn:
             conn.execute("DELETE FROM system_settings WHERE key = ?", (key,))
             conn.commit()
+
+    # ── 对话 ──────────────────────────────────────────────────
+
+    def create_conversation(self, kb_name: str, title: str = "新对话", user_id: int | None = None) -> dict:
+        with closing(self._get_conn()) as conn:
+            now = datetime.now().isoformat()
+            cursor = conn.execute(
+                """INSERT INTO conversations (kb_name, user_id, title, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (kb_name, user_id, title, now, now),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM conversations WHERE id = ?", (cursor.lastrowid,)
+            ).fetchone()
+        return dict(row)
+
+    def list_conversations(self, kb_name: str | None = None, user_id: int | None = None) -> list[dict]:
+        sql = "SELECT * FROM conversations WHERE 1=1"
+        params: list = []
+        if kb_name:
+            sql += " AND kb_name = ?"
+            params.append(kb_name)
+        if user_id is not None:
+            sql += " AND user_id = ?"
+            params.append(user_id)
+        sql += " ORDER BY updated_at DESC, id DESC"
+        with closing(self._get_conn()) as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_conversation(self, conv_id: int) -> dict | None:
+        with closing(self._get_conn()) as conn:
+            row = conn.execute(
+                "SELECT * FROM conversations WHERE id = ?", (conv_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_conversation_title(self, conv_id: int, title: str) -> dict | None:
+        with closing(self._get_conn()) as conn:
+            now = datetime.now().isoformat()
+            conn.execute(
+                "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
+                (title, now, conv_id),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM conversations WHERE id = ?", (conv_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def delete_conversation(self, conv_id: int) -> None:
+        with closing(self._get_conn()) as conn:
+            # 手动级联：SQLite 默认不启用 FK 约束
+            conn.execute(
+                "DELETE FROM message_feedback WHERE message_id IN "
+                "(SELECT id FROM conversation_messages WHERE conversation_id = ?)",
+                (conv_id,),
+            )
+            conn.execute("DELETE FROM conversation_messages WHERE conversation_id = ?", (conv_id,))
+            conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+            conn.commit()
+
+    # ── 消息 ──────────────────────────────────────────────────
+
+    def add_message(
+        self,
+        conversation_id: int,
+        role: str,
+        content: str,
+        sources_json: str | None = None,
+        files_json: str | None = None,
+    ) -> dict:
+        with closing(self._get_conn()) as conn:
+            now = datetime.now().isoformat()
+            cursor = conn.execute(
+                """INSERT INTO conversation_messages
+                   (conversation_id, role, content, sources, files, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (conversation_id, role, content, sources_json, files_json, now),
+            )
+            # 更新对话的 updated_at 以便排序
+            conn.execute(
+                "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                (now, conversation_id),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM conversation_messages WHERE id = ?", (cursor.lastrowid,)
+            ).fetchone()
+        return self._parse_message_row(row)
+
+    def list_messages(self, conversation_id: int) -> list[dict]:
+        with closing(self._get_conn()) as conn:
+            rows = conn.execute(
+                "SELECT * FROM conversation_messages WHERE conversation_id = ? "
+                "ORDER BY id ASC",
+                (conversation_id,),
+            ).fetchall()
+        return [self._parse_message_row(r) for r in rows]
+
+    @staticmethod
+    def _parse_message_row(row) -> dict:
+        """将 sqlite Row 转为 dict，并把 sources/files 字段从 JSON 字符串反序列化为 list。"""
+        msg = dict(row)
+        for field in ("sources", "files"):
+            raw = msg.get(field)
+            if raw is None:
+                continue
+            try:
+                msg[field] = json.loads(raw)
+            except (ValueError, TypeError):
+                logger.warning("[message] 无法解析 %s 字段（msg_id=%s）", field, msg.get("id"))
+                msg[field] = None
+        return msg
+
+    # ── 反馈 ──────────────────────────────────────────────────
+
+    def get_message_feedback(self, message_id: int) -> dict | None:
+        with closing(self._get_conn()) as conn:
+            row = conn.execute(
+                "SELECT * FROM message_feedback WHERE message_id = ?", (message_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def set_message_feedback(self, message_id: int, rating: str) -> dict:
+        with closing(self._get_conn()) as conn:
+            now = datetime.now().isoformat()
+            # 先删后插，避免依赖 UNIQUE 约束（旧 schema 可能没有）
+            conn.execute("DELETE FROM message_feedback WHERE message_id = ?", (message_id,))
+            conn.execute(
+                """INSERT INTO message_feedback (message_id, rating, created_at)
+                   VALUES (?, ?, ?)""",
+                (message_id, rating, now),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM message_feedback WHERE message_id = ?", (message_id,)
+            ).fetchone()
+        return dict(row)

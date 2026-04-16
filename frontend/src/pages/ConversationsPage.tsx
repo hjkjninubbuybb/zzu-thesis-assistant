@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowUp, Loader2, ChevronDown, ChevronUp, Trash2, AlertCircle,
   MessageSquare, Download, Plus, ThumbsUp, ThumbsDown, BookOpen, ShieldAlert,
+  Pencil, Check, X as XIcon,
 } from 'lucide-react'
 import { knowledgeApi, faqApi, conversationApi } from '@/lib/api'
 
@@ -217,7 +218,9 @@ function MessageBubble({
   if (msg.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className={`max-w-[75%] text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm ${isStudent ? 'bg-[#2563EB]' : 'bg-[#1A1A1A]'}`}>
+        <div
+          className={`max-w-[75%] text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm ${isStudent ? 'bg-[#2563EB]' : 'bg-[#1A1A1A]'} ${msg.isNew ? 'animate-apple-slide-r' : ''}`}
+        >
           {msg.content}
         </div>
       </div>
@@ -225,7 +228,7 @@ function MessageBubble({
   }
 
   return (
-    <div className="flex justify-start">
+    <div className={`flex justify-start ${msg.isNew ? 'animate-apple-slide-l' : ''}`}>
       <div className="max-w-[80%]">
         <div className="bg-white border border-gray-200 text-gray-800 text-sm px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm">
           {msg.status === 'loading' ? (
@@ -312,6 +315,112 @@ function groupByDate(conversations: ConversationInfo[]) {
   return groups.filter(g => g.items.length > 0)
 }
 
+// ── 对话侧栏条目（支持重命名） ────────────────────────────
+
+function ConversationItem({
+  conv,
+  active,
+  theme,
+  onSelect,
+  onRename,
+  onDelete,
+}: {
+  conv: ConversationInfo
+  active: boolean
+  theme: 'admin' | 'student'
+  onSelect: (id: number) => void
+  onRename: (id: number, title: string) => void
+  onDelete: (id: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(conv.title)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [editing])
+
+  // 外部标题更新（如 LLM 总结完成）时，同步 draft
+  useEffect(() => {
+    if (!editing) setDraft(conv.title)
+  }, [conv.title, editing])
+
+  const commit = () => {
+    const t = draft.trim()
+    if (t && t !== conv.title) onRename(conv.id, t)
+    setEditing(false)
+  }
+  const cancel = () => {
+    setDraft(conv.title)
+    setEditing(false)
+  }
+
+  const activeBorder = theme === 'admin' ? 'border-[#E8E4DC]' : 'border-[#D9DEE5]'
+
+  if (editing) {
+    return (
+      <div className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white shadow-sm border ${activeBorder}`}>
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') commit()
+            else if (e.key === 'Escape') cancel()
+          }}
+          maxLength={50}
+          className="flex-1 min-w-0 text-sm bg-transparent outline-none text-gray-900"
+        />
+        <button
+          onClick={commit}
+          title="保存"
+          className="p-1 rounded text-emerald-500 hover:bg-emerald-50 transition-colors"
+        >
+          <Check size={13} />
+        </button>
+        <button
+          onClick={cancel}
+          title="取消"
+          className="p-1 rounded text-gray-400 hover:bg-gray-100 transition-colors"
+        >
+          <XIcon size={13} />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      onClick={() => onSelect(conv.id)}
+      onDoubleClick={e => { e.stopPropagation(); setEditing(true) }}
+      className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
+        active
+          ? `bg-white shadow-sm border ${activeBorder} text-gray-900`
+          : 'text-gray-600 hover:bg-white/70'
+      }`}
+    >
+      <span className="flex-1 truncate">{conv.title}</span>
+      <button
+        onClick={e => { e.stopPropagation(); setEditing(true) }}
+        title="重命名"
+        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-[#1A1A1A] transition-all"
+      >
+        <Pencil size={11} />
+      </button>
+      <button
+        onClick={e => { e.stopPropagation(); onDelete(conv.id) }}
+        title="删除"
+        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 transition-all"
+      >
+        <Trash2 size={12} />
+      </button>
+    </div>
+  )
+}
+
 // ── 管理端侧边栏（展示预设知识库，无下拉选择）─────────────
 
 function AdminConversationSidebar({
@@ -321,6 +430,7 @@ function AdminConversationSidebar({
   onSelect,
   onNew,
   onDelete,
+  onRename,
 }: {
   conversations: ConversationInfo[]
   activeId: number | null
@@ -328,6 +438,7 @@ function AdminConversationSidebar({
   onSelect: (id: number) => void
   onNew: () => void
   onDelete: (id: number) => void
+  onRename: (id: number, title: string) => void
 }) {
   const groups = groupByDate(conversations)
   return (
@@ -369,23 +480,15 @@ function AdminConversationSidebar({
             <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">{group.label}</p>
             <div className="space-y-0.5">
               {group.items.map(conv => (
-                <div
+                <ConversationItem
                   key={conv.id}
-                  onClick={() => onSelect(conv.id)}
-                  className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                    conv.id === activeId
-                      ? 'bg-white shadow-sm border border-[#E8E4DC] text-gray-900'
-                      : 'text-gray-600 hover:bg-white/70'
-                  }`}
-                >
-                  <span className="flex-1 truncate">{conv.title}</span>
-                  <button
-                    onClick={e => { e.stopPropagation(); onDelete(conv.id) }}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 transition-all"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
+                  conv={conv}
+                  active={conv.id === activeId}
+                  theme="admin"
+                  onSelect={onSelect}
+                  onRename={onRename}
+                  onDelete={onDelete}
+                />
               ))}
             </div>
           </div>
@@ -404,6 +507,7 @@ function StudentConversationSidebar({
   onSelect,
   onNew,
   onDelete,
+  onRename,
 }: {
   conversations: ConversationInfo[]
   activeId: number | null
@@ -411,6 +515,7 @@ function StudentConversationSidebar({
   onSelect: (id: number) => void
   onNew: () => void
   onDelete: (id: number) => void
+  onRename: (id: number, title: string) => void
 }) {
   const groups = groupByDate(conversations)
   return (
@@ -455,23 +560,15 @@ function StudentConversationSidebar({
             <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">{group.label}</p>
             <div className="space-y-0.5">
               {group.items.map(conv => (
-                <div
+                <ConversationItem
                   key={conv.id}
-                  onClick={() => onSelect(conv.id)}
-                  className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                    conv.id === activeId
-                      ? 'bg-white shadow-sm border border-[#D9DEE5] text-gray-900'
-                      : 'text-gray-600 hover:bg-white/70'
-                  }`}
-                >
-                  <span className="flex-1 truncate">{conv.title}</span>
-                  <button
-                    onClick={e => { e.stopPropagation(); onDelete(conv.id) }}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 transition-all"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
+                  conv={conv}
+                  active={conv.id === activeId}
+                  theme="student"
+                  onSelect={onSelect}
+                  onRename={onRename}
+                  onDelete={onDelete}
+                />
               ))}
             </div>
           </div>
@@ -583,6 +680,13 @@ export default function ConversationsPage() {
     queryClient.invalidateQueries({ queryKey: ['conversations'] })
   }, [activeConvId, queryClient])
 
+  const handleRenameConversation = useCallback(async (convId: number, title: string) => {
+    try {
+      await conversationApi.updateTitle(convId, title)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    } catch { /* 静默失败 */ }
+  }, [queryClient])
+
   const handleFeedback = useCallback(async (msgId: number, rating: 'up' | 'down') => {
     try {
       await conversationApi.submitFeedback(msgId, rating)
@@ -606,7 +710,7 @@ export default function ConversationsPage() {
     let convId = activeConvId
     if (!convId) {
       try {
-        const conv = await conversationApi.create(chatKb, q.slice(0, 50))
+        const conv = await conversationApi.create(chatKb, '新对话')
         convId = conv.id
         setActiveConvId(conv.id)
         queryClient.invalidateQueries({ queryKey: ['conversations'] })
@@ -620,14 +724,11 @@ export default function ConversationsPage() {
       userDbMsg = await conversationApi.addMessage(convId, { role: 'user', content: q })
     } catch { /* 继续发送，不阻塞 */ }
 
-    if (messages.length === 0) {
-      conversationApi.updateTitle(convId, q.slice(0, 50)).catch(() => {})
-      queryClient.invalidateQueries({ queryKey: ['conversations'] })
-    }
+    const isFirstTurn = messages.length === 0
 
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: q, dbMessageId: userDbMsg?.id }
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: q, dbMessageId: userDbMsg?.id, isNew: true }
     const assistantId = crypto.randomUUID()
-    const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', content: '', status: 'loading' }
+    const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', content: '', status: 'loading', isNew: true }
 
     setMessages(prev => [...prev, userMsg, assistantMsg])
     setIsStreaming(true)
@@ -700,6 +801,14 @@ export default function ConversationsPage() {
           : m
       ))
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
+
+      // 首轮对话结束后，让 LLM 总结一个语义化标题
+      if (isFirstTurn) {
+        conversationApi
+          .summarizeTitle(currentConvId)
+          .then(() => queryClient.invalidateQueries({ queryKey: ['conversations'] }))
+          .catch(() => { /* 失败则保持 "新对话" */ })
+      }
     } catch (e) {
       if ((e as Error).name === 'AbortError') return
       setMessages(prev => prev.map(m =>
@@ -738,6 +847,7 @@ export default function ConversationsPage() {
           onSelect={loadConversation}
           onNew={handleNewConversation}
           onDelete={handleDeleteConversation}
+          onRename={handleRenameConversation}
         />
       ) : (
         <AdminConversationSidebar
@@ -747,6 +857,7 @@ export default function ConversationsPage() {
           onSelect={loadConversation}
           onNew={handleNewConversation}
           onDelete={handleDeleteConversation}
+          onRename={handleRenameConversation}
         />
       )}
 
