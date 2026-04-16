@@ -540,7 +540,7 @@ function KBListCard({
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[#1A1A1A]">知识库列表</h3>
         <button
-          onClick={() => navigate('/knowledge')}
+          onClick={() => navigate('/admin/knowledge')}
           className="flex items-center gap-1 text-xs text-[#9A9A9A] hover:text-[#1A1A1A] transition-colors px-2 py-1 rounded-lg hover:bg-[#F2EFE9]"
         >
           <Plus size={12} />
@@ -557,7 +557,7 @@ function KBListCard({
           return (
             <button
               key={kb.id}
-              onClick={() => navigate(`/documents?kb=${kb.name}`)}
+              onClick={() => navigate(`/admin/documents?kb=${kb.name}`)}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F8F6F2] transition-colors group w-full text-left"
               style={{
                 opacity: animate ? 1 : 0,
