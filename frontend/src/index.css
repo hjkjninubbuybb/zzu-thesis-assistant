@@ -24,6 +24,20 @@
   --radius: 0.75rem;
 }
 
+/* ───── Student theme override ───── */
+[data-theme="student"] {
+  --color-background: hsl(215 25% 94%);
+  --color-foreground: hsl(215 28% 17%);
+  --color-secondary: hsl(215 20% 96%);
+  --color-muted: hsl(215 12% 94%);
+  --color-muted-foreground: hsl(215 10% 48%);
+  --color-accent: hsl(220 72% 96%);
+  --color-accent-foreground: hsl(220 72% 50%);
+  --color-border: hsl(215 18% 88%);
+  --color-input: hsl(215 18% 88%);
+  --color-ring: hsl(220 72% 50%);
+}
+
 * {
   border-color: var(--color-border);
 }
