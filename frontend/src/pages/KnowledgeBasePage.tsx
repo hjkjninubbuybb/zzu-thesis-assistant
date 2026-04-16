@@ -1,9 +1,8 @@
 import { useState, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { } from 'react-router-dom'
 import {
   Plus, Trash2, FileText, Loader2, AlertCircle, X, Database,
-  Upload, ChevronDown, ChevronUp, CheckCircle, Clock,
+  Upload, ChevronDown, ChevronUp, CheckCircle, Clock, Users, BookOpen,
 } from 'lucide-react'
 import { knowledgeApi, documentApi, extractError } from '@/lib/api'
 import type { KBInfo, DocType, SplitterType, UploadParams } from '@/types/api'
@@ -419,6 +418,76 @@ function DocumentPanel({ kbName, onToast }: {
 
 // ── KnowledgeBasePage ──────────────────────────────────────
 
+// ── 状态横幅 ──────────────────────────────────────────────
+
+function StatusBanner({
+  icon: Icon,
+  kbName,
+  label,
+  subLabel,
+  emptyLabel,
+  emptySubLabel,
+  accentColor,
+  onClear,
+  clearing,
+}: {
+  icon: React.ElementType
+  kbName: string | null
+  label: string
+  subLabel: string
+  emptyLabel: string
+  emptySubLabel: string
+  accentColor: string  // 'indigo' | 'emerald'
+  onClear: () => void
+  clearing: boolean
+}) {
+  const isIndigo = accentColor === 'indigo'
+  return (
+    <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl ${
+      kbName
+        ? isIndigo ? 'bg-[#EEF2FF] border border-[#C7D2FE]' : 'bg-emerald-50 border border-emerald-200'
+        : 'bg-amber-50 border border-amber-200'
+    }`}>
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+        kbName
+          ? isIndigo ? 'bg-[#4F46E5]/10' : 'bg-emerald-100'
+          : 'bg-amber-100'
+      }`}>
+        <Icon size={16} className={kbName ? (isIndigo ? 'text-[#4F46E5]' : 'text-emerald-600') : 'text-amber-600'} />
+      </div>
+      <div className="flex-1 min-w-0">
+        {kbName ? (
+          <>
+            <p className={`text-sm font-medium ${isIndigo ? 'text-[#312E81]' : 'text-emerald-900'}`}>
+              {label}：<span className="font-bold">{kbName}</span>
+            </p>
+            <p className={`text-xs mt-0.5 ${isIndigo ? 'text-[#4338CA]' : 'text-emerald-700'}`}>{subLabel}</p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-amber-800">{emptyLabel}</p>
+            <p className="text-xs text-amber-700 mt-0.5">{emptySubLabel}</p>
+          </>
+        )}
+      </div>
+      {kbName && (
+        <button
+          onClick={onClear}
+          disabled={clearing}
+          className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border disabled:opacity-50 transition-colors ${
+            isIndigo
+              ? 'border-[#A5B4FC] text-[#4338CA] hover:bg-[#EEF2FF]'
+              : 'border-emerald-300 text-emerald-700 hover:bg-emerald-100'
+          }`}
+        >
+          {clearing ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
+          取消分配
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function KnowledgeBasePage() {
   const qc = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
@@ -436,10 +505,28 @@ export default function KnowledgeBasePage() {
     queryFn: knowledgeApi.list,
   })
 
+  const { data: studentKbData } = useQuery({
+    queryKey: ['active-kb'],
+    queryFn: knowledgeApi.getActiveKb,
+  })
+  const { data: adminKbData } = useQuery({
+    queryKey: ['admin-kb'],
+    queryFn: knowledgeApi.getAdminKb,
+  })
+
+  const studentKbName = studentKbData?.kb_name ?? null
+  const adminKbName = adminKbData?.kb_name ?? null
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ['knowledge-bases'] })
+    qc.invalidateQueries({ queryKey: ['active-kb'] })
+    qc.invalidateQueries({ queryKey: ['admin-kb'] })
+  }
+
   const deleteMutation = useMutation({
     mutationFn: (name: string) => knowledgeApi.delete(name),
     onSuccess: (_, name) => {
-      qc.invalidateQueries({ queryKey: ['knowledge-bases'] })
+      invalidateAll()
       setDeleteTarget(null)
       if (expandedKb === name) setExpandedKb(null)
       showToast(`知识库 "${name}" 已删除`, 'success')
@@ -447,12 +534,36 @@ export default function KnowledgeBasePage() {
     onError: (e) => showToast(extractError(e), 'error'),
   })
 
+  // 学生 KB mutations
+  const setStudentMutation = useMutation({
+    mutationFn: (kbName: string) => knowledgeApi.setActiveKb(kbName),
+    onSuccess: (data) => { invalidateAll(); showToast(`已将「${data.kb_name}」设为学生知识库`, 'success') },
+    onError: (e) => showToast(extractError(e), 'error'),
+  })
+  const clearStudentMutation = useMutation({
+    mutationFn: knowledgeApi.clearActiveKb,
+    onSuccess: () => { invalidateAll(); showToast('已取消学生知识库分配', 'success') },
+    onError: (e) => showToast(extractError(e), 'error'),
+  })
+
+  // 管理端 KB mutations
+  const setAdminMutation = useMutation({
+    mutationFn: (kbName: string) => knowledgeApi.setAdminKb(kbName),
+    onSuccess: (data) => { invalidateAll(); showToast(`已将「${data.kb_name}」设为管理端知识库`, 'success') },
+    onError: (e) => showToast(extractError(e), 'error'),
+  })
+  const clearAdminMutation = useMutation({
+    mutationFn: knowledgeApi.clearAdminKb,
+    onSuccess: () => { invalidateAll(); showToast('已取消管理端知识库分配', 'success') },
+    onError: (e) => showToast(extractError(e), 'error'),
+  })
+
   return (
     <div className="px-8 py-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#1A1A1A]">知识库</h1>
-          <p className="mt-1 text-sm" style={{ color: '#8A8A8A' }}>管理知识库的创建与删除</p>
+          <p className="mt-1 text-sm" style={{ color: '#8A8A8A' }}>管理知识库，分别为管理端和学生端指定使用的知识库</p>
         </div>
         <button
           onClick={() => setCreateOpen(true)}
@@ -460,6 +571,32 @@ export default function KnowledgeBasePage() {
         >
           <Plus size={15} />新建知识库
         </button>
+      </div>
+
+      {/* 两个状态横幅 */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <StatusBanner
+          icon={BookOpen}
+          kbName={adminKbName}
+          label="管理端当前知识库"
+          subLabel="教师/管理员的对话将路由至此知识库"
+          emptyLabel="尚未为管理端分配知识库"
+          emptySubLabel="教师和管理员将无法发起问答，请从下方选择"
+          accentColor="emerald"
+          onClear={() => clearAdminMutation.mutate()}
+          clearing={clearAdminMutation.isPending}
+        />
+        <StatusBanner
+          icon={Users}
+          kbName={studentKbName}
+          label="学生端当前知识库"
+          subLabel="所有学生的问答请求将路由至此知识库"
+          emptyLabel="尚未为学生分配知识库"
+          emptySubLabel="学生将无法发起问答，请从下方选择"
+          accentColor="indigo"
+          onClear={() => clearStudentMutation.mutate()}
+          clearing={clearStudentMutation.isPending}
+        />
       </div>
 
       {isLoading && (
@@ -489,9 +626,18 @@ export default function KnowledgeBasePage() {
           {kbs.map((kb, i) => {
             const color = KB_COLORS[i % KB_COLORS.length]
             const isExpanded = expandedKb === kb.name
+            const isStudentKb = kb.name === studentKbName
+            const isAdminKb = kb.name === adminKbName
+            const highlighted = isStudentKb || isAdminKb
             return (
               <div key={kb.id}>
-                <div className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-colors ${isExpanded ? 'border-[#1A1A1A] bg-white' : 'border-[#F0EDE8] bg-white hover:bg-[#F8F6F2]'}`}>
+                <div className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-colors ${
+                  highlighted
+                    ? 'bg-white border-gray-300'
+                    : isExpanded
+                      ? 'border-[#1A1A1A] bg-white'
+                      : 'border-[#F0EDE8] bg-white hover:bg-[#F8F6F2]'
+                }`}>
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0 select-none"
                     style={{ background: color }}
@@ -499,8 +645,20 @@ export default function KnowledgeBasePage() {
                     {kb.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#1A1A1A]">{kb.name}</p>
-                    <p className="text-xs truncate" style={{ color: '#8A8A8A' }}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-[#1A1A1A]">{kb.name}</p>
+                      {isAdminKb && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-full border border-emerald-200">
+                          <BookOpen size={9} />管理端
+                        </span>
+                      )}
+                      {isStudentKb && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-[#EEF2FF] text-[#4338CA] text-[10px] font-semibold rounded-full border border-[#C7D2FE]">
+                          <Users size={9} />学生端
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs truncate mt-0.5" style={{ color: '#8A8A8A' }}>
                       {kb.description || '暂无描述'}
                     </p>
                   </div>
@@ -512,6 +670,46 @@ export default function KnowledgeBasePage() {
                     {formatDate(kb.created_at)}
                   </p>
                   <div className="flex items-center gap-2 shrink-0">
+                    {/* 管理端 KB 按钮 */}
+                    {isAdminKb ? (
+                      <button
+                        onClick={() => clearAdminMutation.mutate()}
+                        disabled={clearAdminMutation.isPending}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+                      >
+                        {clearAdminMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
+                        取消管理端
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setAdminMutation.mutate(kb.name)}
+                        disabled={setAdminMutation.isPending}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-[#E8E4DC] text-gray-600 hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 transition-colors"
+                      >
+                        {setAdminMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <BookOpen size={11} />}
+                        设为管理端
+                      </button>
+                    )}
+                    {/* 学生 KB 按钮 */}
+                    {isStudentKb ? (
+                      <button
+                        onClick={() => clearStudentMutation.mutate()}
+                        disabled={clearStudentMutation.isPending}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-[#A5B4FC] bg-[#EEF2FF] text-[#4338CA] hover:bg-[#E0E7FF] disabled:opacity-50 transition-colors"
+                      >
+                        {clearStudentMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
+                        取消学生端
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setStudentMutation.mutate(kb.name)}
+                        disabled={setStudentMutation.isPending}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-[#E8E4DC] text-gray-600 hover:border-[#818CF8] hover:text-[#4338CA] hover:bg-[#EEF2FF] disabled:opacity-50 transition-colors"
+                      >
+                        {setStudentMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <Users size={11} />}
+                        设为学生端
+                      </button>
+                    )}
                     <button
                       onClick={() => setExpandedKb(isExpanded ? null : kb.name)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${isExpanded ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'border-[#F0EDE8] text-[#1A1A1A] hover:bg-[#F2EFE9]'}`}
