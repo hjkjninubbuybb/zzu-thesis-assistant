@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Search,
   ChevronDown,
-  ChevronUp,
   MessagesSquare,
   HelpCircle,
 } from 'lucide-react'
@@ -12,7 +11,7 @@ import { knowledgeApi, faqApi } from '@/lib/api'
 import type { FAQItem } from '@/types/api'
 
 const cardStyle = (delay: number): React.CSSProperties => ({
-  animation: `fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms both`,
+  animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${delay}ms both`,
 })
 
 export default function StudentFaqPage() {
@@ -123,7 +122,7 @@ export default function StudentFaqPage() {
               index={i}
               expanded={expandedId === faq.id}
               onToggle={() => setExpandedId(expandedId === faq.id ? null : faq.id)}
-              onAsk={() => navigate(`/s/chat`)}
+              onAsk={() => navigate(`/student/chat`)}
             />
           ))}
         </div>
@@ -151,8 +150,7 @@ function FaqAccordion({
         expanded ? 'border-[#2563EB]/30 bg-[#FAFBFF]' : 'border-[#D9DEE5] bg-white hover:border-[#B0BDD5]'
       }`}
       style={{
-        opacity: 0,
-        animation: `fadeSlideUp 0.4s ease ${200 + index * 50}ms both`,
+        animation: `appleFadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) ${Math.min(200 + index * 55, 650)}ms both`,
       }}
     >
       <button
@@ -170,28 +168,31 @@ function FaqAccordion({
             {faq.category}
           </span>
         )}
-        {expanded
-          ? <ChevronUp size={16} className="text-[#6E7787] shrink-0" />
-          : <ChevronDown size={16} className="text-[#6E7787] shrink-0" />
-        }
+        <ChevronDown
+          size={16}
+          className="text-[#6E7787] shrink-0 transition-transform duration-300"
+          style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0)' }}
+        />
       </button>
 
-      {expanded && (
-        <div className="px-5 pb-4">
-          <div className="ml-10 text-sm text-[#4B5563] leading-relaxed whitespace-pre-line">
-            {faq.answer}
-          </div>
-          <div className="ml-10 mt-3">
-            <button
-              onClick={e => { e.stopPropagation(); onAsk() }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#EEF2FF] text-xs font-medium text-[#2563EB] hover:bg-[#DBEAFE] transition-colors"
-            >
-              <MessagesSquare size={12} />
-              去提问
-            </button>
+      <div className={`accordion-body ${expanded ? 'open' : ''}`}>
+        <div>
+          <div className="px-5 pb-4">
+            <div className="ml-10 text-sm text-[#4B5563] leading-relaxed whitespace-pre-line">
+              {faq.answer}
+            </div>
+            <div className="ml-10 mt-3">
+              <button
+                onClick={e => { e.stopPropagation(); onAsk() }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#EEF2FF] text-xs font-medium text-[#2563EB] hover:bg-[#DBEAFE] transition-colors"
+              >
+                <MessagesSquare size={12} />
+                去提问
+              </button>
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -52,8 +52,8 @@ function CreateStudentModal({ onClose }: { onClose: () => void }) {
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="bg-white rounded-2xl border border-[#F0EDE8] shadow-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-apple-fade">
+      <div className="bg-white rounded-2xl border border-[#F0EDE8] shadow-lg p-6 w-full max-w-md animate-apple-pop">
         <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">添加学生账号</h2>
         <div className="flex flex-col gap-3">
           {field('username', '用户名 *', '仅字母数字下划线')}
@@ -105,8 +105,8 @@ function ResetPasswordModal({ user, onClose }: { user: UserInfo; onClose: () => 
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="bg-white rounded-2xl border border-[#F0EDE8] shadow-lg p-6 w-full max-w-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-apple-fade">
+      <div className="bg-white rounded-2xl border border-[#F0EDE8] shadow-lg p-6 w-full max-w-sm animate-apple-pop">
         <h2 className="text-base font-semibold text-[#1A1A1A] mb-1">重置密码</h2>
         <p className="text-xs text-[#9A9A9A] mb-4">为 <b>{user.display_name || user.username}</b> 设置新密码</p>
         <input type="password" value={pwd} onChange={e => setPwd(e.target.value)}
@@ -182,10 +182,14 @@ export default function StudentsPage() {
       )
     : items
 
+  const settle = (d: number): React.CSSProperties => ({
+    animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
+  })
+
   return (
     <div className="flex flex-col gap-5 h-full">
       {/* 头部 */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" style={settle(0)}>
         <div>
           <h1 className="text-lg font-semibold text-[#1A1A1A]">学生账号</h1>
           <p className="text-xs text-[#9A9A9A] mt-0.5">共 {total} 名学生</p>
@@ -204,7 +208,7 @@ export default function StudentsPage() {
             <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleImport} disabled={importing} />
           </label>
           <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] transition">
+            className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] transition apple-press">
             <Plus size={15} /> 添加学生
           </button>
         </div>
@@ -219,7 +223,7 @@ export default function StudentsPage() {
       )}
 
       {/* 搜索框 */}
-      <div className="relative">
+      <div className="relative" style={settle(50)}>
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]" />
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="搜索用户名、姓名或学号..."
@@ -227,7 +231,7 @@ export default function StudentsPage() {
       </div>
 
       {/* 列表卡片 */}
-      <div className="flex-1 bg-white rounded-2xl border border-[#F0EDE8] shadow-sm overflow-hidden">
+      <div className="flex-1 bg-white rounded-2xl border border-[#F0EDE8] shadow-sm overflow-hidden" style={settle(100)}>
         {isLoading ? (
           <div className="flex items-center justify-center h-48 text-sm text-[#9A9A9A]">加载中...</div>
         ) : filtered.length === 0 ? (
@@ -244,10 +248,14 @@ export default function StudentsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(u => {
+              {filtered.map((u, i) => {
                 const profile = u.profile as { student_id?: string; grade?: string; major?: string } | null
                 return (
-                  <tr key={u.id} className="border-b border-[#F8F6F3] hover:bg-[#FAFAF9] transition">
+                  <tr
+                    key={u.id}
+                    className="border-b border-[#F8F6F3] hover:bg-[#FAFAF9] transition"
+                    style={{ animation: `appleFadeUp 0.55s cubic-bezier(0.25, 1, 0.5, 1) ${Math.min(160 + i * 45, 600)}ms both` }}
+                  >
                     <td className="px-4 py-3 font-medium text-[#1A1A1A]">{u.display_name || '—'}</td>
                     <td className="px-4 py-3 text-[#4A4A4A] font-mono text-xs">{u.username}</td>
                     <td className="px-4 py-3 text-[#4A4A4A]">{profile?.student_id || '—'}</td>
@@ -270,7 +278,9 @@ export default function StudentsPage() {
                         <MoreHorizontal size={16} />
                       </button>
                       {menuOpen === u.id && (
-                        <div className="absolute right-4 top-10 z-20 bg-white border border-[#F0EDE8] rounded-xl shadow-md py-1 min-w-[140px]"
+                        <div
+                          className="absolute right-4 top-10 z-20 bg-white border border-[#F0EDE8] rounded-xl shadow-md py-1 min-w-[140px]"
+                          style={{ animation: 'applePopIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both' }}
                           onMouseLeave={() => setMenuOpen(null)}>
                           <button
                             onClick={() => { toggleActive.mutate(u); setMenuOpen(null) }}

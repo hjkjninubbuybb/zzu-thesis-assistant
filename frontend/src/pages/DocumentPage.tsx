@@ -35,7 +35,7 @@ const DOC_TYPE_BAR_COLORS: Record<DocType, string> = {
 
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
-    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white text-sm z-50 ${type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white text-sm z-50 animate-apple-toast ${type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
       <span>{message}</span>
       <button onClick={onClose}><X size={14} /></button>
     </div>
@@ -210,15 +210,19 @@ export default function DocumentPage() {
   const pendingCount = queue.filter(q => q.status === 'pending').length
   const hasDone = queue.some(q => q.status === 'done')
 
+  const settle = (d: number): React.CSSProperties => ({
+    animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
+  })
+
   return (
     <div className="p-6 max-w-5xl flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
-      <div className="mb-6">
+      <div className="mb-6" style={settle(0)}>
         <h1 className="text-2xl font-semibold text-gray-900">文档</h1>
         <p className="mt-1 text-sm text-gray-500">上传与管理知识库中的文档</p>
       </div>
 
       {/* 知识库选择 */}
-      <div className="mb-6">
+      <div className="mb-6" style={settle(60)}>
         <label className="block text-sm font-medium text-gray-700 mb-1">选择知识库</label>
         <select
           value={selectedKb}
@@ -233,7 +237,7 @@ export default function DocumentPage() {
       {selectedKb && (
         <>
           {/* 上传区域 */}
-          <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5">
+          <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5" style={settle(120)}>
             <h2 className="text-sm font-medium text-gray-700 mb-3">上传文档</h2>
 
             {/* 拖拽区 */}
@@ -425,7 +429,7 @@ export default function DocumentPage() {
           </div>
 
           {/* 文档列表 */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden" style={settle(180)}>
             <div className="px-4 py-3 border-b border-gray-100">
               <h2 className="text-sm font-medium text-gray-700">已入库文档</h2>
             </div>

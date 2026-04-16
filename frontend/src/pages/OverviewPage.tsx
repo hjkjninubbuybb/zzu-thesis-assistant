@@ -634,7 +634,7 @@ export default function OverviewPage() {
 
   // Wrapper style helper for staggered fade-slide-up
   const cardStyle = (delay: number): React.CSSProperties => ({
-    animation: `fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms both`,
+    animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${delay}ms both`,
   })
 
   return (

@@ -60,7 +60,7 @@ function StatusIcon({ status }: { status: FileStatus }) {
 
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
-    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white text-sm z-50 ${type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white text-sm z-50 animate-apple-toast ${type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
       <span>{message}</span>
       <button onClick={onClose}><X size={14} /></button>
     </div>
@@ -73,8 +73,8 @@ function ConfirmDialog({ name, onConfirm, onCancel, loading }: {
   name: string; onConfirm: () => void; onCancel: () => void; loading: boolean
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-40">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 animate-apple-fade">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
         <h3 className="text-base font-semibold text-gray-900">确认删除</h3>
         <p className="mt-2 text-sm text-gray-500">
           将删除知识库 <span className="font-medium text-gray-800">"{name}"</span> 及其所有文档，此操作不可撤销。
@@ -114,8 +114,8 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
   const handleSubmit = () => { if (!validate()) return; mutation.mutate() }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-40">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 animate-apple-fade">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-900">新建知识库</h3>
           <button onClick={onClose}><X size={18} className="text-gray-400 hover:text-gray-600" /></button>
@@ -558,23 +558,27 @@ export default function KnowledgeBasePage() {
     onError: (e) => showToast(extractError(e), 'error'),
   })
 
+  const settle = (d: number): React.CSSProperties => ({
+    animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
+  })
+
   return (
     <div className="px-8 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6" style={settle(0)}>
         <div>
           <h1 className="text-2xl font-bold text-[#1A1A1A]">知识库</h1>
           <p className="mt-1 text-sm" style={{ color: '#8A8A8A' }}>管理知识库，分别为管理端和学生端指定使用的知识库</p>
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] transition-colors apple-press"
         >
           <Plus size={15} />新建知识库
         </button>
       </div>
 
       {/* 两个状态横幅 */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-2 gap-3 mb-6" style={settle(60)}>
         <StatusBanner
           icon={BookOpen}
           kbName={adminKbName}
@@ -630,7 +634,7 @@ export default function KnowledgeBasePage() {
             const isAdminKb = kb.name === adminKbName
             const highlighted = isStudentKb || isAdminKb
             return (
-              <div key={kb.id}>
+              <div key={kb.id} style={settle(Math.min(120 + i * 50, 500))}>
                 <div className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-colors ${
                   highlighted
                     ? 'bg-white border-gray-300'

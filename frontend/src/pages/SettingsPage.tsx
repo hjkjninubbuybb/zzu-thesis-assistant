@@ -98,7 +98,7 @@ function NumberInput({ value, min, max, onChange }: {
 
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
-    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white text-sm z-50 ${type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white text-sm z-50 animate-apple-toast ${type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
       {type === 'success' ? <CheckCircle size={16} /> : null}
       <span>{message}</span>
       <button onClick={onClose}><X size={14} /></button>
@@ -229,9 +229,13 @@ export default function SettingsPage() {
     )
   }
 
+  const settle = (d: number): React.CSSProperties => ({
+    animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
+  })
+
   return (
     <div className="p-6 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6" style={settle(0)}>
         <div>
           <h1 className="text-2xl font-semibold text-stone-900">系统配置</h1>
           <p className="mt-1 text-sm text-stone-500">管理模型、检索和 RAG 核心参数</p>
@@ -239,7 +243,7 @@ export default function SettingsPage() {
         <button
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
-          className="flex items-center gap-2 px-5 py-2.5 bg-stone-800 text-white text-sm rounded-lg hover:bg-stone-900 disabled:opacity-60 transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-stone-800 text-white text-sm rounded-lg hover:bg-stone-900 disabled:opacity-60 transition-colors apple-press"
         >
           {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
           保存配置
@@ -249,6 +253,7 @@ export default function SettingsPage() {
       <div className="space-y-4">
 
         {/* API 密钥 */}
+        <div style={settle(80)}>
         <Section icon={Key} title="API 密钥">
           <Field label="DashScope" hint="用于 LLM / Embedding / Reranker">
             <div className="space-y-2">
@@ -339,8 +344,10 @@ export default function SettingsPage() {
             </div>
           </Field>
         </Section>
+        </div>
 
         {/* 模型配置 */}
+        <div style={settle(160)}>
         <Section icon={Cpu} title="模型配置">
           <div className="space-y-6">
             <Field label="对话模型" hint="生成最终回答">
@@ -373,8 +380,10 @@ export default function SettingsPage() {
             </Field>
           </div>
         </Section>
+        </div>
 
         {/* 检索参数 */}
+        <div style={settle(240)}>
         <Section icon={Search} title="检索参数">
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
@@ -398,8 +407,10 @@ export default function SettingsPage() {
             </div>
           </div>
         </Section>
+        </div>
 
         {/* RAG 参数 */}
+        <div style={settle(320)}>
         <Section icon={Sparkles} title="RAG 参数">
           <Field label="最大改写次数" hint="改写可提升召回，但增加延迟">
             <div className="flex gap-1.5">
@@ -419,6 +430,7 @@ export default function SettingsPage() {
             </div>
           </Field>
         </Section>
+        </div>
 
       </div>
 

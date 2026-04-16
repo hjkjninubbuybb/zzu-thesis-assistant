@@ -56,6 +56,13 @@ body {
   flex-direction: column;
 }
 
+/* ───── Apple-style easing variables ───── */
+
+:root {
+  --apple-ease: cubic-bezier(0.25, 1, 0.5, 1);
+  --apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
 /* ───── Keyframe animations ───── */
 
 @keyframes fadeSlideUp {
@@ -67,6 +74,57 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Apple 风格 — 模糊/缩放/下沉 → 清晰/原位 */
+@keyframes appleSettleIn {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.96) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 遮罩层渐显 */
+@keyframes appleFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* 模态框 — 弹性缩放入场 */
+@keyframes applePopIn {
+  0%   { opacity: 0; transform: scale(0.92) translateY(10px); }
+  70%  { opacity: 1; transform: scale(1.02) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* 聊天气泡 — 水平弹入 */
+@keyframes appleSlideRight {
+  from { opacity: 0; transform: translateX(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes appleSlideLeft {
+  from { opacity: 0; transform: translateX(-16px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* Toast — 底部弹入 */
+@keyframes appleToastIn {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.95); }
+  70%  { transform: translateY(-3px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 行/列表项 — 轻盈入场 */
+@keyframes appleFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes blobFloat {
@@ -148,12 +206,63 @@ body {
   animation: fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.animate-apple-settle {
+  animation: appleSettleIn 0.8s var(--apple-ease) both;
+}
+
+.animate-apple-pop {
+  animation: applePopIn 0.55s var(--apple-spring) both;
+}
+
+.animate-apple-toast {
+  animation: appleToastIn 0.6s var(--apple-spring) both;
+}
+
+.animate-apple-slide-r {
+  animation: appleSlideRight 0.5s var(--apple-ease) both;
+}
+
+.animate-apple-slide-l {
+  animation: appleSlideLeft 0.5s var(--apple-ease) both;
+}
+
+.animate-apple-fade {
+  animation: appleFadeIn 0.4s ease both;
+}
+
+/* 手风琴 — grid-template-rows 平滑过渡 */
+.accordion-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.5s var(--apple-ease),
+              opacity 0.45s ease;
+}
+
+.accordion-body.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.accordion-body > div {
+  overflow: hidden;
+}
+
+/* Apple 按压反馈 */
+.apple-press {
+  transition: transform 0.2s var(--apple-ease);
+}
+
+.apple-press:active {
+  transform: scale(0.97);
+}
+
 .hover-lift {
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+  transition: transform 0.2s var(--apple-ease),
     box-shadow 0.2s ease;
 }
 
 .hover-lift:hover {
   transform: translateY(-3px);
-  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.10);
 }

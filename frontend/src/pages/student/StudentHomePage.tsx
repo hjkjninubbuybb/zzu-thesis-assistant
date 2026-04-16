@@ -32,7 +32,7 @@ function useCountUp(target: number, duration = 900) {
 }
 
 const cardStyle = (delay: number): React.CSSProperties => ({
-  animation: `fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms both`,
+  animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${delay}ms both`,
 })
 
 export default function StudentHomePage() {
@@ -85,7 +85,7 @@ export default function StudentHomePage() {
             background: 'linear-gradient(135deg, #2563EB 0%, #3B82F6 50%, #60A5FA 100%)',
             minHeight: 160,
           }}
-          onClick={() => navigate('/s/chat')}
+          onClick={() => navigate('/student/chat')}
         >
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
             <Sparkles size={20} className="text-white" strokeWidth={1.8} />
@@ -133,7 +133,7 @@ export default function StudentHomePage() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-[#202938]">最近对话</h3>
             <button
-              onClick={() => navigate('/s/chat')}
+              onClick={() => navigate('/student/chat')}
               className="flex items-center gap-1 text-xs text-[#6E7787] hover:text-[#2563EB] transition-colors px-2 py-1 rounded-lg hover:bg-[#EEF2FF]"
             >
               查看全部
@@ -164,7 +164,7 @@ export default function StudentHomePage() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-[#202938]">常见问题</h3>
             <button
-              onClick={() => navigate('/s/faq')}
+              onClick={() => navigate('/student/faq')}
               className="flex items-center gap-1 text-xs text-[#6E7787] hover:text-[#2563EB] transition-colors px-2 py-1 rounded-lg hover:bg-[#EEF2FF]"
             >
               更多
@@ -235,11 +235,11 @@ function ConvItem({ conv, index }: { conv: ConversationInfo; index: number }) {
 
   return (
     <button
-      onClick={() => navigate('/s/chat')}
+      onClick={() => navigate('/student/chat')}
       className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#EEF2FF] transition-colors group w-full text-left"
       style={{
         opacity: 0,
-        animation: `fadeSlideUp 0.4s ease ${500 + index * 60}ms both`,
+        animation: `appleFadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) ${500 + index * 75}ms both`,
       }}
     >
       <div className="w-8 h-8 rounded-lg bg-[#EEF2FF] flex items-center justify-center shrink-0">
@@ -267,7 +267,7 @@ function FaqItem({ faq, index }: { faq: FAQItem; index: number }) {
       className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#EEF2FF] transition-colors group w-full text-left"
       style={{
         opacity: 0,
-        animation: `fadeSlideUp 0.4s ease ${500 + index * 60}ms both`,
+        animation: `appleFadeUp 0.6s cubic-bezier(0.25, 1, 0.5, 1) ${500 + index * 75}ms both`,
       }}
     >
       <div className="w-8 h-8 rounded-lg bg-[#F0FDF4] flex items-center justify-center shrink-0">

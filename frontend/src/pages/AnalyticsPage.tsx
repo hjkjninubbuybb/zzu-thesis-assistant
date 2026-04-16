@@ -46,7 +46,7 @@ function StatCard({
   return (
     <div
       className="bg-white rounded-2xl p-5 flex flex-col gap-3 hover-lift border border-[#F0EDE8] shadow-sm"
-      style={{ animation: animate ? `fadeSlideUp 0.55s cubic-bezier(0.22,1,0.36,1) ${delay}ms both` : 'none' }}
+      style={{ animation: animate ? `appleSettleIn 0.75s cubic-bezier(0.25,1,0.5,1) ${delay}ms both` : 'none' }}
     >
       <div className="flex items-start justify-between">
         <p className="text-xs font-medium text-[#9A9A9A]">{label}</p>
@@ -78,7 +78,7 @@ function BarChart({ data, animate }: { data: AnalyticsSummary['week_data']; anim
   return (
     <div
       className="bg-white rounded-2xl p-6 flex flex-col gap-5 hover-lift border border-[#F0EDE8] shadow-sm h-full"
-      style={{ animation: animate ? 'fadeSlideUp 0.55s cubic-bezier(0.22,1,0.36,1) 280ms both' : 'none' }}
+      style={{ animation: animate ? 'appleSettleIn 0.75s cubic-bezier(0.25,1,0.5,1) 280ms both' : 'none' }}
     >
       <div>
         <h3 className="text-sm font-semibold text-[#1A1A1A]">每日提问量</h3>
@@ -155,7 +155,7 @@ function KBOverviewCard({
       className="rounded-2xl p-6 flex flex-col gap-5 hover-lift h-full"
       style={{
         background: '#1A1A1A',
-        animation: animate ? 'fadeSlideUp 0.55s cubic-bezier(0.22,1,0.36,1) 360ms both' : 'none',
+        animation: animate ? 'appleSettleIn 0.75s cubic-bezier(0.25,1,0.5,1) 360ms both' : 'none',
       }}
     >
       <div>
@@ -209,7 +209,7 @@ function RecentQuestionsCard({
   return (
     <div
       className="bg-white rounded-2xl p-6 flex flex-col gap-4 hover-lift border border-[#F0EDE8] shadow-sm"
-      style={{ animation: animate ? 'fadeSlideUp 0.55s cubic-bezier(0.22,1,0.36,1) 440ms both' : 'none' }}
+      style={{ animation: animate ? 'appleSettleIn 0.75s cubic-bezier(0.25,1,0.5,1) 440ms both' : 'none' }}
     >
       <div>
         <h3 className="text-sm font-semibold text-[#1A1A1A]">最近提问</h3>
@@ -280,7 +280,7 @@ function FeedbackCard({
   return (
     <div
       className="bg-white rounded-2xl p-6 flex flex-col gap-5 hover-lift border border-[#F0EDE8] shadow-sm"
-      style={{ animation: animate ? 'fadeSlideUp 0.55s cubic-bezier(0.22,1,0.36,1) 520ms both' : 'none' }}
+      style={{ animation: animate ? 'appleSettleIn 0.75s cubic-bezier(0.25,1,0.5,1) 520ms both' : 'none' }}
     >
       <div>
         <h3 className="text-sm font-semibold text-[#1A1A1A]">回答反馈</h3>

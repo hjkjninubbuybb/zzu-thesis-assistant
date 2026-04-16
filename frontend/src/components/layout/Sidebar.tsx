@@ -46,7 +46,7 @@ function NavItem({
           'w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 text-sm',
           isActive
             ? 'bg-[#1A1A1A] text-white shadow-sm'
-            : 'text-[#9A9A9A] hover:bg-[#F2EFE9] hover:text-[#1A1A1A] active:scale-95'
+            : 'text-[#9A9A9A] hover:bg-[#F2EFE9] hover:text-[#1A1A1A] active:scale-[0.97]'
         )
       }
     >

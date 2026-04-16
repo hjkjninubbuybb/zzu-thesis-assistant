@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, Pencil, Trash2, X, Loader2, MessageSquareQuote,
-  ToggleLeft, ToggleRight, AlertCircle, ChevronDown, ChevronUp,
+  ToggleLeft, ToggleRight, AlertCircle, ChevronDown,
   Search, Hash, Sparkles, Upload, Download, FileText, CheckCircle2,
 } from 'lucide-react'
 import { knowledgeApi, faqApi, extractError } from '@/lib/api'
@@ -21,7 +21,7 @@ function getCategoryColor(category: string, allCategories: string[]): string {
 
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
-    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm z-50 ${type === 'success' ? 'bg-[#1A1A1A]' : 'bg-red-600'}`}>
+    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm z-50 animate-apple-toast ${type === 'success' ? 'bg-[#1A1A1A]' : 'bg-red-600'}`}>
       <span>{message}</span>
       <button onClick={onClose}><X size={14} /></button>
     </div>
@@ -54,8 +54,8 @@ function FaqDialog({ title, initial, loading, onClose, onSubmit }: FaqDialogProp
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4 animate-apple-fade">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-apple-pop">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0EDE8]">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-[#F2EFE9] flex items-center justify-center">
@@ -148,8 +148,8 @@ function ConfirmDeleteDialog({ question, onConfirm, onCancel, loading }: {
   question: string; onConfirm: () => void; onCancel: () => void; loading: boolean
 }) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 animate-apple-fade">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
         <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-4">
           <Trash2 size={18} className="text-red-500" />
         </div>
@@ -188,11 +188,14 @@ function FaqCard({ faq, index, categoryColor, onEdit, onDelete, onToggle }: {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className={`group relative bg-white rounded-2xl border transition-all duration-200 overflow-hidden ${
-      faq.enabled
-        ? 'border-[#F0EDE8] hover:border-[#D8D4CE] hover:shadow-sm'
-        : 'border-[#F0EDE8] opacity-50'
-    }`}>
+    <div
+      className={`group relative bg-white rounded-2xl border transition-all duration-200 overflow-hidden ${
+        faq.enabled
+          ? 'border-[#F0EDE8] hover:border-[#D8D4CE] hover:shadow-sm'
+          : 'border-[#F0EDE8] opacity-50'
+      }`}
+      style={{ animation: `appleSettleIn 0.7s cubic-bezier(0.25, 1, 0.5, 1) ${Math.min(120 + index * 55, 600)}ms both` }}
+    >
       {/* 分类色条 */}
       <div
         className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl transition-all"
@@ -247,21 +250,25 @@ function FaqCard({ faq, index, categoryColor, onEdit, onDelete, onToggle }: {
             </div>
           </div>
 
-          {/* 答案预览 / 展开 */}
-          {!expanded ? (
+          {/* 答案预览 */}
+          {!expanded && (
             <button
               onClick={() => setExpanded(true)}
               className="mt-1.5 text-left w-full"
             >
               <p className="text-xs truncate" style={{ color: '#A0A0A0' }}>{faq.answer}</p>
             </button>
-          ) : (
-            <div className="mt-3 bg-[#F8F6F2] rounded-xl p-4 border border-[#F0EDE8]">
-              <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#5A5A5A' }}>
-                {faq.answer}
-              </p>
-            </div>
           )}
+          {/* 展开的答案 — 平滑手风琴 */}
+          <div className={`accordion-body ${expanded ? 'open' : ''}`}>
+            <div>
+              <div className="mt-3 bg-[#F8F6F2] rounded-xl p-4 border border-[#F0EDE8]">
+                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#5A5A5A' }}>
+                  {faq.answer}
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* 底部元信息 */}
           <div className="flex items-center gap-3 mt-2.5">
@@ -289,7 +296,11 @@ function FaqCard({ faq, index, categoryColor, onEdit, onDelete, onToggle }: {
           onClick={() => setExpanded(v => !v)}
           className="shrink-0 p-1.5 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-[#F2EFE9] transition-colors mt-0.5"
         >
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          <ChevronDown
+            size={14}
+            className="transition-transform duration-300"
+            style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0)' }}
+          />
         </button>
       </div>
     </div>
@@ -342,8 +353,8 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4 animate-apple-fade">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-apple-pop">
         {/* 标题 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0EDE8]">
           <div className="flex items-center gap-2.5">
@@ -578,11 +589,15 @@ export default function FaqPage() {
 
   const enabledCount = faqs.filter(f => f.enabled).length
 
+  const settle = (d: number): React.CSSProperties => ({
+    animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
+  })
+
   return (
     <div className="px-8 py-8 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
 
       {/* ── 标题栏 ── */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-6" style={settle(0)}>
         <div>
           <h1 className="text-2xl font-bold text-[#1A1A1A]">FAQ 管理</h1>
           <p className="mt-1 text-sm" style={{ color: '#8A8A8A' }}>
@@ -603,7 +618,10 @@ export default function FaqPage() {
                 <ChevronDown size={12} className={`transition-transform duration-150 ${menuOpen ? 'rotate-180' : ''}`} />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-[#F0EDE8] rounded-xl shadow-lg z-30 overflow-hidden w-44 py-1">
+                <div
+                  className="absolute right-0 top-full mt-1 bg-white border border-[#F0EDE8] rounded-xl shadow-lg z-30 overflow-hidden w-44 py-1"
+                  style={{ animation: 'applePopIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both', transformOrigin: 'top right' }}
+                >
                   <button
                     onClick={() => { faqApi.downloadTemplate(selectedKb); setMenuOpen(false) }}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#1A1A1A] hover:bg-[#F8F6F2] transition-colors text-left"
@@ -638,7 +656,7 @@ export default function FaqPage() {
       </div>
 
       {/* ── 工具栏 ── */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
+      <div className="flex items-center gap-3 mb-5 flex-wrap" style={settle(80)}>
         {/* 知识库选择 */}
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-sm font-medium" style={{ color: '#8A8A8A' }}>知识库</span>
