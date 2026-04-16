@@ -26,8 +26,26 @@ _vs = VectorStore()
 @router.post("")
 async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)):
     """RAG 对话（SSE 流式）。"""
-    if not _ds.get_kb(body.kb_name):
-        raise HTTPException(status_code=404, detail=f"知识库 '{body.kb_name}' 不存在")
+    role = current_user.get("role")
+    if role == "student":
+        # 学生：强制使用学生知识库
+        kb_name = _ds.get_setting("active_kb")
+        if not kb_name:
+            raise HTTPException(
+                status_code=403,
+                detail="管理员尚未分配知识库，请联系管理员或稍后再试",
+            )
+    else:
+        # 管理员/教师：使用管理端预设知识库
+        kb_name = _ds.get_setting("admin_kb")
+        if not kb_name:
+            raise HTTPException(
+                status_code=403,
+                detail="尚未配置管理端知识库，请在知识库页面选择后再使用",
+            )
+
+    if not _ds.get_kb(kb_name):
+        raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
 
     cfg = get_config()
     ret_cfg = cfg["retrieval"]
@@ -37,10 +55,10 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
         try:
             # 1. 构建检索器（同步阻塞，用 to_thread 包装）
             yield {"event": "status", "data": json.dumps({"step": "building_retriever"}, ensure_ascii=False)}
-            corpus = await asyncio.to_thread(fetch_corpus, body.kb_name, _vs)
+            corpus = await asyncio.to_thread(fetch_corpus, kb_name, _vs)
 
             retriever = HybridRetriever(
-                kb_name=body.kb_name,
+                kb_name=kb_name,
                 corpus_nodes=corpus,
                 k_vector=ret_cfg["vector_top_k"],
                 k_bm25=ret_cfg["bm25_top_k"],
@@ -66,7 +84,7 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
                     for item in stream_rag(
                         query=body.query,
                         retriever_fn=retriever_fn,
-                        kb_name=body.kb_name,
+                        kb_name=kb_name,
                         history=body.history,
                     ):
                         loop.call_soon_threadsafe(queue.put_nowait, item)
