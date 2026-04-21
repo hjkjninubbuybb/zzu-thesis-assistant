@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -204,7 +204,7 @@ function FeedbackButtons({
 
 // ── 消息气泡 ──────────────────────────────────────────────
 
-function MessageBubble({
+const MessageBubble = memo(function MessageBubble({
   msg,
   onFeedback,
   onSuggestionClick,
@@ -235,7 +235,7 @@ function MessageBubble({
             msg.content ? (
               <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-strong:text-gray-900">
                 <ReactMarkdown>{msg.content}</ReactMarkdown>
-                <span className="inline-block w-1.5 h-4 bg-gray-400 opacity-70 animate-pulse ml-0.5 align-middle rounded-sm" />
+                <span className="cursor-blink text-gray-400" />
               </div>
             ) : (
               <div className="flex items-center gap-2 text-gray-400">
@@ -275,7 +275,8 @@ function MessageBubble({
               <button
                 key={i}
                 onClick={() => onSuggestionClick?.(s)}
-                className={`text-xs px-3 py-1.5 rounded-full border border-[#E8E4DC] bg-[#FAFAF8] text-gray-600 hover:bg-[#F2EFE9] hover:text-[#1A1A1A] transition-colors text-left ${isStudent ? 'border-[#D9DEE5] hover:bg-[#EEF2FF] hover:text-[#2563EB]' : ''}`}
+                style={{ animationDelay: `${i * 60}ms` }}
+                className={`animate-apple-fade-up text-xs px-3 py-1.5 rounded-full border border-[#E8E4DC] bg-[#FAFAF8] text-gray-600 hover:bg-[#F2EFE9] hover:text-[#1A1A1A] transition-colors text-left ${isStudent ? 'border-[#D9DEE5] hover:bg-[#EEF2FF] hover:text-[#2563EB]' : ''}`}
               >
                 {s}
               </button>
@@ -285,7 +286,7 @@ function MessageBubble({
       </div>
     </div>
   )
-}
+})
 
 // ── 对话列表分组 ─────────────────────────────────────────
 
@@ -475,24 +476,35 @@ function AdminConversationSidebar({
             {adminKbName ? '暂无对话记录' : '等待知识库配置'}
           </p>
         )}
-        {groups.map(group => (
-          <div key={group.label}>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">{group.label}</p>
-            <div className="space-y-0.5">
-              {group.items.map(conv => (
-                <ConversationItem
-                  key={conv.id}
-                  conv={conv}
-                  active={conv.id === activeId}
-                  theme="admin"
-                  onSelect={onSelect}
-                  onRename={onRename}
-                  onDelete={onDelete}
-                />
-              ))}
+        {(() => {
+          let idx = 0
+          return groups.map(group => (
+            <div key={group.label}>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">{group.label}</p>
+              <div className="space-y-0.5">
+                {group.items.map(conv => {
+                  const delay = Math.min(idx++ * 35, 280)
+                  return (
+                    <div
+                      key={conv.id}
+                      className="animate-apple-fade-up"
+                      style={{ animationDelay: `${delay}ms` }}
+                    >
+                      <ConversationItem
+                        conv={conv}
+                        active={conv.id === activeId}
+                        theme="admin"
+                        onSelect={onSelect}
+                        onRename={onRename}
+                        onDelete={onDelete}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        })()}
       </div>
     </div>
   )
@@ -555,24 +567,35 @@ function StudentConversationSidebar({
             {activeKbName ? '暂无对话记录' : '等待知识库分配'}
           </p>
         )}
-        {groups.map(group => (
-          <div key={group.label}>
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">{group.label}</p>
-            <div className="space-y-0.5">
-              {group.items.map(conv => (
-                <ConversationItem
-                  key={conv.id}
-                  conv={conv}
-                  active={conv.id === activeId}
-                  theme="student"
-                  onSelect={onSelect}
-                  onRename={onRename}
-                  onDelete={onDelete}
-                />
-              ))}
+        {(() => {
+          let idx = 0
+          return groups.map(group => (
+            <div key={group.label}>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">{group.label}</p>
+              <div className="space-y-0.5">
+                {group.items.map(conv => {
+                  const delay = Math.min(idx++ * 35, 280)
+                  return (
+                    <div
+                      key={conv.id}
+                      className="animate-apple-fade-up"
+                      style={{ animationDelay: `${delay}ms` }}
+                    >
+                      <ConversationItem
+                        conv={conv}
+                        active={conv.id === activeId}
+                        theme="student"
+                        onSelect={onSelect}
+                        onRename={onRename}
+                        onDelete={onDelete}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        })()}
       </div>
     </div>
   )
@@ -640,8 +663,12 @@ export default function ConversationsPage() {
   const activeConv = conversations.find(c => c.id === activeConvId)
   const chatKb = activeConv?.kb_name ?? effectiveKb
 
+  const scrollRAF = useRef(0)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    cancelAnimationFrame(scrollRAF.current)
+    scrollRAF.current = requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    })
   }, [messages])
 
   const loadConversation = useCallback(async (convId: number) => {
@@ -882,14 +909,14 @@ export default function ConversationsPage() {
         </div>
 
         {/* 消息区 */}
-        <div className="flex-1 overflow-y-auto py-5">
+        <div className="flex-1 overflow-y-auto py-5" style={{ contain: 'paint', transform: 'translateZ(0)' }}>
           <div className="max-w-2xl mx-auto w-full px-4 space-y-4 h-full flex flex-col">
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center flex-1 gap-4">
+              <div className="flex flex-col items-center justify-center flex-1 gap-4 animate-apple-settle">
                 {isStudent && !studentKb ? (
                   // 学生：尚未分配知识库
                   <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center">
+                    <div className="animate-idle-breath w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center">
                       <ShieldAlert size={22} className="text-amber-500" strokeWidth={1.6} />
                     </div>
                     <div className="space-y-1">
@@ -899,7 +926,7 @@ export default function ConversationsPage() {
                   </div>
                 ) : (
                   <>
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isStudent ? 'bg-[#EEF2FF]' : 'bg-[#F2EFE9]'}`}>
+                    <div className={`animate-idle-breath w-12 h-12 rounded-2xl flex items-center justify-center ${isStudent ? 'bg-[#EEF2FF]' : 'bg-[#F2EFE9]'}`}>
                       <MessageSquare size={22} className={isStudent ? 'text-[#2563EB]' : 'text-[#1A1A1A]'} strokeWidth={1.6} />
                     </div>
                     <div className="text-center space-y-1">
@@ -930,14 +957,14 @@ export default function ConversationsPage() {
                 key={msg.id}
                 msg={msg}
                 onFeedback={handleFeedback}
-                onSuggestionClick={(text) => sendMessage(text)}
+                onSuggestionClick={sendMessage}
                 isStudent={isStudent}
               />
             ))}
             {isStreaming && statusText && (
-              <div className="flex items-center gap-2 text-xs text-gray-400 pl-2">
-                <Loader2 size={12} className="animate-spin" />
-                {statusText}
+              <div className="flex items-center gap-2 text-xs pl-2">
+                <Loader2 size={12} className="animate-spin text-gray-400" />
+                <span className="text-shimmer">{statusText}</span>
               </div>
             )}
             <div ref={bottomRef} />

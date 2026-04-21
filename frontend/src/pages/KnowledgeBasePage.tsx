@@ -563,7 +563,7 @@ export default function KnowledgeBasePage() {
   })
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-8 py-8 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
       <div className="flex items-center justify-between mb-6" style={settle(0)}>
         <div>
           <h1 className="text-2xl font-bold text-[#1A1A1A]">知识库</h1>

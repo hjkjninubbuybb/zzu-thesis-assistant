@@ -61,6 +61,8 @@ body {
 :root {
   --apple-ease: cubic-bezier(0.25, 1, 0.5, 1);
   --apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  /* iOS sheet 曲线 — 慢启动 + 长尾收住，有"分量感"不 snappy，无过冲 */
+  --apple-pop-ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* ───── Keyframe animations ───── */
@@ -76,7 +78,7 @@ body {
   }
 }
 
-/* Apple 风格 — 模糊/缩放/下沉 → 清晰/原位 */
+/* Apple 风格 — 模糊 → 清晰的对焦感（macOS Spotlight / Quick Look 招牌效果） */
 @keyframes appleSettleIn {
   from {
     opacity: 0;
@@ -96,11 +98,10 @@ body {
   to   { opacity: 1; }
 }
 
-/* 模态框 — 弹性缩放入场 */
+/* 模态框 — 平滑落定（去掉过冲回弹，避免"弹一下"的廉价感） */
 @keyframes applePopIn {
-  0%   { opacity: 0; transform: scale(0.92) translateY(10px); }
-  70%  { opacity: 1; transform: scale(1.02) translateY(-2px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
 }
 
 /* 聊天气泡 — 水平弹入 */
@@ -114,11 +115,10 @@ body {
   to   { opacity: 1; transform: translateX(0) scale(1); }
 }
 
-/* Toast — 底部弹入 */
+/* Toast — 底部平滑滑入（去掉过冲，更"系统感"） */
 @keyframes appleToastIn {
-  0%   { opacity: 0; transform: translateY(20px) scale(0.95); }
-  70%  { transform: translateY(-3px) scale(1.01); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* 行/列表项 — 轻盈入场 */
@@ -207,15 +207,15 @@ body {
 }
 
 .animate-apple-settle {
-  animation: appleSettleIn 0.8s var(--apple-ease) both;
+  animation: appleSettleIn 0.7s var(--apple-pop-ease) both;
 }
 
 .animate-apple-pop {
-  animation: applePopIn 0.55s var(--apple-spring) both;
+  animation: applePopIn 0.5s var(--apple-pop-ease) both;
 }
 
 .animate-apple-toast {
-  animation: appleToastIn 0.6s var(--apple-spring) both;
+  animation: appleToastIn 0.45s var(--apple-pop-ease) both;
 }
 
 .animate-apple-slide-r {
@@ -265,4 +265,134 @@ body {
 .hover-lift:hover {
   transform: translateY(-3px);
   box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.10);
+}
+
+/* ───── Glassmorphism utilities ─────
+   配合 BlobBackdrop 使用：半透明卡 + backdrop-filter 让背后光晕透出
+   保留当前暖米/冷蓝两套配色，不引入新色 */
+
+.glass-card {
+  background-color: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 12px 36px -16px rgba(40, 32, 20, 0.18);
+}
+
+/* 略弱版本：用于 sidebar / 顶层壳，保留较高可读性 */
+.glass-soft {
+  background-color: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 6px 28px -14px rgba(40, 32, 20, 0.16);
+}
+
+[data-theme="student"] .glass-card {
+  background-color: rgba(255, 255, 255, 0.66);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 12px 36px -16px rgba(20, 30, 60, 0.18);
+}
+
+[data-theme="student"] .glass-soft {
+  background-color: rgba(255, 255, 255, 0.84);
+  border-color: rgba(255, 255, 255, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 6px 28px -14px rgba(20, 30, 60, 0.16);
+}
+
+/* ───── Idle drift — 大背景光晕用，Apple 风慢速漂移 ─────
+   位移 56–84px / 周期 53–89s 互质 / 无 scale 跳变 / 透明度极弱呼吸
+   单峰 keyframe + ease-in-out → 正弦式潮汐，无明显节奏点 */
+
+@keyframes blobIdleA {
+  0%, 100% { transform: translate3d(0, 0, 0);        opacity: 0.85; }
+  50%      { transform: translate3d(72px, -56px, 0); opacity: 1; }
+}
+
+@keyframes blobIdleB {
+  0%, 100% { transform: translate3d(0, 0, 0);        opacity: 0.90; }
+  50%      { transform: translate3d(-84px, 64px, 0); opacity: 1; }
+}
+
+@keyframes blobIdleC {
+  0%, 100% { transform: translate3d(0, 0, 0);        opacity: 0.80; }
+  50%      { transform: translate3d(58px, 78px, 0);  opacity: 0.95; }
+}
+
+@keyframes blobIdleD {
+  0%, 100% { transform: translate3d(0, 0, 0);         opacity: 0.85; }
+  50%      { transform: translate3d(-66px, -48px, 0); opacity: 1; }
+}
+
+/* 用户系统启用「减少动效」时，光晕完全静止（保留视觉，去掉运动） */
+@media (prefers-reduced-motion: reduce) {
+  .blob-idle { animation: none !important; }
+}
+
+/* ───── 对话页专用动效 ───── */
+
+/* 复用现有 appleFadeUp keyframe，暴露 utility 类用于会话列表 / 建议按钮 stagger */
+.animate-apple-fade-up {
+  animation: appleFadeUp 0.5s var(--apple-pop-ease) both;
+}
+
+/* AI 流式光标 — Claude 风方块闪烁，0.8s 节奏避开 animate-pulse 的 1s 整数 */
+@keyframes cursorBlink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.cursor-blink {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  vertical-align: -2px;
+  animation: cursorBlink 0.8s steps(1) infinite;
+}
+
+/* 状态文字扫光 — "正在检索/思考"专用，复用现有 @keyframes shimmer */
+.text-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(154, 154, 154, 0.55) 0%,
+    rgba(26, 26, 26, 0.95) 50%,
+    rgba(154, 154, 154, 0.55) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* 空状态中央 logo 缓慢呼吸 */
+@keyframes idleBreath {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+  50%      { transform: scale(1.06); box-shadow: 0 8px 30px -8px rgba(0, 0, 0, 0.12); }
+}
+.animate-idle-breath {
+  animation: idleBreath 3.6s ease-in-out infinite;
+}
+
+/* prefers-reduced-motion 兼容：呼吸停掉、shimmer 降级为普通深灰文，光标保留闪烁（功能性指示） */
+@media (prefers-reduced-motion: reduce) {
+  .animate-idle-breath { animation: none; }
+  .text-shimmer {
+    animation: none;
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+    color: rgba(26, 26, 26, 0.7);
+    -webkit-text-fill-color: initial;
+  }
 }

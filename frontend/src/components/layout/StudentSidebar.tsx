@@ -59,7 +59,7 @@ export default function StudentSidebar() {
   const avatarChar = displayName.slice(0, 1).toUpperCase()
 
   return (
-    <aside className="w-48 shrink-0 flex flex-col bg-white rounded-2xl border border-[#D9DEE5] shadow-sm">
+    <aside className="glass-soft w-48 shrink-0 flex flex-col rounded-2xl">
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <div className="w-9 h-9 bg-[#2563EB] rounded-xl flex items-center justify-center shadow-sm shrink-0">

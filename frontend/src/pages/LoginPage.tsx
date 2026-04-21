@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { extractError } from '@/lib/api'
 import { getStoredUser } from '@/lib/auth'
+import BlobBackdrop from '@/components/layout/BlobBackdrop'
 
 interface LoginPageProps {
   variant: 'admin' | 'student'
@@ -55,10 +56,12 @@ export default function LoginPage({ variant }: LoginPageProps) {
   if (isStudent) {
     return (
       <div
-        className="flex-1 flex items-center justify-center p-4 flex-col gap-6"
+        data-theme="student"
+        className="relative flex-1 flex items-center justify-center p-4 flex-col gap-6 overflow-hidden"
         style={{ background: 'hsl(215, 25%, 94%)' }}
       >
-        <div className="w-full max-w-sm bg-white rounded-2xl border border-[#D9DEE5] shadow-sm p-8" style={settle(0)}>
+        <BlobBackdrop variant="cool" intensity="hero" />
+        <div className="glass-card relative z-10 w-full max-w-sm rounded-2xl p-8" style={settle(0)}>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-[#2563EB] rounded-xl flex items-center justify-center shadow-sm shrink-0">
@@ -117,7 +120,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
 
         <Link
           to="/admin/login"
-          className="text-xs text-[#6E7787] hover:text-[#2563EB] transition-colors"
+          className="relative z-10 text-xs text-[#6E7787] hover:text-[#2563EB] transition-colors"
           style={settle(150)}
         >
           教师 / 管理员登录 →
@@ -129,10 +132,11 @@ export default function LoginPage({ variant }: LoginPageProps) {
   // Admin / Teacher variant
   return (
     <div
-      className="flex-1 flex items-center justify-center p-4 flex-col gap-6"
+      className="relative flex-1 flex items-center justify-center p-4 flex-col gap-6 overflow-hidden"
       style={{ background: 'hsl(38, 22%, 91%)' }}
     >
-      <div className="w-full max-w-sm bg-white rounded-2xl border border-[#F0EDE8] shadow-sm p-8" style={settle(0)}>
+      <BlobBackdrop variant="warm" intensity="hero" />
+      <div className="glass-card relative z-10 w-full max-w-sm rounded-2xl p-8" style={settle(0)}>
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 bg-[#1A1A1A] rounded-xl flex items-center justify-center shadow-sm shrink-0">
@@ -191,7 +195,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
 
       <Link
         to="/student/login"
-        className="text-xs text-[#9A9A9A] hover:text-[#1A1A1A] transition-colors"
+        className="relative z-10 text-xs text-[#9A9A9A] hover:text-[#1A1A1A] transition-colors"
         style={settle(150)}
       >
         学生登录 →
