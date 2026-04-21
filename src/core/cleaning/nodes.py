@@ -13,6 +13,7 @@ from .prompts import (
     OPTIMIZER_RETRY_TEMPLATE,
     TABLE_OPTIMIZER_SYSTEM_PROMPT,
     FORM_TABLE_EXTRACTOR_PROMPT,
+    FORM_DOCUMENT_OPTIMIZER_PROMPT,
     EVALUATOR_SYSTEM_PROMPT,
 )
 
@@ -62,6 +63,8 @@ def optimizer_node(state: CleaningState) -> dict:
         system_prompt = TABLE_OPTIMIZER_SYSTEM_PROMPT
     elif content_type == "form_table":
         system_prompt = FORM_TABLE_EXTRACTOR_PROMPT
+    elif content_type == "form":
+        system_prompt = FORM_DOCUMENT_OPTIMIZER_PROMPT
     else:
         system_prompt = OPTIMIZER_SYSTEM_PROMPT
 
