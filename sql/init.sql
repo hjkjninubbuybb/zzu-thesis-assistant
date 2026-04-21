@@ -114,6 +114,14 @@ CREATE TABLE IF NOT EXISTS faqs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='FAQ表';
 
 
+-- ── 系统设置 ──────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS system_settings (
+    `key`  VARCHAR(100) PRIMARY KEY                    COMMENT '设置键',
+    value  TEXT         NOT NULL                       COMMENT '设置值'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统设置表';
+
+
 -- ── 对话 ──────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS conversations (

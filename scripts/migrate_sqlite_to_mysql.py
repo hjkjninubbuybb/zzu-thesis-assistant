@@ -118,6 +118,20 @@ def migrate() -> None:
                     (r["id"], r["message_id"], r["rating"], r["created_at"]),
                 )
 
+            # ── system_settings ──────────────────────────────────
+            try:
+                rows = sqlite_conn.execute("SELECT * FROM system_settings").fetchall()
+                print(f"[migrate] system_settings: {len(rows)} 条")
+                for r in rows:
+                    cur.execute(
+                        """INSERT INTO system_settings (`key`, value)
+                           VALUES (%s, %s)
+                           ON DUPLICATE KEY UPDATE value = VALUES(value)""",
+                        (r["key"], r["value"]),
+                    )
+            except Exception:
+                print("[migrate] system_settings 表不存在，跳过")
+
         mysql.commit()
         print("[migrate] ✅ 迁移完成！")
     except Exception as e:
