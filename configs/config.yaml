@@ -14,6 +14,18 @@ splitter:
   chunk_size: 256
   chunk_overlap_ratio: 0.2
   separators: chinese_markdown
+  policy:
+    type: recursive            # 纯文本文档：实验最优策略
+  manual:
+    type: manual_step          # 图文混排文档：按步骤结构切分 + LLM 语义抽取
+    use_llm: true
+  form:
+    type: recursive            # 模板文档：表格在解析阶段已分离，文本部分用 recursive
+  semantic:                    # semantic 类型专用参数（任意 doc_type 可选用）
+    buffer_size: 2
+    breakpoint_percentile_threshold: 90
+faq:
+  score_threshold: 0.75     # FAQ 语义匹配阈值，>= 走快答，< 走 RAG Agent
 retrieval:
   vector_top_k: 10
   bm25_top_k: 10
