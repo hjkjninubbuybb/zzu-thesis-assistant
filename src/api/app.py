@@ -1,7 +1,5 @@
 """FastAPI 应用入口。"""
 
-import sqlite3
-from contextlib import closing
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -17,7 +15,6 @@ from src.api.routes.config import router as config_router
 from src.api.routes.conversation import router as conversation_router
 from src.api.routes.faq import router as faq_router
 from src.api.routes.user import router as user_router
-from src.config import ROOT_DIR
 
 app = FastAPI(title="RAG 1.0 API", version="1.0.0")
 
@@ -51,62 +48,59 @@ app.include_router(faq_router)
 
 # ── 使用统计端点（内联，避免 import 缓存问题）────────────────
 
-_DB_PATH = ROOT_DIR / "data" / "metadata.db"
-
-
-def _analytics_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(_DB_PATH))
-    conn.row_factory = sqlite3.Row
-    return conn
-
 
 @app.get("/api/analytics/summary", tags=["analytics"])
 def analytics_summary(_user: dict = Depends(require_teacher_or_admin)) -> dict:
     """返回系统使用统计汇总。"""
-    with closing(_analytics_conn()) as conn:
-        total_questions: int = conn.execute(
-            "SELECT COUNT(*) FROM conversation_messages WHERE role = 'user'"
-        ).fetchone()[0]
+    from src.storage.database import get_conn
 
-        today_str = date.today().isoformat()
-        today_questions: int = conn.execute(
-            "SELECT COUNT(*) FROM conversation_messages WHERE role = 'user' AND DATE(created_at) = ?",
-            (today_str,),
-        ).fetchone()[0]
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS cnt FROM conversation_messages WHERE role = 'user'")
+            total_questions: int = cur.fetchone()["cnt"]
 
-        week_rows = conn.execute(
-            "SELECT DATE(created_at) AS day, COUNT(*) AS cnt "
-            "FROM conversation_messages WHERE role = 'user' AND DATE(created_at) >= ? "
-            "GROUP BY DATE(created_at) ORDER BY day",
-            ((date.today() - timedelta(days=6)).isoformat(),),
-        ).fetchall()
-        day_map = {row[0]: row[1] for row in week_rows}
-        week_data = [
-            {"day": (date.today() - timedelta(days=6 - i)).isoformat(),
-             "count": day_map.get((date.today() - timedelta(days=6 - i)).isoformat(), 0)}
-            for i in range(7)
-        ]
+            today_str = date.today().isoformat()
+            cur.execute(
+                "SELECT COUNT(*) AS cnt FROM conversation_messages WHERE role = 'user' AND DATE(created_at) = %s",
+                (today_str,),
+            )
+            today_questions: int = cur.fetchone()["cnt"]
 
-        total_conversations: int = conn.execute(
-            "SELECT COUNT(*) FROM conversations"
-        ).fetchone()[0]
+            cur.execute(
+                "SELECT DATE(created_at) AS day, COUNT(*) AS cnt "
+                "FROM conversation_messages WHERE role = 'user' AND DATE(created_at) >= %s "
+                "GROUP BY DATE(created_at) ORDER BY day",
+                ((date.today() - timedelta(days=6)).isoformat(),),
+            )
+            week_rows = cur.fetchall()
+            day_map = {str(row["day"]): row["cnt"] for row in week_rows}
+            week_data = [
+                {"day": (date.today() - timedelta(days=6 - i)).isoformat(),
+                 "count": day_map.get((date.today() - timedelta(days=6 - i)).isoformat(), 0)}
+                for i in range(7)
+            ]
 
-        feedback_rows = conn.execute(
-            "SELECT rating, COUNT(*) AS cnt FROM message_feedback GROUP BY rating"
-        ).fetchall()
-        feedback_map = {row[0]: row[1] for row in feedback_rows}
+            cur.execute("SELECT COUNT(*) AS cnt FROM conversations")
+            total_conversations: int = cur.fetchone()["cnt"]
 
-        kb_count: int  = conn.execute("SELECT COUNT(*) FROM knowledge_bases").fetchone()[0]
-        doc_count: int = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
-        faq_count: int = conn.execute("SELECT COUNT(*) FROM faqs WHERE enabled = 1").fetchone()[0]
+            cur.execute("SELECT rating, COUNT(*) AS cnt FROM message_feedback GROUP BY rating")
+            feedback_map = {row["rating"]: row["cnt"] for row in cur.fetchall()}
 
-        recent_rows = conn.execute(
-            "SELECT cm.content, cm.created_at, c.kb_name "
-            "FROM conversation_messages cm "
-            "JOIN conversations c ON cm.conversation_id = c.id "
-            "WHERE cm.role = 'user' "
-            "ORDER BY cm.created_at DESC LIMIT 10",
-        ).fetchall()
+            cur.execute("SELECT COUNT(*) AS cnt FROM knowledge_bases")
+            kb_count: int = cur.fetchone()["cnt"]
+            cur.execute("SELECT COUNT(*) AS cnt FROM documents")
+            doc_count: int = cur.fetchone()["cnt"]
+            cur.execute("SELECT COUNT(*) AS cnt FROM faqs WHERE enabled = 1")
+            faq_count: int = cur.fetchone()["cnt"]
+
+            cur.execute(
+                "SELECT cm.content, cm.created_at, c.kb_name "
+                "FROM conversation_messages cm "
+                "JOIN conversations c ON cm.conversation_id = c.id "
+                "WHERE cm.role = 'user' "
+                "ORDER BY cm.created_at DESC LIMIT 10",
+            )
+            recent_rows = cur.fetchall()
 
     return {
         "total_questions":     total_questions,
@@ -118,7 +112,7 @@ def analytics_summary(_user: dict = Depends(require_teacher_or_admin)) -> dict:
         "kb_count":            kb_count,
         "doc_count":           doc_count,
         "faq_count":           faq_count,
-        "recent_questions":    [{"content": r[0], "created_at": r[1], "kb_name": r[2]} for r in recent_rows],
+        "recent_questions":    [{"content": r["content"], "created_at": str(r["created_at"]), "kb_name": r["kb_name"]} for r in recent_rows],
     }
 
 
