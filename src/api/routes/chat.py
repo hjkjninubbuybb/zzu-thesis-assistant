@@ -10,9 +10,10 @@ from sse_starlette.sse import EventSourceResponse
 from src.api.auth import get_current_user
 from src.api.schemas import ChatRequest
 from src.config import get_config
+from src.core.faq_match import try_faq_match, faq_generate
 from src.core.retrieval import HybridRetriever, fetch_corpus
 from src.core.reranker import Reranker
-from src.core.rag_pipeline import stream_rag
+from src.core.rag_pipeline import stream_rag, _get_llm
 from src.storage.document_store import DocumentStore
 from src.storage.vector_store import VectorStore
 
@@ -53,6 +54,65 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
 
     async def event_generator():
         try:
+            # ── 第一层：FAQ 防线 ──────────────────────────────────────
+            yield {"event": "status", "data": json.dumps({"step": "faq_matching"}, ensure_ascii=False)}
+            faq_threshold = cfg.get("faq", {}).get("score_threshold", 0.75)
+            faq_results = await asyncio.to_thread(
+                try_faq_match, body.query, kb_name, _vs, _ds, faq_threshold,
+            )
+
+            if faq_results:
+                yield {"event": "status", "data": json.dumps({"step": "faq_answering"}, ensure_ascii=False)}
+                faq_answer = await asyncio.to_thread(faq_generate, body.query, faq_results)
+
+                if faq_answer is not None:
+                    # FAQ 快答成功 —— 直接返回，不走 RAG Agent
+                    logger.info(
+                        "[chat] FAQ 快答命中 (score=%.4f, faq_id=%d)",
+                        faq_results[0]["score"], faq_results[0]["faq_id"],
+                    )
+                    yield {"event": "token", "data": json.dumps({"text": faq_answer}, ensure_ascii=False)}
+                    yield {
+                        "event": "answer",
+                        "data": json.dumps({"text": faq_answer}, ensure_ascii=False),
+                    }
+                    yield {
+                        "event": "sources",
+                        "data": json.dumps({"sources": [
+                            {
+                                "node_id": f"faq-{r['faq_id']}",
+                                "text": r["question"][:200],
+                                "source_file": "FAQ",
+                                "score": round(r["score"], 4),
+                            }
+                            for r in faq_results
+                        ]}, ensure_ascii=False),
+                    }
+
+                    # 生成追问建议
+                    try:
+                        llm = _get_llm()
+                        sug_resp = llm.invoke(
+                            f"基于以下问答，生成2-3个用户可能想继续追问的简短问题"
+                            f"（每行一个，不要编号，不要解释）：\n"
+                            f"问：{body.query}\n答：{faq_answer}"
+                        )
+                        raw_sug = sug_resp.content if hasattr(sug_resp, "content") else str(sug_resp)
+                        suggestions = [s.strip() for s in raw_sug.strip().split("\n") if s.strip()][:3]
+                        if suggestions:
+                            yield {"event": "suggestions", "data": json.dumps(
+                                {"items": suggestions}, ensure_ascii=False,
+                            )}
+                    except Exception as e:
+                        logger.warning("[chat] FAQ 快答后生成追问建议失败: %s", e)
+
+                    yield {"event": "done", "data": "{}"}
+                    return
+
+                # faq_answer is None → fast_model 判断 FAQ 不足，fall through
+                logger.info("[chat] FAQ 命中但内容不足，转 RAG Agent")
+
+            # ── 第二层：RAG Agent ─────────────────────────────────────
             # 1. 构建检索器（同步阻塞，用 to_thread 包装）
             yield {"event": "status", "data": json.dumps({"step": "building_retriever"}, ensure_ascii=False)}
             corpus = await asyncio.to_thread(fetch_corpus, kb_name, _vs)

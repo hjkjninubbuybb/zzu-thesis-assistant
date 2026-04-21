@@ -3,7 +3,6 @@
 import asyncio
 import io
 import logging
-import os
 import urllib.parse
 import uuid
 from datetime import date
@@ -12,8 +11,6 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query as Quer
 from fastapi.responses import StreamingResponse
 
 from src.api.auth import get_current_user, require_teacher_or_admin
-from langchain_community.chat_models import ChatTongyi
-from langchain_core.messages import HumanMessage, SystemMessage
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -21,6 +18,7 @@ from openpyxl.utils import get_column_letter
 from src.api.schemas import FAQCreate, FAQImportError, FAQImportResult, FAQItem, FAQSearchResponse, FAQUpdate, MessageResponse
 from src.config import get_config
 from src.core.embedding import get_embed_model
+from src.core.faq_match import rewrite_query as _rewrite_query
 from src.storage.document_store import DocumentStore
 from src.storage.vector_store import VectorStore
 
@@ -75,7 +73,7 @@ async def create_faq(kb_name: str, body: FAQCreate, current_user: dict = Depends
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
 
-    # 先写 SQLite（无 vector_id）
+    # 先写 MySQL（无 vector_id）
     row = _doc_store.add_faq(
         kb_name=kb_name,
         question=body.question,
@@ -127,7 +125,7 @@ async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate, current_user: d
         becoming_enabled = updates["enabled"] and not bool(existing.get("enabled"))
 
         if becoming_disabled:
-            # 禁用 → 从 Qdrant 删除，vector_id 保留在 SQLite 供恢复时使用
+            # 禁用 → 从 Qdrant 删除，vector_id 保留在 MySQL 供恢复时使用
             vid = updates.get("vector_id") or existing.get("vector_id")
             if vid:
                 try:
@@ -152,31 +150,6 @@ async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate, current_user: d
     if row is None:
         raise HTTPException(status_code=404, detail="FAQ 不存在")
     return row
-
-
-_REWRITE_SYSTEM = (
-    "你是一个搜索查询优化助手，专门为郑州大学本科毕业设计问答系统优化用户的搜索词。"
-    "将用户输入改写为语义更清晰、更适合向量检索的标准问题形式。"
-    "规则：展开口语缩写、补全省略主语、替换非正式用语为规范术语。"
-    "只输出改写后的查询词，不要任何解释或标点以外的内容。"
-)
-
-
-def _rewrite_query(raw: str) -> str:
-    """调用快速 LLM 改写查询词，失败时回退原始输入。"""
-    try:
-        cfg = get_config()["llm"]
-        llm = ChatTongyi(
-            model=cfg["fast_model"],
-            api_key=os.environ.get("DASHSCOPE_API_KEY"),
-        )
-        resp = llm.invoke([SystemMessage(content=_REWRITE_SYSTEM), HumanMessage(content=raw)])
-        rewritten = resp.content.strip()
-        logger.info("[faq search] 查询改写: %r → %r", raw, rewritten)
-        return rewritten if rewritten else raw
-    except Exception as e:
-        logger.warning("[faq search] 查询改写失败，使用原始输入: %s", e)
-        return raw
 
 
 @router.get("/{kb_name}/search", response_model=FAQSearchResponse)
@@ -214,7 +187,7 @@ async def search_faqs(
         logger.warning("[faq search] Qdrant 搜索失败: %s", e)
         raise HTTPException(status_code=500, detail="向量检索失败，请稍后重试") from e
 
-    # 4. 按 faq_id 从 SQLite 取完整记录
+    # 4. 按 faq_id 从 MySQL 取完整记录
     items: list[dict] = []
     seen: set[int] = set()
     for hit in hits:
@@ -497,7 +470,7 @@ async def import_faqs_excel(
                 filtered.append(r)
         valid_rows = filtered
 
-    # SQLite 批量插入
+    # MySQL 批量插入
     faq_rows: list[dict] = []
     failed_count = 0
     for r in valid_rows:
@@ -516,7 +489,7 @@ async def import_faqs_excel(
                 "vector_id": str(uuid.uuid4()),
             })
         except Exception as e:
-            logger.warning("[faq import] SQLite 插入失败: %s", e)
+            logger.warning("[faq import] MySQL 插入失败: %s", e)
             all_errors.append(FAQImportError(row=0, question=r["question"][:50], reason=f"数据库写入失败：{e}"))
             failed_count += 1
 
