@@ -8,7 +8,7 @@
 - **检索**: Qdrant 向量库 + BM25，RRF 融合 + DashScope Rerank
 - **LLM/Embedding**: DashScope（通义千问系列）
 - **前端**: React + TypeScript + Vite（构建产物由 FastAPI 静态托管）
-- **存储**: Qdrant（向量）+ SQLite（`data/metadata.db`，文档/FAQ/对话/用户元数据）
+- **存储**: Qdrant（向量）+ MySQL 8.0（用户/文档/FAQ/对话/系统设置等全部元数据）
 - **认证**: JWT（python-jose + passlib/bcrypt），三种角色：admin / teacher / student
 
 ### 双层问答架构
