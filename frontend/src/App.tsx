@@ -16,6 +16,7 @@ import StudentHomePage from '@/pages/student/StudentHomePage'
 import StudentFaqPage from '@/pages/student/StudentFaqPage'
 import StudentProfilePage from '@/pages/student/StudentProfilePage'
 import { useAuth } from '@/hooks/useAuth'
+import { UploadProvider } from '@/lib/uploadContext'
 
 function RoleRedirect() {
   const { user } = useAuth()
@@ -25,8 +26,9 @@ function RoleRedirect() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
+        <UploadProvider>
         <Routes>
           {/* 登录路由 */}
           <Route path="/admin/login" element={<LoginPage variant="admin" />} />
@@ -49,19 +51,20 @@ export default function App() {
           </Route>
 
           {/* 学生端 */}
-          <Route element={<RouteGuard allowedRoles={['student']} />}>
+          <Route path="student" element={<RouteGuard allowedRoles={['student']} />}>
             <Route element={<StudentLayout />}>
-              <Route path="student" element={<StudentHomePage />} />
-              <Route path="student/chat" element={<ConversationsPage />} />
-              <Route path="student/faq" element={<StudentFaqPage />} />
-              <Route path="student/profile" element={<StudentProfilePage />} />
+              <Route index element={<StudentHomePage />} />
+              <Route path="chat" element={<ConversationsPage />} />
+              <Route path="faq" element={<StudentFaqPage />} />
+              <Route path="profile" element={<StudentProfilePage />} />
             </Route>
           </Route>
 
           {/* 角色感知重定向 */}
           <Route path="*" element={<RoleRedirect />} />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+        </UploadProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

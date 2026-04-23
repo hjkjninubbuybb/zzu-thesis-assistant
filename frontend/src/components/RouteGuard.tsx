@@ -22,12 +22,10 @@ export default function RouteGuard({ allowedRoles }: RouteGuardProps) {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // 学生访问管理端 → 引导到管理员登录页（LoginPage 会自动清除 student 会话）
-    // 管理员访问学生端 → 引导到管理员首页
-    const target = user.role === 'student' && !pathname.startsWith('/student')
-      ? '/admin/login'
-      : user.role === 'student' ? '/student' : '/admin'
-    return <Navigate to={target} replace />
+    // 角色不匹配时，跳到当前门户的登录页
+    // LoginPage 会自动清除不匹配的会话，实现两端真正分离
+    const loginPath = pathname.startsWith('/student') ? '/student/login' : '/admin/login'
+    return <Navigate to={loginPath} replace />
   }
 
   return <Outlet />
