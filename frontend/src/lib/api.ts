@@ -6,7 +6,7 @@ import type {
   LoginResponse, UserInfo, UserCreate, UserUpdate, PaginatedUsers,
   StudentProfileCreate, ApiKeyInfo, AnalyticsSummary,
 } from '@/types/api'
-import { getAccessToken, getRefreshToken, saveAuth, clearAuth } from '@/lib/auth'
+import { getAccessToken, getRefreshToken, saveAuth, clearAuth, getCurrentPortal } from '@/lib/auth'
 
 const client = axios.create({
   baseURL: '/api',
@@ -39,8 +39,9 @@ client.interceptors.response.use(
 
     const refreshToken = getRefreshToken()
     if (!refreshToken) {
-      clearAuth()
-      window.location.href = '/login'
+      const p = getCurrentPortal()
+      clearAuth(p)
+      window.location.href = p === 'student' ? '/student/login' : '/admin/login'
       return Promise.reject(error)
     }
 
@@ -64,8 +65,9 @@ client.interceptors.response.use(
       _refreshQueue = []
       return client(original)
     } catch {
-      clearAuth()
-      window.location.href = '/login'
+      const p = getCurrentPortal()
+      clearAuth(p)
+      window.location.href = p === 'student' ? '/student/login' : '/admin/login'
       return Promise.reject(error)
     } finally {
       _refreshing = false

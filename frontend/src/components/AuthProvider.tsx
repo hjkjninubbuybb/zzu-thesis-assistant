@@ -1,42 +1,46 @@
 import { useState, useEffect, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import type { UserInfo } from '@/types/api'
 import { AuthContext } from '@/hooks/useAuth'
 import { authApi } from '@/lib/api'
-import { saveAuth, clearAuth, getStoredUser, getRefreshToken } from '@/lib/auth'
+import { saveAuth, clearAuth, getStoredUser, getRefreshToken, type Portal } from '@/lib/auth'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  const portal: Portal = pathname.startsWith('/student') ? 'student' : 'admin'
+
   const [user, setUserState] = useState<UserInfo | null>(null)
   const [ready, setReady] = useState(false)
 
-  // 启动时静默刷新：用 refresh token 换新 access token
+  // portal 变化时重新加载对应会话
   useEffect(() => {
-    const refreshToken = getRefreshToken()
+    setReady(false)
+    const refreshToken = getRefreshToken(portal)
     if (!refreshToken) {
-      // 没有 refresh token，直接用 localStorage 里的用户信息（或 null）
-      setUserState(getStoredUser())
+      setUserState(getStoredUser(portal))
       setReady(true)
       return
     }
     authApi.refresh(refreshToken)
       .then(data => {
-        saveAuth(data)
+        saveAuth(data, portal)
         setUserState(data.user)
       })
       .catch(() => {
-        clearAuth()
+        clearAuth(portal)
         setUserState(null)
       })
       .finally(() => setReady(true))
-  }, [])
+  }, [portal])
 
   const login = async (username: string, password: string) => {
     const data = await authApi.login(username, password)
-    saveAuth(data)
+    saveAuth(data, portal)
     setUserState(data.user)
   }
 
   const logout = () => {
-    clearAuth()
+    clearAuth(portal)
     setUserState(null)
   }
 
