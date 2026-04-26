@@ -9,6 +9,7 @@ import {
 import { knowledgeApi, faqApi, conversationApi } from '@/lib/api'
 
 import { useAuth } from '@/hooks/useAuth'
+import { getAccessToken, getRefreshToken, saveAuth, clearAuth, getCurrentPortal } from '@/lib/auth'
 import type { ChatMessage, FileItem, HistoryMessage, SourceItem, ConversationInfo } from '@/types/api'
 
 // ── 历史记录构建 ──────────────────────────────────────────
@@ -52,7 +53,7 @@ async function streamChat(
   onFile?: (file: FileItem) => void,
   onSuggestions?: (items: string[]) => void,
 ) {
-  const token = localStorage.getItem('rag_access_token')
+  const token = getAccessToken()
   const resp = await fetch('/api/chat', {
     method: 'POST',
     headers: {
@@ -62,6 +63,29 @@ async function streamChat(
     body: JSON.stringify({ kb_name, query, max_reformulations, history }),
     signal,
   })
+  if (resp.status === 401) {
+    // 尝试 refresh token，成功则重试一次
+    const refreshToken = getRefreshToken()
+    if (refreshToken) {
+      try {
+        const refreshResp = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        })
+        if (refreshResp.ok) {
+          const data = await refreshResp.json()
+          saveAuth(data)
+          // 用新 token 重试
+          return streamChat(kb_name, query, max_reformulations, history, signal, onStatus, onAnswer, onSources, onError, onToken, onAgentAction, onFile, onSuggestions)
+        }
+      } catch { /* refresh 失败，走下面跳转 */ }
+    }
+    const p = getCurrentPortal()
+    clearAuth(p)
+    window.location.href = p === 'student' ? '/student/login' : '/admin/login'
+    return
+  }
   if (!resp.ok) {
     const data = await resp.json().catch(() => ({}))
     onError(data.detail ?? `HTTP ${resp.status}`)

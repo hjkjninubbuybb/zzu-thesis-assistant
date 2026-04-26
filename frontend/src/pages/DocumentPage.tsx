@@ -1,12 +1,15 @@
-import { useState, useRef, useCallback, useMemo } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
   Upload, Trash2, Loader2, X, ChevronDown, ChevronUp, FileText,
-  CheckCircle, AlertCircle, Clock, RotateCcw,
+  CheckCircle, AlertCircle, Clock,
 } from 'lucide-react'
 import { knowledgeApi, documentApi, extractError } from '@/lib/api'
-import type { DocType, UploadParams } from '@/types/api'
+import { useUpload } from '@/lib/uploadContext'
+import type { DocType, SplitterType, UploadParams } from '@/types/api'
+
+// ── 格式化工具 ──────────────────────────────────────────────
 
 function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -16,22 +19,22 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('zh-CN')
 }
 
-const DOC_TYPE_LABELS: Record<DocType, string> = {
-  policy: '政策文件',
-  manual: '操作手册',
-  form:   '填报模板',
-}
-const DOC_TYPE_COLORS: Record<DocType, string> = {
-  policy: 'bg-blue-50 text-blue-700',
-  manual: 'bg-purple-50 text-purple-700',
-  form:   'bg-amber-50 text-amber-700',
-}
-const DOC_TYPE_BAR_COLORS: Record<DocType, string> = {
-  policy: 'bg-blue-500',
-  manual: 'bg-purple-500',
-  form:   'bg-amber-500',
+// ── 常量 ────────────────────────────────────────────────────
+
+const DOC_TYPES: { type: DocType; label: string; color: string; barColor: string; badge: string }[] = [
+  { type: 'policy', label: '政策文件', color: 'text-blue-600',  barColor: 'bg-blue-500',   badge: 'bg-blue-50 text-blue-700' },
+  { type: 'manual', label: '操作手册', color: 'text-purple-600', barColor: 'bg-purple-500', badge: 'bg-purple-50 text-purple-700' },
+  { type: 'form',   label: '填报模板', color: 'text-amber-600',  barColor: 'bg-amber-500',  badge: 'bg-amber-50 text-amber-700' },
+]
+
+// 每种类型的默认参数
+const DEFAULT_PARAMS_MAP: Record<DocType, UploadParams> = {
+  policy: { splitter_type: 'recursive', chunk_size: 256, chunk_overlap_ratio: 0.1, enable_cleaning: true,  doc_type: 'policy' },
+  manual: { splitter_type: 'recursive', chunk_size: 256, chunk_overlap_ratio: 0.1, enable_cleaning: true,  doc_type: 'manual' },
+  form:   { splitter_type: 'recursive', chunk_size: 256, chunk_overlap_ratio: 0.0, enable_cleaning: false, doc_type: 'form'   },
 }
 
+// ── 子组件 ──────────────────────────────────────────────────
 
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
@@ -42,52 +45,63 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
   )
 }
 
-const DEFAULT_PARAMS: UploadParams = {
-  splitter_type: 'recursive',
-  chunk_size: 256,
-  chunk_overlap_ratio: 0.1,
-  enable_cleaning: false,
-  doc_type: 'policy',
+function UploadStatusIcon({ status }: { status: 'pending' | 'uploading' | 'done' | 'error' }) {
+  if (status === 'pending')   return <Clock      size={14} className="text-gray-400" />
+  if (status === 'uploading') return <Loader2    size={14} className="animate-spin text-blue-500" />
+  if (status === 'done')      return <CheckCircle size={14} className="text-emerald-500" />
+  return                              <AlertCircle size={14} className="text-red-500" />
 }
 
-// ── 队列项类型 ─────────────────────────────────────────────
-
-type FileStatus = 'pending' | 'uploading' | 'done' | 'error'
-
-interface QueueItem {
-  id: string
-  file: File
-  status: FileStatus
-  progress: number
-  chunks?: number
-  error?: string
-}
-
-function StatusIcon({ status }: { status: FileStatus }) {
-  if (status === 'pending') return <Clock size={14} className="text-gray-400" />
-  if (status === 'uploading') return <Loader2 size={14} className="animate-spin text-blue-500" />
-  if (status === 'done') return <CheckCircle size={14} className="text-emerald-500" />
-  return <AlertCircle size={14} className="text-red-500" />
-}
+// ── 主页面 ──────────────────────────────────────────────────
 
 export default function DocumentPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const selectedKb = searchParams.get('kb') ?? ''
+  const selectedKb  = searchParams.get('kb')   ?? ''
+  const activeType  = (searchParams.get('type') as DocType) ?? 'policy'
   const qc = useQueryClient()
 
-  const [dragOver, setDragOver] = useState(false)
-  const [queue, setQueue] = useState<QueueItem[]>([])
-  const [params, setParams] = useState<UploadParams>(DEFAULT_PARAMS)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  const [deleteId, setDeleteId] = useState<number | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const { queue, addFiles, removeItem } = useUpload()
+
+  // 每个类型的暂存文件（未开始上传）
+  const [stagedMap, setStagedMap] = useState<Record<DocType, File[]>>({ policy: [], manual: [], form: [] })
+  // 每个类型的参数
+  const [paramsMap, setParamsMap] = useState<Record<DocType, UploadParams>>(DEFAULT_PARAMS_MAP)
+  // 每个类型的高级参数折叠状态
+  const [advancedMap, setAdvancedMap] = useState<Record<DocType, boolean>>({ policy: false, manual: false, form: false })
+
+  const [dragOver, setDragOver]     = useState(false)
+  const [deleteId, setDeleteId]     = useState<number | null>(null)
+  const [toast, setToast]           = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3500)
   }
+
+  // ── 当前 tab 的衍生值 ─────────────────────────────────────
+
+  const stagedFiles = stagedMap[activeType]
+  const params      = paramsMap[activeType]
+  const advancedOpen = advancedMap[activeType]
+
+  const setStaged = (files: File[]) =>
+    setStagedMap(prev => ({ ...prev, [activeType]: files }))
+
+  const setParams = (updater: (p: UploadParams) => UploadParams) =>
+    setParamsMap(prev => ({ ...prev, [activeType]: updater(prev[activeType]) }))
+
+  const setAdvanced = (open: boolean) =>
+    setAdvancedMap(prev => ({ ...prev, [activeType]: open }))
+
+  // 当前 kb+type 在全局队列中的上传任务
+  const activeUploads = queue.filter(
+    q => q.kbName === selectedKb && q.docType === activeType
+      && (q.status === 'pending' || q.status === 'uploading'),
+  )
+  const showFileList = activeUploads.length === 0 && stagedFiles.length === 0
+
+  // ── 数据查询 ──────────────────────────────────────────────
 
   const { data: kbs } = useQuery({ queryKey: ['knowledge-bases'], queryFn: knowledgeApi.list })
 
@@ -97,36 +111,7 @@ export default function DocumentPage() {
     enabled: !!selectedKb,
   })
 
-  const addFiles = useCallback((files: FileList | File[]) => {
-    const arr = Array.from(files)
-    const items: QueueItem[] = arr.map(file => ({
-      id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
-      file,
-      status: 'pending',
-      progress: 0,
-    }))
-    setQueue(prev => [
-      ...prev.filter(q => q.status !== 'error'),
-      ...items,
-    ])
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
-    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files)
-  }, [addFiles])
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.length) addFiles(e.target.files)
-    e.target.value = ''
-  }
-
-  const removeFromQueue = (id: string) =>
-    setQueue(prev => prev.filter(item => item.id !== id))
-
-  const clearDone = () =>
-    setQueue(prev => prev.filter(item => item.status !== 'done'))
+  const typeDocs = docs?.filter(d => d.doc_type === activeType) ?? []
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => documentApi.delete(selectedKb, id),
@@ -139,83 +124,59 @@ export default function DocumentPage() {
     onError: (e) => showToast(extractError(e), 'error'),
   })
 
-  const startUpload = async () => {
-    const pending = queue.filter(item => item.status === 'pending')
-    if (!pending.length || !selectedKb) return
+  // ── 文件选取 ──────────────────────────────────────────────
 
-    setUploading(true)
-    let successCount = 0
-    let failCount = 0
+  const addStaged = useCallback((files: FileList | File[]) => {
+    const arr = Array.from(files)
+    setStaged([...stagedFiles, ...arr])
+  }, [stagedFiles, activeType])
 
-    for (const item of pending) {
-      // 标记为上传中
-      setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'uploading', progress: 0 } : q))
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (e.dataTransfer.files.length) addStaged(e.dataTransfer.files)
+  }, [addStaged])
 
-      try {
-        const doc = await documentApi.upload(
-          selectedKb,
-          item.file,
-          params,
-          (pct) => setQueue(prev => prev.map(q => q.id === item.id ? { ...q, progress: pct } : q)),
-        )
-        setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'done', progress: 100, chunks: doc.chunk_count } : q))
-        successCount++
-        qc.invalidateQueries({ queryKey: ['documents', selectedKb] })
-        qc.invalidateQueries({ queryKey: ['knowledge-bases'] })
-      } catch (e) {
-        setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: extractError(e) } : q))
-        failCount++
-      }
-    }
-
-    setUploading(false)
-    if (successCount > 0 && failCount === 0) {
-      showToast(`${successCount} 个文档入库成功`, 'success')
-    } else if (failCount > 0) {
-      showToast(`${successCount} 成功，${failCount} 失败`, 'error')
-    }
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) addStaged(e.target.files)
+    e.target.value = ''
   }
 
-  const retrySingle = async (id: string) => {
-    const item = queue.find(q => q.id === id)
-    if (!item || uploading) return
-    setQueue(prev => prev.map(q => q.id === id ? { ...q, status: 'pending', error: undefined, progress: 0 } : q))
-    setUploading(true)
-    try {
-      const doc = await documentApi.upload(
-        selectedKb,
-        item.file,
-        params,
-        (pct) => setQueue(prev => prev.map(q => q.id === id ? { ...q, progress: pct } : q)),
-      )
-      setQueue(prev => prev.map(q => q.id === id ? { ...q, status: 'done', progress: 100, chunks: doc.chunk_count } : q))
-      qc.invalidateQueries({ queryKey: ['documents', selectedKb] })
-      qc.invalidateQueries({ queryKey: ['knowledge-bases'] })
-      showToast('重传成功', 'success')
-    } catch (e) {
-      setQueue(prev => prev.map(q => q.id === id ? { ...q, status: 'error', error: extractError(e) } : q))
-      showToast(extractError(e), 'error')
-    }
-    setUploading(false)
+  const removeStagedFile = (index: number) =>
+    setStaged(stagedFiles.filter((_, i) => i !== index))
+
+  // ── 开始上传 ──────────────────────────────────────────────
+
+  const handleStartUpload = () => {
+    if (!stagedFiles.length || !selectedKb) return
+    addFiles(selectedKb, activeType, stagedFiles, params)
+    setStaged([])  // 移交给全局 context，清空暂存
   }
 
-  const docGroups = useMemo(() => {
-    if (!docs?.length) return []
-    const order: DocType[] = ['policy', 'manual', 'form']
-    return order
-      .map(type => ({ type, items: docs.filter(d => d.doc_type === type) }))
-      .filter(g => g.items.length > 0)
-  }, [docs])
+  // ── Tab 切换 ──────────────────────────────────────────────
 
-  const pendingCount = queue.filter(q => q.status === 'pending').length
-  const hasDone = queue.some(q => q.status === 'done')
+  const switchType = (type: DocType) => {
+    const next: Record<string, string> = { type }
+    if (selectedKb) next.kb = selectedKb
+    setSearchParams(next)
+  }
+
+  const switchKb = (kb: string) => {
+    const next: Record<string, string> = { type: activeType }
+    if (kb) next.kb = kb
+    setSearchParams(next)
+  }
 
   const settle = (d: number): React.CSSProperties => ({
     animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
   })
 
+  const activeTypeMeta = DOC_TYPES.find(t => t.type === activeType)!
+
   return (
     <div className="p-6 max-w-5xl flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
+
+      {/* 标题 */}
       <div className="mb-6" style={settle(0)}>
         <h1 className="text-2xl font-semibold text-gray-900">文档</h1>
         <p className="mt-1 text-sm text-gray-500">上传与管理知识库中的文档</p>
@@ -226,7 +187,7 @@ export default function DocumentPage() {
         <label className="block text-sm font-medium text-gray-700 mb-1">选择知识库</label>
         <select
           value={selectedKb}
-          onChange={e => setSearchParams(e.target.value ? { kb: e.target.value } : {})}
+          onChange={e => switchKb(e.target.value)}
           className="border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-60"
         >
           <option value="">— 请选择 —</option>
@@ -234,11 +195,39 @@ export default function DocumentPage() {
         </select>
       </div>
 
+      {!selectedKb && (
+        <div className="text-sm text-gray-400 py-16 text-center border border-dashed border-gray-200 rounded-lg">
+          请先选择一个知识库
+        </div>
+      )}
+
       {selectedKb && (
         <>
-          {/* 上传区域 */}
-          <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5" style={settle(120)}>
-            <h2 className="text-sm font-medium text-gray-700 mb-3">上传文档</h2>
+          {/* 类型 Tab */}
+          <div className="flex gap-1 mb-6 border-b border-gray-200" style={settle(100)}>
+            {DOC_TYPES.map(t => (
+              <button
+                key={t.type}
+                onClick={() => switchType(t.type)}
+                className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors -mb-px border-b-2 ${
+                  activeType === t.type
+                    ? `border-gray-900 text-gray-900`
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── 上传区 ─────────────────────────────────────── */}
+          <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5" style={settle(150)}>
+            <h2 className="text-sm font-medium text-gray-700 mb-3">
+              上传
+              <span className={`ml-2 text-xs px-2 py-0.5 rounded font-semibold ${activeTypeMeta.badge}`}>
+                {activeTypeMeta.label}
+              </span>
+            </h2>
 
             {/* 拖拽区 */}
             <div
@@ -246,89 +235,45 @@ export default function DocumentPage() {
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}`}
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+              }`}
             >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.txt,.md"
+                accept=".pdf,.txt,.md,.docx"
                 multiple
                 className="hidden"
                 onChange={handleFileChange}
               />
               <Upload size={24} className="mx-auto text-gray-400 mb-2" />
               <p className="text-sm text-gray-600">拖拽文件到此处，或 <span className="text-blue-600">点击选择</span></p>
-              <p className="text-xs text-gray-400 mt-1">支持 .pdf / .txt / .md，可多选</p>
+              <p className="text-xs text-gray-400 mt-1">支持 .pdf / .docx / .txt / .md，可多选</p>
             </div>
 
-            {/* 文件队列 */}
-            {queue.length > 0 && (
+            {/* 暂存文件列表 */}
+            {stagedFiles.length > 0 && (
               <div className="mt-3 space-y-1.5">
-                {queue.map(item => (
-                  <div key={item.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-50 border border-gray-100">
-                    <StatusIcon status={item.status} />
+                {stagedFiles.map((file, i) => (
+                  <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-50 border border-gray-100">
                     <FileText size={14} className="text-gray-400 shrink-0" />
-                    <span className="text-sm text-gray-800 truncate flex-1 min-w-0">{item.file.name}</span>
-                    <span className="text-xs text-gray-400 shrink-0">{formatSize(item.file.size)}</span>
-                    {item.status === 'uploading' && (
-                      <div className="w-20 bg-gray-200 rounded-full h-1.5 shrink-0">
-                        <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${item.progress}%` }} />
-                      </div>
-                    )}
-                    {item.status === 'done' && item.chunks !== undefined && (
-                      <span className="text-xs text-emerald-600 shrink-0">{item.chunks} chunks</span>
-                    )}
-                    {item.status === 'error' && (
-                      <>
-                        <span className="text-xs text-red-500 shrink-0 max-w-32 truncate" title={item.error}>{item.error}</span>
-                        <button
-                          onClick={() => retrySingle(item.id)}
-                          title="重试"
-                          disabled={uploading}
-                          className="p-1 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors shrink-0 disabled:opacity-40"
-                        >
-                          <RotateCcw size={13} />
-                        </button>
-                        <button
-                          onClick={() => removeFromQueue(item.id)}
-                          className="text-gray-400 hover:text-gray-600 shrink-0"
-                        >
-                          <X size={12} />
-                        </button>
-                      </>
-                    )}
-                    {item.status === 'pending' && (
-                      <button
-                        onClick={() => removeFromQueue(item.id)}
-                        className="text-gray-400 hover:text-gray-600 shrink-0"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
+                    <span className="text-sm text-gray-800 truncate flex-1 min-w-0">{file.name}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{formatSize(file.size)}</span>
+                    <button
+                      onClick={() => removeStagedFile(i)}
+                      className="text-gray-400 hover:text-gray-600 shrink-0"
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* 文档类型 */}
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">文档类型</label>
-              <div className="flex gap-3">
-                {(Object.entries(DOC_TYPE_LABELS) as [DocType, string][]).map(([val, label]) => (
-                  <button
-                    key={val}
-                    onClick={() => setParams(p => ({ ...p, doc_type: val }))}
-                    className={`px-4 py-2 text-sm rounded-md border transition-colors ${params.doc_type === val ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* 高级参数（折叠） */}
             <button
-              onClick={() => setAdvancedOpen(o => !o)}
+              onClick={() => setAdvanced(!advancedOpen)}
               className="mt-4 flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
             >
               {advancedOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -342,10 +287,10 @@ export default function DocumentPage() {
                   <label className="block text-xs font-medium text-gray-600 mb-2">切分策略</label>
                   <div className="flex flex-wrap gap-2">
                     {([
-                      { value: 'recursive', label: 'Recursive', ndcg: 0.85, desc: '按标点和 Markdown 递归分割' },
-                      { value: 'sentence', label: 'Sentence', ndcg: 0.81, desc: '按句子边界分割' },
-                      { value: 'token', label: 'Token', ndcg: 0.81, desc: '固定 Token 数分割' },
-                    ] as const).map(s => (
+                      { value: 'recursive' as SplitterType, label: 'Recursive', ndcg: 0.85, desc: '按标点和 Markdown 递归分割' },
+                      { value: 'sentence'  as SplitterType, label: 'Sentence',  ndcg: 0.81, desc: '按句子边界分割' },
+                      { value: 'token'     as SplitterType, label: 'Token',     ndcg: 0.81, desc: '固定 Token 数分割' },
+                    ]).map(s => (
                       <button
                         key={s.value}
                         onClick={() => setParams(p => ({ ...p, splitter_type: s.value }))}
@@ -407,114 +352,131 @@ export default function DocumentPage() {
               </div>
             )}
 
-            {/* 操作按钮 */}
-            <div className="mt-4 flex items-center gap-3">
+            {/* 开始上传按钮 */}
+            <div className="mt-4">
               <button
-                onClick={startUpload}
-                disabled={pendingCount === 0 || uploading}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleStartUpload}
+                disabled={stagedFiles.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-md hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                {uploading ? '入库中...' : `上传入库${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+                <Upload size={14} />
+                开始上传{stagedFiles.length > 0 ? ` (${stagedFiles.length})` : ''}
               </button>
-              {hasDone && !uploading && (
-                <button
-                  onClick={clearDone}
-                  className="text-xs text-gray-500 hover:text-gray-700"
-                >
-                  清除已完成
-                </button>
-              )}
             </div>
           </div>
 
-          {/* 文档列表 */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden" style={settle(180)}>
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-medium text-gray-700">已入库文档</h2>
-            </div>
+          {/* ── 状态区：上传进度 或 文件列表 ────────────────── */}
 
-            {docsLoading && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 py-8 justify-center">
-                <Loader2 size={14} className="animate-spin" />加载中...
+          {/* 上传进度（有进行中任务时显示） */}
+          {!showFileList && (
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden" style={settle(200)}>
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin text-blue-500" />
+                <h2 className="text-sm font-medium text-gray-700">
+                  入库中 — {activeTypeMeta.label}
+                </h2>
               </div>
-            )}
+              <div className="p-4 space-y-2">
+                {activeUploads.map(item => (
+                  <div key={item.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-50 border border-gray-100">
+                    <UploadStatusIcon status={item.status} />
+                    <FileText size={14} className="text-gray-400 shrink-0" />
+                    <span className="text-sm text-gray-800 truncate flex-1 min-w-0">{item.file.name}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{formatSize(item.file.size)}</span>
+                    {item.status === 'uploading' && (
+                      <div className="w-24 bg-gray-200 rounded-full h-1.5 shrink-0">
+                        <div
+                          className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                          style={{ width: `${item.progress}%` }}
+                        />
+                      </div>
+                    )}
+                    {item.status === 'pending' && (
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="text-gray-400 hover:text-gray-600 shrink-0"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-            {docs && docs.length === 0 && (
-              <div className="text-sm text-gray-400 py-10 text-center">暂无文档，请上传</div>
-            )}
+          {/* 已入库文件列表（无进行中任务时显示） */}
+          {showFileList && (
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden" style={settle(200)}>
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                <div className={`w-1 h-4 rounded-full ${activeTypeMeta.barColor}`} />
+                <h2 className="text-sm font-medium text-gray-700">
+                  已入库 — {activeTypeMeta.label}
+                </h2>
+                <span className="text-xs text-gray-400 ml-1">{typeDocs.length} 个文档</span>
+              </div>
 
-            {docGroups.length > 0 && (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="text-left px-4 py-3 text-gray-600 font-medium">文件名</th>
-                    <th className="text-center px-4 py-3 text-gray-600 font-medium">大小</th>
-                    <th className="text-center px-4 py-3 text-gray-600 font-medium">Chunks</th>
-                    <th className="text-left px-4 py-3 text-gray-600 font-medium">上传时间</th>
-                    <th className="text-right px-4 py-3 text-gray-600 font-medium">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {docGroups.map(group => (
-                    <>
-                      {/* 分组标题行 */}
-                      <tr key={`group-${group.type}`} className="bg-[#F8F6F2]">
-                        <td colSpan={5} className="px-0 py-0">
-                          <div className="flex items-center gap-3 py-2 px-4">
-                            <div className={`w-1 h-4 rounded-full shrink-0 ${DOC_TYPE_BAR_COLORS[group.type]}`} />
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${DOC_TYPE_COLORS[group.type]}`}>
-                              {DOC_TYPE_LABELS[group.type]}
-                            </span>
-                            <span className="text-xs text-gray-400">{group.items.length} 个文档</span>
-                          </div>
+              {docsLoading && (
+                <div className="flex items-center gap-2 text-sm text-gray-500 py-8 justify-center">
+                  <Loader2 size={14} className="animate-spin" />加载中...
+                </div>
+              )}
+
+              {!docsLoading && typeDocs.length === 0 && (
+                <div className="text-sm text-gray-400 py-10 text-center">
+                  暂无{activeTypeMeta.label}，请上传
+                </div>
+              )}
+
+              {typeDocs.length > 0 && (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-4 py-3 text-gray-600 font-medium">文件名</th>
+                      <th className="text-center px-4 py-3 text-gray-600 font-medium">大小</th>
+                      <th className="text-center px-4 py-3 text-gray-600 font-medium">Chunks</th>
+                      <th className="text-left px-4 py-3 text-gray-600 font-medium">上传时间</th>
+                      <th className="text-right px-4 py-3 text-gray-600 font-medium">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {typeDocs.map(doc => (
+                      <tr key={doc.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-900 font-medium max-w-xs truncate">{doc.file_name}</td>
+                        <td className="px-4 py-3 text-center text-gray-500">{formatSize(doc.file_size)}</td>
+                        <td className="px-4 py-3 text-center text-gray-700">{doc.chunk_count}</td>
+                        <td className="px-4 py-3 text-gray-500">{formatDate(doc.created_at)}</td>
+                        <td className="px-4 py-3 text-right">
+                          {deleteId === doc.id ? (
+                            <div className="flex items-center gap-2 justify-end">
+                              <span className="text-xs text-gray-500">确认删除？</span>
+                              <button
+                                onClick={() => deleteMutation.mutate(doc.id)}
+                                disabled={deleteMutation.isPending}
+                                className="text-xs px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-1"
+                              >
+                                {deleteMutation.isPending && <Loader2 size={10} className="animate-spin" />}
+                                确认
+                              </button>
+                              <button onClick={() => setDeleteId(null)} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">取消</button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteId(doc.id)}
+                              className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </td>
                       </tr>
-                      {/* 文档行 */}
-                      {group.items.map(doc => (
-                        <tr key={doc.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                          <td className="px-4 py-3 text-gray-900 font-medium max-w-xs truncate">{doc.file_name}</td>
-                          <td className="px-4 py-3 text-center text-gray-500">{formatSize(doc.file_size)}</td>
-                          <td className="px-4 py-3 text-center text-gray-700">{doc.chunk_count}</td>
-                          <td className="px-4 py-3 text-gray-500">{formatDate(doc.created_at)}</td>
-                          <td className="px-4 py-3 text-right">
-                            {deleteId === doc.id ? (
-                              <div className="flex items-center gap-2 justify-end">
-                                <span className="text-xs text-gray-500">确认删除？</span>
-                                <button
-                                  onClick={() => deleteMutation.mutate(doc.id)}
-                                  disabled={deleteMutation.isPending}
-                                  className="text-xs px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-1"
-                                >
-                                  {deleteMutation.isPending && <Loader2 size={10} className="animate-spin" />}
-                                  确认
-                                </button>
-                                <button onClick={() => setDeleteId(null)} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">取消</button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setDeleteId(doc.id)}
-                                className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
         </>
-      )}
-
-      {!selectedKb && (
-        <div className="text-sm text-gray-400 py-16 text-center border border-dashed border-gray-200 rounded-lg">
-          请先选择一个知识库
-        </div>
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
