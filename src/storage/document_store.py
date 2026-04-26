@@ -267,13 +267,14 @@ class DocumentStore:
                        VALUES (%s, %s, %s, %s, %s, %s)""",
                     (conversation_id, role, content, sources_json, files_json, now),
                 )
+                msg_id = cur.lastrowid  # 在 UPDATE 之前保存，避免被覆盖
                 cur.execute(
                     "UPDATE conversations SET updated_at = %s WHERE id = %s",
                     (now, conversation_id),
                 )
                 conn.commit()
                 cur.execute(
-                    "SELECT * FROM conversation_messages WHERE id = %s", (cur.lastrowid,)
+                    "SELECT * FROM conversation_messages WHERE id = %s", (msg_id,)
                 )
                 return self._parse_message_row(cur.fetchone())
 
@@ -293,6 +294,8 @@ class DocumentStore:
 
         pymysql DictCursor 返回 dict；MySQL JSON 列可能返回 str 或已解析的对象。
         """
+        if row is None:
+            return {}
         msg = dict(row)
         for field in ("sources", "files"):
             raw = msg.get(field)

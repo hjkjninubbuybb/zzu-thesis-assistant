@@ -72,6 +72,9 @@ class BM25Retriever:
         k = min(self.top_k, len(self.nodes))
         results, scores = self._bm25.retrieve(query_tokens, k=k)
 
+        if not len(results) or not len(results[0]):
+            return []
+
         out = []
         for idx, score in zip(results[0], scores[0]):
             idx = int(idx)
