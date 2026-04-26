@@ -6,7 +6,7 @@ import os
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from src.config import get_config
+from src.config import get_config, get_dashscope_api_key
 from src.core.embedding import get_embed_model
 from src.storage.document_store import DocumentStore
 from src.storage.vector_store import VectorStore
@@ -29,7 +29,7 @@ def rewrite_query(raw: str) -> str:
         cfg = get_config()["llm"]
         llm = ChatTongyi(
             model=cfg["fast_model"],
-            api_key=os.environ.get("DASHSCOPE_API_KEY"),
+            api_key=get_dashscope_api_key(),
         )
         resp = llm.invoke([SystemMessage(content=_REWRITE_SYSTEM), HumanMessage(content=raw)])
         rewritten = resp.content.strip()
@@ -136,7 +136,7 @@ def faq_generate(query: str, faq_results: list[dict]) -> str | None:
         llm = ChatTongyi(
             model=cfg["fast_model"],
             streaming=False,
-            api_key=os.environ.get("DASHSCOPE_API_KEY"),
+            api_key=get_dashscope_api_key(),
         )
         resp = llm.invoke([SystemMessage(content=system), HumanMessage(content=query)])
         text = resp.content.strip()

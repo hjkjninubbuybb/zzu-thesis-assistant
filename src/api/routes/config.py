@@ -1,20 +1,18 @@
 """系统配置读写接口。"""
 
 import logging
-import os
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from src.api.auth import require_admin
-from src.config import ROOT_DIR, get_config
+from src.config import ROOT_DIR, get_config, get_dashscope_api_key
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 logger = logging.getLogger(__name__)
 
 CONFIG_PATH = ROOT_DIR / "configs" / "config.yaml"
-ENV_PATH = ROOT_DIR / ".env"
 
 # 允许写入的模型名枚举（防止写入无效模型名导致运行时报错）
 _ALLOWED_LLM_MODELS = {"qwen-turbo", "qwen-plus", "qwen-max", "qwen-long"}
@@ -55,7 +53,7 @@ class ApiKeyUpdate(BaseModel):
 @router.get("/api-key")
 def get_api_key(current_user: dict = Depends(require_admin)) -> dict:
     """获取已配置的 API Key（脱敏显示）。"""
-    key = os.environ.get("DASHSCOPE_API_KEY", "")
+    key = get_dashscope_api_key()
     if not key:
         return {"has_key": False, "masked_key": ""}
     masked = key[:3] + "****" + key[-4:] if len(key) > 7 else "****"
@@ -64,27 +62,10 @@ def get_api_key(current_user: dict = Depends(require_admin)) -> dict:
 
 @router.put("/api-key")
 def update_api_key(body: ApiKeyUpdate, current_user: dict = Depends(require_admin)) -> dict:
-    """更新 DashScope API Key（写入 .env 并更新进程环境变量）。"""
-    lines: list[str] = []
-    found = False
-    if ENV_PATH.exists():
-        with open(ENV_PATH, "r", encoding="utf-8") as f:
-            for line in f:
-                if line.startswith("DASHSCOPE_API_KEY="):
-                    lines.append(f"DASHSCOPE_API_KEY={body.api_key}\n")
-                    found = True
-                else:
-                    lines.append(line)
-    if not found:
-        lines.append(f"DASHSCOPE_API_KEY={body.api_key}\n")
-
-    try:
-        with open(ENV_PATH, "w", encoding="utf-8") as f:
-            f.writelines(lines)
-    except OSError as e:
-        raise HTTPException(status_code=500, detail="写入 .env 失败，请检查文件权限") from e
-
-    os.environ["DASHSCOPE_API_KEY"] = body.api_key
+    """更新 DashScope API Key（写入数据库 system_settings）。"""
+    from src.storage.document_store import DocumentStore
+    ds = DocumentStore()
+    ds.set_setting("dashscope_api_key", body.api_key)
     logger.info("DashScope API Key 已更新")
     return {"message": "API Key 已更新", "has_key": True}
 
@@ -92,7 +73,7 @@ def update_api_key(body: ApiKeyUpdate, current_user: dict = Depends(require_admi
 @router.post("/api-key/test")
 def test_api_key(current_user: dict = Depends(require_admin)) -> dict:
     """测试当前 DashScope API Key 是否有效（发送一次轻量 Embedding 请求）。"""
-    key = os.environ.get("DASHSCOPE_API_KEY", "")
+    key = get_dashscope_api_key()
     if not key:
         return {"ok": False, "message": "未配置 API Key"}
     try:

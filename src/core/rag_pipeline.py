@@ -18,7 +18,7 @@ from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage
 from langgraph.prebuilt import create_react_agent  # langgraph 版，非 langchain 旧版
 
-from src.config import get_config
+from src.config import get_config, get_dashscope_api_key
 from src.core.tools import (
     get_academic_calendar,
     list_kb_documents,
@@ -67,7 +67,7 @@ SYSTEM_PROMPT = """\
 def _get_llm(model: str | None = None) -> ChatTongyi:
     if model is None:
         model = get_config()["llm"]["model"]
-    return ChatTongyi(model=model, streaming=True, api_key=os.environ.get("DASHSCOPE_API_KEY"))
+    return ChatTongyi(model=model, streaming=True, api_key=get_dashscope_api_key())
 
 
 def build_rag_agent(

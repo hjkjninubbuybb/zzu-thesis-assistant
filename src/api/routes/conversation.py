@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from langchain_community.chat_models import ChatTongyi
@@ -17,7 +16,7 @@ from src.api.schemas import (
     MessageResponse,
     SaveMessageRequest,
 )
-from src.config import get_config
+from src.config import get_config, get_dashscope_api_key
 from src.storage.document_store import DocumentStore
 
 router = APIRouter(prefix="/api/conversation", tags=["conversation"])
@@ -110,7 +109,7 @@ def summarize_title(conv_id: int, current_user: dict = Depends(get_current_user)
     assistant_text = ((first_assistant["content"] if first_assistant else "") or "").strip()[:500]
 
     fast_model = get_config()["llm"].get("fast_model", "qwen-turbo")
-    api_key = os.environ.get("DASHSCOPE_API_KEY")
+    api_key = get_dashscope_api_key()
     if not api_key:
         logger.warning("[summarize_title] DASHSCOPE_API_KEY 未配置，跳过 LLM 调用")
         return _ds.update_conversation_title(conv_id, user_text[:20] or "新对话")

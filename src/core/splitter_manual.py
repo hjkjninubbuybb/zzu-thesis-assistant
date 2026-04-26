@@ -225,7 +225,8 @@ def _extract_semantic(block: dict) -> dict:
 
         from pydantic import SecretStr
 
-        api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+        from src.config import get_dashscope_api_key
+        api_key = get_dashscope_api_key()
         llm = ChatTongyi(
             model="qwen-plus",
             api_key=SecretStr(api_key) if api_key else None,

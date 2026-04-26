@@ -18,7 +18,8 @@ class Reranker:
     def __init__(self, model: str = "gte-rerank", top_n: int = 5):
         self._top_n = top_n
         self._model = model
-        self._api_key = os.environ.get("DASHSCOPE_API_KEY")
+        from src.config import get_dashscope_api_key
+        self._api_key = get_dashscope_api_key()
 
     def _make_reranker(self, top_n: int) -> DashScopeRerank:
         return DashScopeRerank(top_n=top_n, model=self._model, api_key=self._api_key)

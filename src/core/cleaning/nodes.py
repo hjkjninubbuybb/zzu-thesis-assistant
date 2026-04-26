@@ -6,7 +6,7 @@ from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, ValidationError
 
-from src.config import get_config
+from src.config import get_config, get_dashscope_api_key
 from .state import CleaningState
 from .prompts import (
     OPTIMIZER_SYSTEM_PROMPT,
@@ -52,7 +52,7 @@ class EvaluatorOutput(BaseModel):
 def _get_llm(fast: bool = False) -> ChatTongyi:
     cfg = get_config()["llm"]
     model = cfg["fast_model"] if fast else cfg["model"]
-    return ChatTongyi(model=model, api_key=os.environ.get("DASHSCOPE_API_KEY"))
+    return ChatTongyi(model=model, api_key=get_dashscope_api_key())
 
 
 def optimizer_node(state: CleaningState) -> dict:
