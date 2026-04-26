@@ -58,3 +58,16 @@ export function clearAuth(portal?: Portal): void {
 export function isLoggedIn(portal?: Portal): boolean {
   return !!getAccessToken(portal)
 }
+
+/** 从 JWT 中提取过期时间戳（秒），解析失败返回 null */
+export function getTokenExp(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return typeof payload.exp === 'number' ? payload.exp : null
+  } catch {
+    return null
+  }
+}
+
+/** Access token 默认有效期（秒），JWT 解析失败时的兜底值 */
+export const ACCESS_TOKEN_LIFETIME_SEC = 480 * 60

@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { UserInfo } from '@/types/api'
 import { AuthContext } from '@/hooks/useAuth'
+import { useTokenAutoRefresh } from '@/hooks/useTokenAutoRefresh'
 import { authApi } from '@/lib/api'
 import { saveAuth, clearAuth, getStoredUser, getRefreshToken, type Portal } from '@/lib/auth'
 
@@ -32,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setReady(true))
   }, [portal])
+
+  useTokenAutoRefresh(portal, !!user, (u) => setUserState(u))
 
   const login = async (username: string, password: string) => {
     const data = await authApi.login(username, password)
