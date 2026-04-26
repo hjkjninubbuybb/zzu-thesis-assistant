@@ -162,8 +162,8 @@ def reset_password(user_id: int, body: ResetPasswordRequest, current_user: dict 
 
 # ── Excel 导入/导出 ───────────────────────────────────────────
 
-_COLS = ["用户名*", "姓名", "学号*", "年级", "专业", "班级", "初始密码（留空自动生成）"]
-_COL_WIDTH = [18, 14, 18, 10, 22, 14, 28]
+_COLS = ["姓名", "学号*", "年级", "专业", "班级", "初始密码（留空自动生成）"]
+_COL_WIDTH = [14, 18, 10, 22, 14, 28]
 
 
 def _build_student_workbook(rows: list[dict] | None) -> Workbook:
@@ -185,11 +185,10 @@ def _build_student_workbook(rows: list[dict] | None) -> Workbook:
 
     if rows is None:
         # 示例行
-        ws.append(["zhangsan", "张三", "202201001", "2022", "计算机科学与技术", "计科一班", ""])
+        ws.append(["张三", "202201001", "2022", "计算机科学与技术", "计科一班", ""])
     else:
         for r in rows:
             ws.append([
-                r.get("username", ""),
                 r.get("display_name", ""),
                 r.get("student_id", ""),
                 r.get("grade", ""),
@@ -233,7 +232,6 @@ def export_students_excel(current_user: dict = Depends(require_teacher_or_admin)
     for u in items:
         profile = _us.get_student_profile(u["id"]) or {}
         rows.append({
-            "username": u["username"],
             "display_name": u["display_name"],
             "student_id": profile.get("student_id", ""),
             "grade": profile.get("grade", ""),
@@ -272,26 +270,25 @@ async def import_students_excel(
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or not row[0]:
             continue
-        username = str(row[0]).strip()
-        display_name = str(row[1]).strip() if row[1] else ""
-        student_id = str(row[2]).strip() if row[2] else ""
-        grade = str(row[3]).strip() if row[3] else ""
-        major = str(row[4]).strip() if row[4] else ""
-        class_name = str(row[5]).strip() if row[5] else ""
-        password = str(row[6]).strip() if len(row) > 6 and row[6] else (default_password or _random_password())
+        display_name = str(row[0]).strip() if row[0] else ""
+        student_id = str(row[1]).strip() if row[1] else ""
+        grade = str(row[2]).strip() if row[2] else ""
+        major = str(row[3]).strip() if row[3] else ""
+        class_name = str(row[4]).strip() if row[4] else ""
+        password = str(row[5]).strip() if len(row) > 5 and row[5] else (default_password or _random_password())
 
-        if not username or not student_id:
-            failed.append({"row": row_idx, "username": username, "reason": "用户名和学号不能为空"})
+        if not student_id:
+            failed.append({"row": row_idx, "student_id": student_id, "reason": "学号不能为空"})
             continue
 
         # 跳过已存在
-        if _us.get_user_by_username(username) or _us.get_user_by_student_id(student_id):
+        if _us.get_user_by_student_id(student_id):
             skipped += 1
             continue
 
         try:
             user = _us.create_user(
-                username=username,
+                username=student_id,
                 hashed_pwd=hash_password(password),
                 display_name=display_name,
                 role="student",
@@ -300,7 +297,7 @@ async def import_students_excel(
             success += 1
         except Exception as e:
             logger.warning("[student import] 第 %d 行导入失败: %s", row_idx, e)
-            failed.append({"row": row_idx, "username": username, "reason": str(e)})
+            failed.append({"row": row_idx, "student_id": student_id, "reason": str(e)})
 
     return {
         "total": success + skipped + len(failed),

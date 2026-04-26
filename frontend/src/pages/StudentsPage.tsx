@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, MoreHorizontal, UserCheck, UserX, KeyRound, Trash2, Download, Upload, FileDown } from 'lucide-react'
+import { Plus, Search, MoreHorizontal, UserCheck, UserX, KeyRound, Trash2, Download, Upload, FileDown, Pencil } from 'lucide-react'
 import { userApi, extractError } from '@/lib/api'
 import type { UserInfo, UserCreate, StudentProfileCreate } from '@/types/api'
 
@@ -8,8 +8,8 @@ import type { UserInfo, UserCreate, StudentProfileCreate } from '@/types/api'
 
 function CreateStudentModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState<UserCreate & Partial<StudentProfileCreate>>({
-    username: '', password: '', display_name: '', role: 'student',
+  const [form, setForm] = useState<Omit<UserCreate, 'username'> & Partial<StudentProfileCreate>>({
+    password: '', display_name: '', role: 'student',
     student_id: '', grade: '', major: '', class_name: '',
   })
   const [error, setError] = useState<string | null>(null)
@@ -17,19 +17,17 @@ function CreateStudentModal({ onClose }: { onClose: () => void }) {
   const createMut = useMutation({
     mutationFn: async () => {
       const user = await userApi.create({
-        username: form.username,
+        username: form.student_id ?? '',
         password: form.password,
         display_name: form.display_name,
         role: 'student',
       })
-      if (form.student_id) {
-        await userApi.updateStudentProfile(user.id, {
-          student_id: form.student_id,
-          grade: form.grade ?? '',
-          major: form.major ?? '',
-          class_name: form.class_name ?? '',
-        })
-      }
+      await userApi.updateStudentProfile(user.id, {
+        student_id: form.student_id ?? '',
+        grade: form.grade ?? '',
+        major: form.major ?? '',
+        class_name: form.class_name ?? '',
+      })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] })
@@ -56,12 +54,9 @@ function CreateStudentModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white rounded-2xl border border-[#F0EDE8] shadow-lg p-6 w-full max-w-md animate-apple-pop">
         <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">添加学生账号</h2>
         <div className="flex flex-col gap-3">
-          {field('username', '用户名 *', '仅字母数字下划线')}
+          {field('student_id', '学号 *', '如 202212345678')}
           {field('password', '初始密码 *', '至少 6 位', 'password')}
           {field('display_name', '姓名', '学生真实姓名')}
-          <div className="mx-0 my-1 h-px bg-[#F0EDE8]" />
-          <p className="text-xs text-[#9A9A9A]">学生档案（可选）</p>
-          {field('student_id', '学号', '如 202212345678')}
           <div className="flex gap-3">
             <div className="flex-1 flex flex-col gap-1">
               <label className="text-xs text-[#6A6A6A] font-medium">年级</label>
@@ -81,7 +76,7 @@ function CreateStudentModal({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="px-4 py-2 text-sm text-[#6A6A6A]">取消</button>
           <button
             onClick={() => createMut.mutate()}
-            disabled={createMut.isPending || !form.username || !form.password}
+            disabled={createMut.isPending || !form.student_id || !form.password}
             className="px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] disabled:opacity-50 transition"
           >
             {createMut.isPending ? '创建中...' : '创建'}
@@ -125,6 +120,87 @@ function ResetPasswordModal({ user, onClose }: { user: UserInfo; onClose: () => 
   )
 }
 
+// ── 编辑学生弹窗 ────────────────────────────────────────────
+
+function EditStudentModal({ user, onClose }: { user: UserInfo; onClose: () => void }) {
+  const qc = useQueryClient()
+  const profile = user.profile as { student_id?: string; grade?: string; major?: string; class_name?: string } | null
+  const [form, setForm] = useState({
+    display_name: user.display_name || '',
+    student_id: profile?.student_id || '',
+    grade: profile?.grade || '',
+    major: profile?.major || '',
+    class_name: profile?.class_name || '',
+  })
+  const [error, setError] = useState<string | null>(null)
+
+  const editMut = useMutation({
+    mutationFn: async () => {
+      await userApi.update(user.id, { display_name: form.display_name })
+      await userApi.updateStudentProfile(user.id, {
+        student_id: form.student_id,
+        grade: form.grade,
+        major: form.major,
+        class_name: form.class_name,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      onClose()
+    },
+    onError: (err) => setError(extractError(err)),
+  })
+
+  const field = (key: keyof typeof form, label: string, placeholder: string) => (
+    <div key={key} className="flex flex-col gap-1">
+      <label className="text-xs text-[#6A6A6A] font-medium">{label}</label>
+      <input
+        type="text"
+        value={form[key]}
+        onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+        placeholder={placeholder}
+        className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition"
+      />
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-apple-fade">
+      <div className="bg-white rounded-2xl border border-[#F0EDE8] shadow-lg p-6 w-full max-w-md animate-apple-pop">
+        <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">编辑学生信息</h2>
+        <div className="flex flex-col gap-3">
+          {field('student_id', '学号', '如 202212345678')}
+          {field('display_name', '姓名', '学生真实姓名')}
+          <div className="flex gap-3">
+            <div className="flex-1 flex flex-col gap-1">
+              <label className="text-xs text-[#6A6A6A] font-medium">年级</label>
+              <input type="text" value={form.grade} onChange={e => setForm(p => ({...p, grade: e.target.value}))}
+                placeholder="如 2022" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition" />
+            </div>
+            <div className="flex-1 flex flex-col gap-1">
+              <label className="text-xs text-[#6A6A6A] font-medium">班级</label>
+              <input type="text" value={form.class_name} onChange={e => setForm(p => ({...p, class_name: e.target.value}))}
+                placeholder="如 计科一班" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition" />
+            </div>
+          </div>
+          {field('major', '专业', '如 计算机科学与技术')}
+        </div>
+        {error && <div className="mt-3 text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</div>}
+        <div className="flex gap-2 mt-5 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-[#6A6A6A]">取消</button>
+          <button
+            onClick={() => editMut.mutate()}
+            disabled={editMut.isPending || !form.student_id}
+            className="px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] disabled:opacity-50 transition"
+          >
+            {editMut.isPending ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── 主页面 ──────────────────────────────────────────────────
 
 export default function StudentsPage() {
@@ -133,6 +209,7 @@ export default function StudentsPage() {
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [resetTarget, setResetTarget] = useState<UserInfo | null>(null)
+  const [editTarget, setEditTarget] = useState<UserInfo | null>(null)
   const [menuOpen, setMenuOpen] = useState<number | null>(null)
   const [importResult, setImportResult] = useState<{ total: number; success: number; skipped: number; failed: number; errors: unknown[] } | null>(null)
   const [importing, setImporting] = useState(false)
@@ -176,7 +253,6 @@ export default function StudentsPage() {
 
   const filtered = search.trim()
     ? items.filter(u =>
-        u.username.includes(search) ||
         u.display_name.includes(search) ||
         ((u.profile as { student_id?: string })?.student_id ?? '').includes(search)
       )
@@ -226,7 +302,7 @@ export default function StudentsPage() {
       <div className="relative" style={settle(50)}>
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]" />
         <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="搜索用户名、姓名或学号..."
+          placeholder="搜索姓名或学号..."
           className="w-full pl-9 pr-4 py-2 rounded-xl border border-[#E8E5E0] bg-white text-sm outline-none focus:border-[#1A1A1A] transition" />
       </div>
 
@@ -242,7 +318,7 @@ export default function StudentsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#F0EDE8] bg-[#FAFAF9]">
-                {['姓名', '用户名', '学号', '年级/专业', '状态', '创建时间', ''].map(h => (
+                {['姓名', '学号', '年级/专业', '状态', '创建时间', ''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs text-[#9A9A9A] font-medium">{h}</th>
                 ))}
               </tr>
@@ -257,7 +333,6 @@ export default function StudentsPage() {
                     style={{ animation: `appleFadeUp 0.55s cubic-bezier(0.25, 1, 0.5, 1) ${Math.min(160 + i * 45, 600)}ms both` }}
                   >
                     <td className="px-4 py-3 font-medium text-[#1A1A1A]">{u.display_name || '—'}</td>
-                    <td className="px-4 py-3 text-[#4A4A4A] font-mono text-xs">{u.username}</td>
                     <td className="px-4 py-3 text-[#4A4A4A]">{profile?.student_id || '—'}</td>
                     <td className="px-4 py-3 text-[#6A6A6A]">
                       {profile?.grade && profile?.major ? `${profile.grade}级 · ${profile.major}` : '—'}
@@ -282,6 +357,11 @@ export default function StudentsPage() {
                           className="absolute right-4 top-10 z-20 bg-white border border-[#F0EDE8] rounded-xl shadow-md py-1 min-w-[140px]"
                           style={{ animation: 'applePopIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both' }}
                           onMouseLeave={() => setMenuOpen(null)}>
+                          <button
+                            onClick={() => { setEditTarget(u); setMenuOpen(null) }}
+                            className="flex items-center gap-2 w-full px-4 py-2 text-xs text-[#4A4A4A] hover:bg-[#F2EFE9] transition">
+                            <Pencil size={13} />编辑信息
+                          </button>
                           <button
                             onClick={() => { toggleActive.mutate(u); setMenuOpen(null) }}
                             className="flex items-center gap-2 w-full px-4 py-2 text-xs text-[#4A4A4A] hover:bg-[#F2EFE9] transition">
@@ -329,6 +409,7 @@ export default function StudentsPage() {
 
       {showCreate && <CreateStudentModal onClose={() => setShowCreate(false)} />}
       {resetTarget && <ResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} />}
+      {editTarget && <EditStudentModal user={editTarget} onClose={() => setEditTarget(null)} />}
     </div>
   )
 }
