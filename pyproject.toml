@@ -31,11 +31,10 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0",
-    "python-dotenv>=1.0.0",
     # Auth
     "python-jose[cryptography] (>=3.3.0)",
     "passlib[bcrypt] (>=1.7.4)",
-    "bcrypt (>=3.0.0,<5.0.0)",
+    "bcrypt (>=3.0.0,<4.0.0)",
     # MySQL
     "pymysql (>=1.1.0)",
     "dbutils (>=3.1.0)",
