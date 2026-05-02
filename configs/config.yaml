@@ -31,12 +31,15 @@ retrieval:
   bm25_top_k: 10
   hybrid_top_k: 15
   rrf_k: 60
+  query_enhance: true
+  protect_raw_top_n: 1
 reranker:
   model: gte-rerank
   top_n: 5
 rag:
   max_reformulations: 2
-  agent_recursion_limit: 6
+  agent_recursion_limit: 15
+  agent_retry_count: 3
 server:
   api_host: 0.0.0.0
   api_port: 8000
@@ -55,6 +58,3 @@ auth:
   refresh_token_expire_days: 30
   default_admin_username: admin
   default_admin_password: admin123
-academic:
-  spring_start: "02-24"   # 爬取失败时的兜底开学日（MM-DD）
-  autumn_start: "09-01"

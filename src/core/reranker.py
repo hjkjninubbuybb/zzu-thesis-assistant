@@ -79,7 +79,9 @@ class Reranker:
                         try:
                             all_results.extend(future.result())
                         except Exception as e:
-                            logger.warning("[reranker] 批次 rerank 失败，跳过: %s", e)
+                            fallback_batch = futures[future]
+                            logger.warning("[reranker] 批次 rerank 失败，保留原始批次: %s", e)
+                            all_results.extend(fallback_batch)
 
             if not all_results:
                 logger.warning("[reranker] 所有批次均失败，返回原始顺序")

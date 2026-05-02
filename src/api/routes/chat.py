@@ -12,6 +12,7 @@ from src.api.schemas import ChatRequest
 from src.config import get_config
 from src.core.faq_match import try_faq_match, faq_generate
 from src.core.retrieval import HybridRetriever, fetch_corpus
+from src.core.retrieval_strategy import enhance_query, protect_raw_candidates
 from src.core.reranker import Reranker
 from src.core.rag_pipeline import stream_rag, _get_llm
 from src.storage.document_store import DocumentStore
@@ -127,10 +128,17 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
                 vector_store=_vs,
             )
             reranker = Reranker(model=rer_cfg["model"], top_n=rer_cfg["top_n"])
+            query_enhance_enabled = bool(ret_cfg.get("query_enhance", False))
+            protect_raw_top_n = int(ret_cfg.get("protect_raw_top_n", 0) or 0)
+            final_top_n = int(rer_cfg["top_n"])
 
             def retriever_fn(query: str) -> list[dict]:
-                raw = retriever.retrieve(query)
-                return reranker.rerank(query, raw)
+                search_query = enhance_query(query) if query_enhance_enabled else query
+                raw = retriever.retrieve(search_query)
+                reranked = reranker.rerank(search_query, raw)
+                if protect_raw_top_n > 0:
+                    return protect_raw_candidates(raw, reranked, protect_raw_top_n, final_top_n)
+                return reranked
 
             # 2. 流式运行 RAG pipeline
             # stream_rag 是同步生成器，在线程池中运行，通过 asyncio.Queue 桥接到事件循环
