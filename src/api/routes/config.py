@@ -39,9 +39,13 @@ class ConfigUpdate(BaseModel):
     bm25_top_k: int | None = Field(default=None, ge=1, le=50)
     hybrid_top_k: int | None = Field(default=None, ge=1, le=50)
     rrf_k: int | None = Field(default=None, ge=1, le=200)
+    query_enhance: bool | None = None
+    protect_raw_top_n: int | None = Field(default=None, ge=0, le=5)
     reranker_model: str | None = None
     reranker_top_n: int | None = Field(default=None, ge=1, le=20)
     max_reformulations: int | None = Field(default=None, ge=0, le=5)
+    agent_recursion_limit: int | None = Field(default=None, ge=4, le=30)
+    agent_retry_count: int | None = Field(default=None, ge=1, le=5)
 
 
 class ApiKeyUpdate(BaseModel):
@@ -159,6 +163,10 @@ def update_config(body: ConfigUpdate, current_user: dict = Depends(require_admin
         raw.setdefault("retrieval", {})["hybrid_top_k"] = body.hybrid_top_k
     if body.rrf_k is not None:
         raw.setdefault("retrieval", {})["rrf_k"] = body.rrf_k
+    if body.query_enhance is not None:
+        raw.setdefault("retrieval", {})["query_enhance"] = body.query_enhance
+    if body.protect_raw_top_n is not None:
+        raw.setdefault("retrieval", {})["protect_raw_top_n"] = body.protect_raw_top_n
 
     if body.reranker_model is not None:
         raw.setdefault("reranker", {})["model"] = body.reranker_model
@@ -167,6 +175,10 @@ def update_config(body: ConfigUpdate, current_user: dict = Depends(require_admin
 
     if body.max_reformulations is not None:
         raw.setdefault("rag", {})["max_reformulations"] = body.max_reformulations
+    if body.agent_recursion_limit is not None:
+        raw.setdefault("rag", {})["agent_recursion_limit"] = body.agent_recursion_limit
+    if body.agent_retry_count is not None:
+        raw.setdefault("rag", {})["agent_retry_count"] = body.agent_retry_count
 
     # 写回 yaml
     try:
