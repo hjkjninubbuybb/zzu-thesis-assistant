@@ -241,9 +241,9 @@ const MessageBubble = memo(function MessageBubble({
 }) {
   if (msg.role === 'user') {
     return (
-      <div className="flex justify-end">
+      <div className="flex justify-end mb-6">
         <div
-          className={`max-w-[75%] text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm ${isStudent ? 'bg-[#2563EB]' : 'bg-[#1A1A1A]'} ${msg.isNew ? 'animate-apple-slide-r' : ''}`}
+          className={`max-w-[85%] text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-sm ${isStudent ? 'bg-[#2563EB]' : 'bg-[#1A1A1A]'} ${msg.isNew ? 'animate-apple-slide-r' : ''}`}
         >
           {msg.content}
         </div>
@@ -252,62 +252,72 @@ const MessageBubble = memo(function MessageBubble({
   }
 
   return (
-    <div className={`flex justify-start ${msg.isNew ? 'animate-apple-slide-l' : ''}`}>
-      <div className="max-w-[80%]">
-        <div className="bg-white border border-gray-200 text-gray-800 text-sm px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm">
+    <div className={`flex flex-col gap-3 mb-10 ${msg.isNew ? 'animate-apple-fade-up' : ''}`}>
+      {/* AI 内容区 - 无气泡背景 */}
+      <div className="flex gap-4">
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${isStudent ? 'bg-[#EEF2FF] text-[#2563EB]' : 'bg-[#F2EFE9] text-[#1A1A1A]'}`}>
+          <Sparkles size={16} strokeWidth={2} />
+        </div>
+        <div className="flex-1 min-w-0 pt-1">
           {msg.status === 'loading' ? (
             msg.content ? (
-              <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-strong:text-gray-900">
+              <div className="prose prose-sm prose-academic max-w-none">
                 <ReactMarkdown>{msg.content}</ReactMarkdown>
-                <span className="cursor-blink text-gray-400" />
+                <span className="cursor-blink" />
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-gray-400">
+              <div className="flex items-center gap-2 text-gray-400 text-sm">
                 <Loader2 size={14} className="animate-spin" />
-                <span>思考中...</span>
+                <span className="text-shimmer">正在思考...</span>
               </div>
             )
           ) : msg.status === 'error' ? (
-            <div className="flex items-center gap-2 text-red-500">
-              <AlertCircle size={14} />
+            <div className="flex items-center gap-2 text-red-500 bg-red-50 px-4 py-3 rounded-xl text-sm border border-red-100">
+              <AlertCircle size={15} />
               <span>{msg.content}</span>
             </div>
           ) : (
-            <>
-              <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-strong:text-gray-900">
+            <div className="space-y-4">
+              <div className="prose prose-sm prose-academic max-w-none">
                 <ReactMarkdown>{msg.content}</ReactMarkdown>
               </div>
+              
               {msg.files && msg.files.length > 0 && (
-                <div className="mt-3 flex flex-col gap-2">
+                <div className="grid grid-cols-2 gap-2 max-w-md">
                   {msg.files.map((f, i) => <FileCard key={i} file={f} />)}
                 </div>
               )}
+              
               {msg.sources && msg.sources.length > 0 && (
                 <SourcesPanel sources={msg.sources} />
               )}
-              <FeedbackButtons
-                dbMessageId={msg.dbMessageId}
-                feedback={msg.feedback}
-                onFeedback={(rating) => msg.dbMessageId && onFeedback(msg.dbMessageId, rating)}
-              />
-            </>
+
+              <div className="flex items-center justify-between mt-4">
+                <FeedbackButtons
+                  dbMessageId={msg.dbMessageId}
+                  feedback={msg.feedback}
+                  onFeedback={(rating) => msg.dbMessageId && onFeedback(msg.dbMessageId, rating)}
+                />
+              </div>
+            </div>
           )}
         </div>
-        {msg.status === 'done' && msg.suggestions && msg.suggestions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2 ml-1">
-            {msg.suggestions.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => onSuggestionClick?.(s)}
-                style={{ animationDelay: `${i * 60}ms` }}
-                className={`animate-apple-fade-up text-xs px-3 py-1.5 rounded-full border border-[#E8E4DC] bg-[#FAFAF8] text-gray-600 hover:bg-[#F2EFE9] hover:text-[#1A1A1A] transition-colors text-left ${isStudent ? 'border-[#D9DEE5] hover:bg-[#EEF2FF] hover:text-[#2563EB]' : ''}`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
+
+      {msg.status === 'done' && msg.suggestions && msg.suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-2 pl-12">
+          {msg.suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => onSuggestionClick?.(s)}
+              style={{ animationDelay: `${i * 60}ms` }}
+              className={`animate-apple-fade-up text-xs px-3.5 py-1.5 rounded-full border border-gray-100 bg-white/50 text-gray-600 hover:bg-white hover:text-[#1A1A1A] hover:border-gray-200 transition-all shadow-sm active:scale-[0.97] ${isStudent ? 'hover:text-[#2563EB] hover:border-[#D9DEE5]' : ''}`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 })
