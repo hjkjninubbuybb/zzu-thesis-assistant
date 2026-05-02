@@ -159,29 +159,74 @@ function FileCard({ file }: { file: FileItem }) {
 
 function SourcesPanel({ sources }: { sources: SourceItem[] }) {
   const [open, setOpen] = useState(false)
+  if (!sources || sources.length === 0) return null
+
   return (
-    <div className="mt-3 border-t border-gray-100 pt-2">
+    <div className="mt-4 pt-3 border-t border-gray-100">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+        className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400 hover:text-gray-700 transition-colors uppercase tracking-wider"
       >
+        <BookOpen size={12} />
+        知识库参考 ({sources.length})
         {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        引用来源 ({sources.length})
       </button>
       {open && (
-        <div className="mt-2 space-y-2">
+        <div className="mt-3 grid grid-cols-1 gap-2 animate-apple-fade-up">
           {sources.map((s, i) => (
-            <div key={s.node_id} className="bg-gray-50 rounded-md p-3 text-xs">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium text-gray-600">来源 {i + 1}</span>
-                <span className="text-gray-400">{s.source_file}</span>
-                <span className="ml-auto text-gray-400">score: {s.score.toFixed(4)}</span>
+            <div key={s.node_id} className="bg-gray-50/50 rounded-xl p-3 border border-gray-100/50">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-5 h-5 rounded-md bg-white border border-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shadow-sm">
+                  {i + 1}
+                </span>
+                <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[180px]">{s.source_file}</span>
+                <div className="ml-auto flex items-center gap-1 opacity-40">
+                  <div className="w-1 h-1 rounded-full bg-gray-400" />
+                  <span className="text-[9px] font-medium">REL {Math.round(s.score * 100)}%</span>
+                </div>
               </div>
-              <p className="text-gray-600 line-clamp-3">{s.text}</p>
+              <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-3 italic">"{s.text}"</p>
             </div>
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── 智能 Markdown 渲染（带内嵌引用支持） ──────────────────
+
+function AcademicMarkdown({ content, sources }: { content: string, sources?: SourceItem[] }) {
+  // 简单的正则处理：将 [1] [2] 替换为特定的标记，以便渲染为组件
+  // 匹配形如 [1] [2,3] 的引用标记
+  const parts = content.split(/(\[\d+(?:,\s*\d+)*\])/g)
+
+  return (
+    <div className="prose prose-sm prose-academic max-w-none">
+      {parts.map((part, i) => {
+        const match = part.match(/^\[(\d+(?:,\s*\d+)*)\]$/)
+        if (match && sources && sources.length > 0) {
+          const indices = match[1].split(',').map(s => parseInt(s.trim()) - 1)
+          return (
+            <span key={i} className="inline-flex gap-0.5">
+              {indices.map(idx => {
+                const source = sources[idx]
+                if (!source) return <span key={idx}>{part}</span>
+                return (
+                  <span
+                    key={idx}
+                    title={`${source.source_file}: ${source.text.slice(0, 100)}...`}
+                    className="citation-marker"
+                  >
+                    {idx + 1}
+                  </span>
+                )
+              })}
+            </span>
+          )
+        }
+        return <ReactMarkdown key={i} components={{ p: 'span' }}>{part}</ReactMarkdown>
+      })}
     </div>
   )
 }
@@ -261,8 +306,8 @@ const MessageBubble = memo(function MessageBubble({
         <div className="flex-1 min-w-0 pt-1">
           {msg.status === 'loading' ? (
             msg.content ? (
-              <div className="prose prose-sm prose-academic max-w-none">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+              <div className="relative">
+                <AcademicMarkdown content={msg.content} sources={msg.sources} />
                 <span className="cursor-blink" />
               </div>
             ) : (
@@ -272,18 +317,16 @@ const MessageBubble = memo(function MessageBubble({
               </div>
             )
           ) : msg.status === 'error' ? (
-            <div className="flex items-center gap-2 text-red-500 bg-red-50 px-4 py-3 rounded-xl text-sm border border-red-100">
+            <div className="flex items-center gap-2 text-red-500 bg-red-50 px-4 py-3 rounded-xl text-sm border border-red-100 shadow-sm">
               <AlertCircle size={15} />
               <span>{msg.content}</span>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="prose prose-sm prose-academic max-w-none">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
-              </div>
+              <AcademicMarkdown content={msg.content} sources={msg.sources} />
               
               {msg.files && msg.files.length > 0 && (
-                <div className="grid grid-cols-2 gap-2 max-w-md">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-md animate-apple-fade-up">
                   {msg.files.map((f, i) => <FileCard key={i} file={f} />)}
                 </div>
               )}
