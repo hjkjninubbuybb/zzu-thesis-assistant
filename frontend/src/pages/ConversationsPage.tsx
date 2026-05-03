@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowUp, Loader2, ChevronDown, ChevronUp, Trash2, AlertCircle,
-  MessageSquare, Download, Plus, ThumbsUp, ThumbsDown, BookOpen, ShieldAlert,
+  Download, Plus, ThumbsUp, ThumbsDown, BookOpen, ShieldAlert,
   Pencil, Check, X as XIcon,
 } from 'lucide-react'
 import { knowledgeApi, faqApi, conversationApi } from '@/lib/api'
@@ -125,6 +125,28 @@ async function streamChat(
     }
   }
 }
+
+// ── 专属 Agent 头像组件 ────────────────────────────────────
+
+const AgentAvatar = memo(({ isStudent }: { isStudent: boolean }) => (
+  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:rotate-3 border ${
+    isStudent 
+      ? 'bg-blue-50 text-[#2563EB] border-[#DBEAFE]' 
+      : 'bg-slate-100 text-[#334155] border-[#E2E8F0]'
+  }`}>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {/* 博士帽顶部 */}
+      <path d="M12 3L2 8L12 13L22 8L12 3Z" />
+      {/* 博士帽帽筒 */}
+      <path d="M6 10V15.5C6 15.5 8.5 17.5 12 17.5C15.5 17.5 18 15.5 18 15.5V10" />
+      {/* 流苏 */}
+      <path d="M22 8V13" />
+      {/* AI 核心节点 - 位于帽筒中心 */}
+      <circle cx="12" cy="8" r="1.5" fill="currentColor" className="animate-pulse" />
+      <circle cx="12" cy="14" r="1" fill="currentColor" opacity="0.5" />
+    </svg>
+  </div>
+))
 
 // ── 文件卡片 ──────────────────────────────────────────────
 
@@ -288,7 +310,7 @@ const MessageBubble = memo(function MessageBubble({
     return (
       <div className="flex justify-end mb-6">
         <div
-          className={`max-w-[85%] text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-sm ${isStudent ? 'bg-[#2563EB]' : 'bg-[#1A1A1A]'} ${msg.isNew ? 'animate-apple-slide-r' : ''}`}
+          className={`max-w-[85%] text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-sm ${isStudent ? 'bg-[#2563EB]' : 'bg-[#334155]'} ${msg.isNew ? 'animate-apple-slide-r' : ''}`}
         >
           {msg.content}
         </div>
@@ -298,11 +320,9 @@ const MessageBubble = memo(function MessageBubble({
 
   return (
     <div className={`flex flex-col gap-3 mb-10 ${msg.isNew ? 'animate-apple-fade-up' : ''}`}>
-      {/* AI 内容区 - 无气泡背景 */}
+      {/* AI 内容区 - 使用专属头像 */}
       <div className="flex gap-4">
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${isStudent ? 'bg-[#EEF2FF] text-[#2563EB]' : 'bg-[#F2EFE9] text-[#1A1A1A]'}`}>
-          <Sparkles size={16} strokeWidth={2} />
-        </div>
+        <AgentAvatar isStudent={!!isStudent} />
         <div className="flex-1 min-w-0 pt-1">
           {msg.status === 'loading' ? (
             msg.content ? (
@@ -354,7 +374,7 @@ const MessageBubble = memo(function MessageBubble({
               key={i}
               onClick={() => onSuggestionClick?.(s)}
               style={{ animationDelay: `${i * 60}ms` }}
-              className={`animate-apple-fade-up text-xs px-3.5 py-1.5 rounded-full border border-gray-100 bg-white/50 text-gray-600 hover:bg-white hover:text-[#1A1A1A] hover:border-gray-200 transition-all shadow-sm active:scale-[0.97] ${isStudent ? 'hover:text-[#2563EB] hover:border-[#D9DEE5]' : ''}`}
+              className={`animate-apple-fade-up text-xs px-3.5 py-1.5 rounded-full border border-gray-100 bg-white/50 text-gray-600 hover:bg-white hover:text-[#334155] hover:border-gray-200 transition-all shadow-sm active:scale-[0.97] ${isStudent ? 'hover:text-[#2563EB] hover:border-[#D9DEE5]' : ''}`}
             >
               {s}
             </button>
@@ -484,7 +504,7 @@ function ConversationItem({
       <button
         onClick={e => { e.stopPropagation(); setEditing(true) }}
         title="重命名"
-        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-[#1A1A1A] transition-all"
+        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-[#334155] transition-all"
       >
         <Pencil size={11} />
       </button>
@@ -520,7 +540,7 @@ function AdminConversationSidebar({
 }) {
   const groups = groupByDate(conversations)
   return (
-    <div className="w-64 shrink-0 flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden border border-[#F0EDE8]">
+    <div className="w-64 shrink-0 flex flex-col glass-card rounded-2xl overflow-hidden">
       <div className="p-3 border-b border-[#F0EDE8]">
         {adminKbName ? (
           <div className="flex items-center gap-2.5 px-3 py-2.5 bg-emerald-50 rounded-xl mb-2">
@@ -541,7 +561,7 @@ function AdminConversationSidebar({
         <button
           onClick={onNew}
           disabled={!adminKbName}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-[#1A1A1A] hover:bg-[#333]"
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-slate-700 hover:bg-slate-800"
         >
           <Plus size={15} />
           新建对话
@@ -608,7 +628,7 @@ function StudentConversationSidebar({
 }) {
   const groups = groupByDate(conversations)
   return (
-    <div className="w-64 shrink-0 flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden border border-[#D9DEE5]">
+    <div className="w-64 shrink-0 flex flex-col glass-card rounded-2xl overflow-hidden">
       {/* 知识库信息卡 */}
       <div className="p-3 border-b border-[#EEF2FF]">
         {activeKbName ? (
@@ -710,7 +730,7 @@ function ThinkingProcess({ steps }: { steps: ThinkingStep[] }) {
         Agent 思考过程
       </div>
       <div className="space-y-2">
-        {steps.map((step, i) => (
+        {steps.map((step) => (
           <div key={step.id} className="flex items-center gap-3">
             <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
               step.status === 'active' ? 'bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]' :
@@ -776,7 +796,47 @@ export default function ConversationsPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // ... (activeKbData and adminKbData remain same)
+  // 学生端：管理员分配的知识库
+  const { data: activeKbData } = useQuery({
+    queryKey: ['active-kb'],
+    queryFn: knowledgeApi.getActiveKb,
+    enabled: isStudent,
+  })
+  const studentKb = activeKbData?.kb_name ?? null
+
+  // 管理端：管理员预设的知识库
+  const { data: adminKbData } = useQuery({
+    queryKey: ['admin-kb'],
+    queryFn: knowledgeApi.getAdminKb,
+    enabled: !isStudent,
+  })
+  const adminKb = adminKbData?.kb_name ?? null
+
+  // 当前生效的 kb_name
+  const effectiveKb = isStudent ? (studentKb ?? '') : (adminKb ?? '')
+
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['conversations', effectiveKb || '__all__'],
+    queryFn: () => conversationApi.list(effectiveKb || undefined),
+  })
+
+  const { data: faqs } = useQuery({
+    queryKey: ['faqs', effectiveKb],
+    queryFn: () => faqApi.list(effectiveKb),
+    enabled: !!effectiveKb,
+    select: (data) => data.filter(f => f.enabled).slice(0, 6),
+  })
+
+  const activeConv = conversations.find(c => c.id === activeConvId)
+  const chatKb = activeConv?.kb_name ?? effectiveKb
+
+  const scrollRAF = useRef(0)
+  useEffect(() => {
+    cancelAnimationFrame(scrollRAF.current)
+    scrollRAF.current = requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    })
+  }, [messages])
 
   const loadConversation = useCallback(async (convId: number) => {
     setActiveConvId(convId)
@@ -809,7 +869,30 @@ export default function ConversationsPage() {
     queryClient.invalidateQueries({ queryKey: ['conversations'] })
   }, [effectiveKb, queryClient])
 
-  // ... (handleDeleteConversation, handleRenameConversation, handleFeedback remain same)
+  const handleDeleteConversation = useCallback(async (convId: number) => {
+    await conversationApi.delete(convId)
+    if (convId === activeConvId) {
+      setActiveConvId(null)
+      setMessages([])
+    }
+    queryClient.invalidateQueries({ queryKey: ['conversations'] })
+  }, [activeConvId, queryClient])
+
+  const handleRenameConversation = useCallback(async (convId: number, title: string) => {
+    try {
+      await conversationApi.updateTitle(convId, title)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    } catch { /* 静默失败 */ }
+  }, [queryClient])
+
+  const handleFeedback = useCallback(async (msgId: number, rating: 'up' | 'down') => {
+    try {
+      await conversationApi.submitFeedback(msgId, rating)
+      setMessages(prev => prev.map(m =>
+        m.dbMessageId === msgId ? { ...m, feedback: m.feedback === rating ? null : rating } : m
+      ))
+    } catch { /* 静默失败 */ }
+  }, [])
 
   const sendMessage = useCallback(async (directText?: string) => {
     const q = directText !== undefined ? directText.trim() : query.trim()
@@ -951,7 +1034,6 @@ export default function ConversationsPage() {
       ))
     } finally {
       setIsStreaming(false)
-      setStatusText('')
     }
   }, [query, chatKb, maxRef, isStreaming, messages, activeConvId, queryClient])
 
@@ -997,7 +1079,7 @@ export default function ConversationsPage() {
       )}
 
       {/* 右侧聊天区 */}
-      <div className={`flex-1 flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden ${isStudent ? 'border border-[#D9DEE5]' : 'border border-[#F0EDE8]'}`}>
+      <div className="flex-1 flex flex-col glass-card rounded-2xl overflow-hidden">
         {/* 顶部信息栏 */}
         <div className="flex items-center gap-3 px-6 py-3 border-b border-[#F0EDE8] shrink-0">
           <h1 className="text-base font-semibold text-gray-900">
@@ -1026,8 +1108,8 @@ export default function ConversationsPage() {
                 {isStudent && !studentKb ? (
                   // 学生：尚未分配知识库
                   <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="animate-idle-breath w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center">
-                      <ShieldAlert size={22} className="text-amber-500" strokeWidth={1.6} />
+                    <div className="animate-idle-breath">
+                      <AgentAvatar isStudent={true} />
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-gray-800">暂无可用知识库</p>
@@ -1036,8 +1118,8 @@ export default function ConversationsPage() {
                   </div>
                 ) : (
                   <>
-                    <div className={`animate-idle-breath w-12 h-12 rounded-2xl flex items-center justify-center ${isStudent ? 'bg-[#EEF2FF]' : 'bg-[#F2EFE9]'}`}>
-                      <MessageSquare size={22} className={isStudent ? 'text-[#2563EB]' : 'text-[#1A1A1A]'} strokeWidth={1.6} />
+                    <div className="animate-idle-breath scale-150 mb-4">
+                      <AgentAvatar isStudent={isStudent} />
                     </div>
                     <div className="text-center space-y-1">
                       <p className="text-sm font-semibold text-gray-800">开始提问</p>
@@ -1051,7 +1133,7 @@ export default function ConversationsPage() {
                           <button
                             key={faq.id}
                             onClick={() => sendMessage(faq.question)}
-                            className={`text-xs px-3 py-1.5 rounded-full border bg-white text-gray-600 transition-colors text-left ${isStudent ? 'border-[#D9DEE5] hover:bg-[#EEF2FF] hover:text-[#2563EB]' : 'border-[#F0EDE8] hover:bg-[#F2EFE9] hover:text-[#1A1A1A]'}`}
+                            className={`text-xs px-3 py-1.5 rounded-full border bg-white text-gray-600 transition-colors text-left ${isStudent ? 'border-[#D9DEE5] hover:bg-[#EEF2FF] hover:text-[#2563EB]' : 'border-[#F0EDE8] hover:bg-[#F2EFE9] hover:text-[#334155]'}`}
                           >
                             {faq.question}
                           </button>
@@ -1081,7 +1163,7 @@ export default function ConversationsPage() {
 
         {/* 输入区 */}
         <div className="shrink-0 px-4 pb-4 pt-2">
-          <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm px-4 pt-3 pb-3 flex flex-col gap-2 max-w-2xl mx-auto w-full">
+          <div className="relative glass-card rounded-2xl px-4 pt-3 pb-3 flex flex-col gap-2 max-w-2xl mx-auto w-full">
             <textarea
               ref={textareaRef}
               value={query}

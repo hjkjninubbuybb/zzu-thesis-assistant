@@ -44,15 +44,15 @@ function CreateStudentModal({ onClose }: { onClose: () => void }) {
         value={(form[key] as string) ?? ''}
         onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
         placeholder={placeholder}
-        className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition"
+        className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-slate-400 transition"
       />
     </div>
   )
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-apple-fade">
-      <div className="bg-white rounded-2xl border border-[#F0EDE8] shadow-lg p-6 w-full max-w-md animate-apple-pop">
-        <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">添加学生账号</h2>
+      <div className="glass-card rounded-2xl p-6 w-full max-w-md animate-apple-pop">
+        <h2 className="text-base font-semibold text-[#334155] mb-4">添加学生账号</h2>
         <div className="flex flex-col gap-3">
           {field('student_id', '学号 *', '如 202212345678')}
           {field('password', '初始密码 *', '至少 6 位', 'password')}
@@ -61,12 +61,12 @@ function CreateStudentModal({ onClose }: { onClose: () => void }) {
             <div className="flex-1 flex flex-col gap-1">
               <label className="text-xs text-[#6A6A6A] font-medium">年级</label>
               <input type="text" value={form.grade ?? ''} onChange={e => setForm(p => ({...p, grade: e.target.value}))}
-                placeholder="如 2022" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition" />
+                placeholder="如 2022" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-slate-400 transition" />
             </div>
             <div className="flex-1 flex flex-col gap-1">
               <label className="text-xs text-[#6A6A6A] font-medium">班级</label>
               <input type="text" value={form.class_name ?? ''} onChange={e => setForm(p => ({...p, class_name: e.target.value}))}
-                placeholder="如 计科一班" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition" />
+                placeholder="如 计科一班" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-slate-400 transition" />
             </div>
           </div>
           {field('major', '专业', '如 计算机科学与技术')}
@@ -77,7 +77,7 @@ function CreateStudentModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={() => createMut.mutate()}
             disabled={createMut.isPending || !form.student_id || !form.password}
-            className="px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] disabled:opacity-50 transition"
+            className="px-4 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 disabled:opacity-50 transition"
           >
             {createMut.isPending ? '创建中...' : '创建'}
           </button>
@@ -101,17 +101,17 @@ function ResetPasswordModal({ user, onClose }: { user: UserInfo; onClose: () => 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-apple-fade">
-      <div className="bg-white rounded-2xl border border-[#F0EDE8] shadow-lg p-6 w-full max-w-sm animate-apple-pop">
-        <h2 className="text-base font-semibold text-[#1A1A1A] mb-1">重置密码</h2>
+      <div className="glass-card rounded-2xl p-6 w-full max-w-sm animate-apple-pop">
+        <h2 className="text-base font-semibold text-[#334155] mb-1">重置密码</h2>
         <p className="text-xs text-[#9A9A9A] mb-4">为 <b>{user.display_name || user.username}</b> 设置新密码</p>
         <input type="password" value={pwd} onChange={e => setPwd(e.target.value)}
           placeholder="新密码（至少 6 位）"
-          className="w-full px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition" />
+          className="w-full px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-slate-400 transition" />
         {error && <div className="mt-2 text-xs text-red-500">{error}</div>}
         <div className="flex gap-2 mt-4 justify-end">
           <button onClick={onClose} className="px-4 py-2 text-sm text-[#6A6A6A]">取消</button>
           <button onClick={() => mut.mutate()} disabled={mut.isPending || pwd.length < 6}
-            className="px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] disabled:opacity-50 transition">
+            className="px-4 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 disabled:opacity-50 transition">
             {mut.isPending ? '重置中...' : '确认重置'}
           </button>
         </div>
@@ -159,15 +159,15 @@ function EditStudentModal({ user, onClose }: { user: UserInfo; onClose: () => vo
         value={form[key]}
         onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
         placeholder={placeholder}
-        className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition"
+        className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-slate-400 transition"
       />
     </div>
   )
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-apple-fade">
-      <div className="bg-white rounded-2xl border border-[#F0EDE8] shadow-lg p-6 w-full max-w-md animate-apple-pop">
-        <h2 className="text-base font-semibold text-[#1A1A1A] mb-4">编辑学生信息</h2>
+      <div className="glass-card rounded-2xl p-6 w-full max-w-md animate-apple-pop">
+        <h2 className="text-base font-semibold text-[#334155] mb-4">编辑学生信息</h2>
         <div className="flex flex-col gap-3">
           {field('student_id', '学号', '如 202212345678')}
           {field('display_name', '姓名', '学生真实姓名')}
@@ -175,12 +175,12 @@ function EditStudentModal({ user, onClose }: { user: UserInfo; onClose: () => vo
             <div className="flex-1 flex flex-col gap-1">
               <label className="text-xs text-[#6A6A6A] font-medium">年级</label>
               <input type="text" value={form.grade} onChange={e => setForm(p => ({...p, grade: e.target.value}))}
-                placeholder="如 2022" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition" />
+                placeholder="如 2022" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-slate-400 transition" />
             </div>
             <div className="flex-1 flex flex-col gap-1">
               <label className="text-xs text-[#6A6A6A] font-medium">班级</label>
               <input type="text" value={form.class_name} onChange={e => setForm(p => ({...p, class_name: e.target.value}))}
-                placeholder="如 计科一班" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-[#1A1A1A] transition" />
+                placeholder="如 计科一班" className="px-3 py-2 rounded-lg border border-[#E8E5E0] bg-[#FAFAF9] text-sm outline-none focus:border-slate-400 transition" />
             </div>
           </div>
           {field('major', '专业', '如 计算机科学与技术')}
@@ -191,7 +191,7 @@ function EditStudentModal({ user, onClose }: { user: UserInfo; onClose: () => vo
           <button
             onClick={() => editMut.mutate()}
             disabled={editMut.isPending || !form.student_id}
-            className="px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] disabled:opacity-50 transition"
+            className="px-4 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 disabled:opacity-50 transition"
           >
             {editMut.isPending ? '保存中...' : '保存'}
           </button>
@@ -267,7 +267,7 @@ export default function StudentsPage() {
       {/* 头部 */}
       <div className="flex items-center justify-between" style={settle(0)}>
         <div>
-          <h1 className="text-lg font-semibold text-[#1A1A1A]">学生账号</h1>
+          <h1 className="text-lg font-semibold text-[#334155]">学生账号</h1>
           <p className="text-xs text-[#9A9A9A] mt-0.5">共 {total} 名学生</p>
         </div>
         <div className="flex items-center gap-2">
@@ -284,7 +284,7 @@ export default function StudentsPage() {
             <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleImport} disabled={importing} />
           </label>
           <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] transition apple-press">
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 transition apple-press">
             <Plus size={15} /> 添加学生
           </button>
         </div>
@@ -303,11 +303,11 @@ export default function StudentsPage() {
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]" />
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="搜索姓名或学号..."
-          className="w-full pl-9 pr-4 py-2 rounded-xl border border-[#E8E5E0] bg-white text-sm outline-none focus:border-[#1A1A1A] transition" />
+          className="w-full pl-9 pr-4 py-2 rounded-xl border border-[#E8E5E0] bg-white text-sm outline-none focus:border-slate-400 transition" />
       </div>
 
       {/* 列表卡片 */}
-      <div className="flex-1 bg-white rounded-2xl border border-[#F0EDE8] shadow-sm overflow-hidden" style={settle(100)}>
+      <div className="flex-1 glass-card rounded-2xl overflow-hidden" style={settle(100)}>
         {isLoading ? (
           <div className="flex items-center justify-center h-48 text-sm text-[#9A9A9A]">加载中...</div>
         ) : filtered.length === 0 ? (
@@ -332,7 +332,7 @@ export default function StudentsPage() {
                     className="border-b border-[#F8F6F3] hover:bg-[#FAFAF9] transition"
                     style={{ animation: `appleFadeUp 0.55s cubic-bezier(0.25, 1, 0.5, 1) ${Math.min(160 + i * 45, 600)}ms both` }}
                   >
-                    <td className="px-4 py-3 font-medium text-[#1A1A1A]">{u.display_name || '—'}</td>
+                    <td className="px-4 py-3 font-medium text-[#334155]">{u.display_name || '—'}</td>
                     <td className="px-4 py-3 text-[#4A4A4A]">{profile?.student_id || '—'}</td>
                     <td className="px-4 py-3 text-[#6A6A6A]">
                       {profile?.grade && profile?.major ? `${profile.grade}级 · ${profile.major}` : '—'}
@@ -348,7 +348,7 @@ export default function StudentsPage() {
                     <td className="px-4 py-3 relative">
                       <button
                         onClick={() => setMenuOpen(menuOpen === u.id ? null : u.id)}
-                        className="p-1 text-[#C0BDB8] hover:text-[#1A1A1A] transition rounded-lg hover:bg-[#F2EFE9]"
+                        className="p-1 text-[#C0BDB8] hover:text-[#334155] transition rounded-lg hover:bg-[#F2EFE9]"
                       >
                         <MoreHorizontal size={16} />
                       </button>

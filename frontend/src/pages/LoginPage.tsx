@@ -139,16 +139,16 @@ export default function LoginPage({ variant }: LoginPageProps) {
       <div className="glass-card relative z-10 w-full max-w-sm rounded-2xl p-8" style={settle(0)}>
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-[#1A1A1A] rounded-xl flex items-center justify-center shadow-sm shrink-0">
+          <div className="w-10 h-10 bg-slate-700 rounded-xl flex items-center justify-center shadow-sm shrink-0">
             <span className="text-white text-sm font-bold tracking-tight">R</span>
           </div>
           <div>
-            <div className="text-sm font-semibold text-[#1A1A1A] tracking-tight">RAG 1.0</div>
+            <div className="text-sm font-semibold text-[#334155] tracking-tight">RAG 1.0</div>
             <div className="text-xs text-[#9A9A9A]">管理员 / 教师登录</div>
           </div>
         </div>
 
-        <h1 className="text-xl font-semibold text-[#1A1A1A] mb-6">登录</h1>
+        <h1 className="text-xl font-semibold text-[#334155] mb-6">登录</h1>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -159,7 +159,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
               onChange={e => setUsername(e.target.value)}
               placeholder="用户名 / 工号"
               autoComplete="username"
-              className="px-3 py-2.5 rounded-xl border border-[#E8E5E0] bg-[#FAFAF9] text-sm text-[#1A1A1A] placeholder:text-[#C0BDB8] outline-none focus:border-[#1A1A1A] focus:bg-white transition"
+              className="px-3 py-2.5 rounded-xl border border-[#E8E5E0] bg-[#FAFAF9] text-sm text-[#334155] placeholder:text-[#C0BDB8] outline-none focus:border-slate-400 focus:bg-white transition"
               disabled={loading}
             />
           </div>
@@ -172,7 +172,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
               onChange={e => setPassword(e.target.value)}
               placeholder="请输入密码"
               autoComplete="current-password"
-              className="px-3 py-2.5 rounded-xl border border-[#E8E5E0] bg-[#FAFAF9] text-sm text-[#1A1A1A] placeholder:text-[#C0BDB8] outline-none focus:border-[#1A1A1A] focus:bg-white transition"
+              className="px-3 py-2.5 rounded-xl border border-[#E8E5E0] bg-[#FAFAF9] text-sm text-[#334155] placeholder:text-[#C0BDB8] outline-none focus:border-slate-400 focus:bg-white transition"
               disabled={loading}
             />
           </div>
@@ -186,7 +186,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
           <button
             type="submit"
             disabled={loading || !username.trim() || !password.trim()}
-            className="mt-2 w-full py-2.5 bg-[#1A1A1A] text-white text-sm font-medium rounded-xl hover:bg-[#333] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-2 w-full py-2.5 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-800 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? '登录中...' : '登录'}
           </button>
@@ -195,7 +195,7 @@ export default function LoginPage({ variant }: LoginPageProps) {
 
       <Link
         to="/student/login"
-        className="relative z-10 text-xs text-[#9A9A9A] hover:text-[#1A1A1A] transition-colors"
+        className="relative z-10 text-xs text-[#9A9A9A] hover:text-[#334155] transition-colors"
         style={settle(150)}
       >
         学生登录 →

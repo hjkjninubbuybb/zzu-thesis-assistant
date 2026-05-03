@@ -40,8 +40,8 @@ export default function StudentHomePage() {
   const navigate = useNavigate()
   const profile = user?.profile as StudentProfile | null | undefined
 
-  const { data: activeKb } = useQuery({ queryKey: ['active-kb'], queryFn: knowledgeApi.getActiveKb })
-  const { data: conversations = [] } = useQuery({
+  const { data: activeKb, isLoading: isLoadingKb } = useQuery({ queryKey: ['active-kb'], queryFn: knowledgeApi.getActiveKb })
+  const { data: conversations = [], isLoading: isLoadingConvs } = useQuery({
     queryKey: ['conversations', '__all__'],
     queryFn: () => conversationApi.list(),
   })
@@ -63,8 +63,12 @@ export default function StudentHomePage() {
   const todayCount = useCountUp(todayConvs.length)
   const kbCount = useCountUp(activeKb ? 1 : 0)
 
+  if (isLoadingKb || isLoadingConvs) {
+    return <HomeSkeleton />
+  }
+
   return (
-    <div className="p-7 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm border border-[#D9DEE5]">
+    <div className="p-7 flex-1 overflow-y-auto glass-card rounded-2xl">
       {/* 问候区 */}
       <div className="mb-7" style={cardStyle(0)}>
         <h1 className="text-[28px] font-semibold text-[#202938] tracking-tight leading-tight">
@@ -127,7 +131,7 @@ export default function StudentHomePage() {
       <div className="grid grid-cols-2 gap-4">
         {/* 最近对话 */}
         <div
-          className="bg-white rounded-2xl border border-[#D9DEE5] p-5 flex flex-col gap-3 hover-lift"
+          className="glass-card rounded-2xl p-5 flex flex-col gap-3 hover-lift"
           style={cardStyle(400)}
         >
           <div className="flex items-center justify-between">
@@ -158,7 +162,7 @@ export default function StudentHomePage() {
 
         {/* 热门问题 */}
         <div
-          className="bg-white rounded-2xl border border-[#D9DEE5] p-5 flex flex-col gap-3 hover-lift"
+          className="glass-card rounded-2xl p-5 flex flex-col gap-3 hover-lift"
           style={cardStyle(480)}
         >
           <div className="flex items-center justify-between">
@@ -190,6 +194,82 @@ export default function StudentHomePage() {
   )
 }
 
+function HomeSkeleton() {
+  return (
+    <div className="p-7 flex-1 overflow-y-auto glass-card rounded-2xl animate-pulse">
+      {/* 问候区 */}
+      <div className="mb-7">
+        <div className="h-9 bg-gray-100 rounded-lg w-48 mb-2" />
+        <div className="h-4 bg-gray-50 rounded-md w-64" />
+      </div>
+
+      {/* 快捷操作 + 统计 */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="col-span-1 rounded-2xl p-5 bg-gray-100" style={{ minHeight: 160 }} />
+        <div className="glass-card rounded-2xl p-5 flex flex-col justify-between" style={{ minHeight: 160 }}>
+          <div className="w-10 h-10 rounded-xl bg-gray-100" />
+          <div className="space-y-2">
+            <div className="h-7 bg-gray-100 rounded-md w-16" />
+            <div className="h-3 bg-gray-50 rounded-md w-12" />
+          </div>
+        </div>
+        <div className="glass-card rounded-2xl p-5 flex flex-col justify-between" style={{ minHeight: 160 }}>
+          <div className="w-10 h-10 rounded-xl bg-gray-100" />
+          <div className="space-y-2">
+            <div className="h-7 bg-gray-100 rounded-md w-16" />
+            <div className="h-3 bg-gray-50 rounded-md w-12" />
+          </div>
+        </div>
+        <div className="glass-card rounded-2xl p-5 flex flex-col justify-between" style={{ minHeight: 160 }}>
+          <div className="w-10 h-10 rounded-xl bg-gray-100" />
+          <div className="space-y-2">
+            <div className="h-7 bg-gray-100 rounded-md w-16" />
+            <div className="h-3 bg-gray-50 rounded-md w-12" />
+          </div>
+        </div>
+      </div>
+
+      {/* 下半区 */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="glass-card rounded-2xl p-5 h-64 flex flex-col gap-4">
+          <div className="flex justify-between">
+            <div className="h-5 bg-gray-100 rounded-md w-24" />
+            <div className="h-4 bg-gray-50 rounded-md w-16" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex gap-3 items-center">
+                <div className="w-8 h-8 rounded-lg bg-gray-50" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-gray-100 rounded-md w-3/4" />
+                  <div className="h-2 bg-gray-50 rounded-md w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="glass-card rounded-2xl p-5 h-64 flex flex-col gap-4">
+          <div className="flex justify-between">
+            <div className="h-5 bg-gray-100 rounded-md w-24" />
+            <div className="h-4 bg-gray-50 rounded-md w-16" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex gap-3 items-center">
+                <div className="w-8 h-8 rounded-lg bg-gray-50" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-gray-100 rounded-md w-3/4" />
+                  <div className="h-2 bg-gray-50 rounded-md w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function StatCard({
   delay,
   icon: Icon,
@@ -207,7 +287,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="bg-white rounded-2xl border border-[#D9DEE5] p-5 flex flex-col justify-between hover-lift"
+      className="glass-card rounded-2xl p-5 flex flex-col justify-between hover-lift"
       style={{ ...cardStyle(delay), minHeight: 160 }}
     >
       <div

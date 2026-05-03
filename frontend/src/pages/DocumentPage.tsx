@@ -174,7 +174,7 @@ export default function DocumentPage() {
   const activeTypeMeta = DOC_TYPES.find(t => t.type === activeType)!
 
   return (
-    <div className="p-6 max-w-5xl flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
+    <div className="p-6 max-w-5xl flex-1 overflow-y-auto glass-card rounded-2xl">
 
       {/* 标题 */}
       <div className="mb-6" style={settle(0)}>
@@ -221,7 +221,7 @@ export default function DocumentPage() {
           </div>
 
           {/* ── 上传区 ─────────────────────────────────────── */}
-          <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5" style={settle(150)}>
+          <div className="mb-6 glass-card rounded-lg p-5" style={settle(150)}>
             <h2 className="text-sm font-medium text-gray-700 mb-3">
               上传
               <span className={`ml-2 text-xs px-2 py-0.5 rounded font-semibold ${activeTypeMeta.badge}`}>
@@ -369,7 +369,7 @@ export default function DocumentPage() {
 
           {/* 上传进度（有进行中任务时显示） */}
           {!showFileList && (
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden" style={settle(200)}>
+            <div className="glass-card rounded-lg overflow-hidden" style={settle(200)}>
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
                 <Loader2 size={14} className="animate-spin text-blue-500" />
                 <h2 className="text-sm font-medium text-gray-700">

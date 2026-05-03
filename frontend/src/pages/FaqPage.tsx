@@ -21,7 +21,7 @@ function getCategoryColor(category: string, allCategories: string[]): string {
 
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
-    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm z-50 animate-apple-toast ${type === 'success' ? 'bg-[#1A1A1A]' : 'bg-red-600'}`}>
+    <div className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm z-50 animate-apple-toast ${type === 'success' ? 'bg-slate-700' : 'bg-red-600'}`}>
       <span>{message}</span>
       <button onClick={onClose}><X size={14} /></button>
     </div>
@@ -54,14 +54,14 @@ function FaqDialog({ title, initial, loading, onClose, onSubmit }: FaqDialogProp
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4 animate-apple-fade">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-apple-pop">
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] flex items-center justify-center z-50 animate-apple-fade">
+      <div className="glass-card rounded-2xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0EDE8]">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-[#F2EFE9] flex items-center justify-center">
-              <MessageSquareQuote size={14} className="text-[#1A1A1A]" />
+              <MessageSquareQuote size={14} className="text-[#334155]" />
             </div>
-            <h3 className="text-sm font-semibold text-[#1A1A1A]">{title}</h3>
+            <h3 className="text-sm font-semibold text-[#334155]">{title}</h3>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-[#F8F6F2] flex items-center justify-center transition-colors">
             <X size={15} />
@@ -71,7 +71,7 @@ function FaqDialog({ title, initial, loading, onClose, onSubmit }: FaqDialogProp
         <div className="px-6 py-5 space-y-4">
           {/* 问题 */}
           <div>
-            <label className="block text-xs font-semibold text-[#1A1A1A] uppercase tracking-wide mb-2">
+            <label className="block text-xs font-semibold text-[#334155] uppercase tracking-wide mb-2">
               问题 <span className="text-red-400 normal-case">*</span>
             </label>
             <textarea
@@ -79,14 +79,14 @@ function FaqDialog({ title, initial, loading, onClose, onSubmit }: FaqDialogProp
               onChange={e => { setQuestion(e.target.value); setErrors(v => ({ ...v, question: '' })) }}
               rows={2}
               placeholder="输入学生可能会问的问题..."
-              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1A1A1A] resize-none transition-colors placeholder:text-gray-300 ${errors.question ? 'border-red-400 bg-red-50' : 'border-[#E8E4DC] bg-white'}`}
+              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-400 resize-none transition-colors placeholder:text-gray-300 ${errors.question ? 'border-red-400 bg-red-50' : 'border-[#E8E4DC] bg-white'}`}
             />
             {errors.question && <p className="mt-1 text-xs text-red-500">{errors.question}</p>}
           </div>
 
           {/* 答案 */}
           <div>
-            <label className="block text-xs font-semibold text-[#1A1A1A] uppercase tracking-wide mb-2">
+            <label className="block text-xs font-semibold text-[#334155] uppercase tracking-wide mb-2">
               标准答案 <span className="text-red-400 normal-case">*</span>
             </label>
             <textarea
@@ -94,7 +94,7 @@ function FaqDialog({ title, initial, loading, onClose, onSubmit }: FaqDialogProp
               onChange={e => { setAnswer(e.target.value); setErrors(v => ({ ...v, answer: '' })) }}
               rows={6}
               placeholder="输入官方标准答案，将被向量化用于 RAG 检索..."
-              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1A1A1A] resize-none transition-colors placeholder:text-gray-300 ${errors.answer ? 'border-red-400 bg-red-50' : 'border-[#E8E4DC] bg-white'}`}
+              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-400 resize-none transition-colors placeholder:text-gray-300 ${errors.answer ? 'border-red-400 bg-red-50' : 'border-[#E8E4DC] bg-white'}`}
             />
             {errors.answer && <p className="mt-1 text-xs text-red-500">{errors.answer}</p>}
           </div>
@@ -102,36 +102,36 @@ function FaqDialog({ title, initial, loading, onClose, onSubmit }: FaqDialogProp
           {/* 分类 + 排序 */}
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-xs font-semibold text-[#1A1A1A] uppercase tracking-wide mb-2">分类</label>
+              <label className="block text-xs font-semibold text-[#334155] uppercase tracking-wide mb-2">分类</label>
               <div className="relative">
                 <Hash size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   value={category}
                   onChange={e => setCategory(e.target.value)}
                   placeholder="如：入学手续、毕业答辩..."
-                  className="w-full border border-[#E8E4DC] rounded-xl pl-8 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1A1A1A]"
+                  className="w-full border border-[#E8E4DC] rounded-xl pl-8 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-400"
                 />
               </div>
             </div>
             <div className="w-24">
-              <label className="block text-xs font-semibold text-[#1A1A1A] uppercase tracking-wide mb-2">排序</label>
+              <label className="block text-xs font-semibold text-[#334155] uppercase tracking-wide mb-2">排序</label>
               <input
                 type="number" min={0} value={sortOrder}
                 onChange={e => setSortOrder(Number(e.target.value))}
-                className="w-full border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-center outline-none focus:ring-2 focus:ring-[#1A1A1A]"
+                className="w-full border border-[#E8E4DC] rounded-xl px-3 py-2.5 text-sm text-center outline-none focus:ring-2 focus:ring-slate-400"
               />
             </div>
           </div>
         </div>
 
         <div className="flex justify-end gap-2.5 px-6 py-4 border-t border-[#F0EDE8] bg-[#FAFAF9] rounded-b-2xl">
-          <button onClick={onClose} className="px-4 py-2 text-sm rounded-xl border border-[#E8E4DC] hover:bg-[#F8F6F2] transition-colors text-[#1A1A1A]">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-xl border border-[#E8E4DC] hover:bg-[#F8F6F2] transition-colors text-[#334155]">
             取消
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="px-5 py-2 text-sm rounded-xl bg-[#1A1A1A] text-white hover:bg-[#333] disabled:opacity-50 flex items-center gap-2 transition-colors"
+            className="px-5 py-2 text-sm rounded-xl bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2 transition-colors"
           >
             {loading && <Loader2 size={13} className="animate-spin" />}
             {loading ? '保存中…' : '保存'}
@@ -148,14 +148,14 @@ function ConfirmDeleteDialog({ question, onConfirm, onCancel, loading }: {
   question: string; onConfirm: () => void; onCancel: () => void; loading: boolean
 }) {
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 animate-apple-fade">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] flex items-center justify-center z-50 animate-apple-fade">
+      <div className="glass-card rounded-2xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
         <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-4">
           <Trash2 size={18} className="text-red-500" />
         </div>
-        <h3 className="text-base font-semibold text-[#1A1A1A] mb-1">删除 FAQ</h3>
+        <h3 className="text-base font-semibold text-[#334155] mb-1">删除 FAQ</h3>
         <p className="text-sm leading-relaxed" style={{ color: '#8A8A8A' }}>
-          将删除 <span className="font-medium text-[#1A1A1A]">"{question.length > 30 ? question.slice(0, 30) + '…' : question}"</span>，并从向量库中移除对应向量。此操作不可撤销。
+          将删除 <span className="font-medium text-[#334155]">"{question.length > 30 ? question.slice(0, 30) + '…' : question}"</span>，并从向量库中移除对应向量。此操作不可撤销。
         </p>
         <div className="mt-5 flex gap-2.5 justify-end">
           <button onClick={onCancel} className="px-4 py-2 text-sm rounded-xl border border-[#E8E4DC] hover:bg-[#F8F6F2] transition-colors">
@@ -189,10 +189,10 @@ function FaqCard({ faq, index, categoryColor, onEdit, onDelete, onToggle }: {
 
   return (
     <div
-      className={`group relative bg-white rounded-2xl border transition-all duration-200 overflow-hidden ${
+      className={`group relative glass-card rounded-2xl transition-all duration-200 overflow-hidden ${
         faq.enabled
-          ? 'border-[#F0EDE8] hover:border-[#D8D4CE] hover:shadow-sm'
-          : 'border-[#F0EDE8] opacity-50'
+          ? ''
+          : 'opacity-50'
       }`}
       style={{ animation: `appleSettleIn 0.7s cubic-bezier(0.25, 1, 0.5, 1) ${Math.min(120 + index * 55, 600)}ms both` }}
     >
@@ -216,7 +216,7 @@ function FaqCard({ faq, index, categoryColor, onEdit, onDelete, onToggle }: {
               onClick={() => setExpanded(v => !v)}
               className="flex-1 text-left group/q"
             >
-              <p className="text-sm font-semibold text-[#1A1A1A] leading-snug group-hover/q:text-[#333] transition-colors">
+              <p className="text-sm font-semibold text-[#334155] leading-snug group-hover/q:text-[#333] transition-colors">
                 {faq.question}
               </p>
             </button>
@@ -236,7 +236,7 @@ function FaqCard({ faq, index, categoryColor, onEdit, onDelete, onToggle }: {
               <button
                 onClick={() => onEdit(faq)}
                 title="编辑"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-[#1A1A1A] hover:bg-[#F2EFE9] transition-colors"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-[#334155] hover:bg-[#F2EFE9] transition-colors"
               >
                 <Pencil size={13} />
               </button>
@@ -354,14 +354,14 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4 animate-apple-fade">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-apple-pop">
+      <div className="glass-card rounded-2xl w-full max-w-md animate-apple-pop">
         {/* 标题 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0EDE8]">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-[#F2EFE9] flex items-center justify-center">
-              <Upload size={14} className="text-[#1A1A1A]" />
+              <Upload size={14} className="text-[#334155]" />
             </div>
-            <h3 className="text-sm font-semibold text-[#1A1A1A]">从 Excel 导入 FAQ</h3>
+            <h3 className="text-sm font-semibold text-[#334155]">从 Excel 导入 FAQ</h3>
           </div>
           {phase !== 'uploading' && (
             <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-[#F8F6F2] flex items-center justify-center transition-colors">
@@ -380,14 +380,14 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
                 onDragLeave={() => setDragOver(false)}
                 onClick={() => fileInputRef.current?.click()}
                 className={`cursor-pointer border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 transition-colors ${
-                  dragOver ? 'border-[#1A1A1A] bg-[#F2EFE9]' : 'border-[#E8E4DC] hover:border-[#C8C4BC] hover:bg-[#FAFAF9]'
+                  dragOver ? 'border-slate-400 bg-[#F2EFE9]' : 'border-[#E8E4DC] hover:border-[#C8C4BC] hover:bg-[#FAFAF9]'
                 }`}
               >
                 <div className="w-12 h-12 rounded-xl bg-[#F2EFE9] flex items-center justify-center">
-                  <FileText size={22} className="text-[#1A1A1A]" strokeWidth={1.4} />
+                  <FileText size={22} className="text-[#334155]" strokeWidth={1.4} />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-semibold text-[#1A1A1A]">点击选择或拖拽文件到此处</p>
+                  <p className="text-sm font-semibold text-[#334155]">点击选择或拖拽文件到此处</p>
                   <p className="text-xs mt-1" style={{ color: '#A0A0A0' }}>仅支持 .xlsx 格式，文件大小不超过 5MB</p>
                 </div>
               </div>
@@ -397,7 +397,7 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
                 <span>没有模板？</span>
                 <button
                   onClick={() => faqApi.downloadTemplate(kbName)}
-                  className="text-[#1A1A1A] font-medium underline underline-offset-2 hover:opacity-70 transition-opacity"
+                  className="text-[#334155] font-medium underline underline-offset-2 hover:opacity-70 transition-opacity"
                 >
                   下载填写模板
                 </button>
@@ -408,9 +408,9 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
           {/* phase: uploading */}
           {phase === 'uploading' && (
             <div className="flex flex-col items-center gap-4 py-8">
-              <Loader2 size={32} className="animate-spin text-[#1A1A1A]" />
+              <Loader2 size={32} className="animate-spin text-[#334155]" />
               <div className="text-center">
-                <p className="text-sm font-semibold text-[#1A1A1A]">正在上传并向量化…</p>
+                <p className="text-sm font-semibold text-[#334155]">正在上传并向量化…</p>
                 <p className="text-xs mt-1" style={{ color: '#A0A0A0' }}>批量向量化可能需要一些时间，请耐心等待</p>
               </div>
             </div>
@@ -422,7 +422,7 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
               {/* 统计条 */}
               <div className="grid grid-cols-4 gap-2 text-center">
                 {[
-                  { label: '总行数', value: result.total, color: '#1A1A1A' },
+                  { label: '总行数', value: result.total, color: '#334155' },
                   { label: '成功', value: result.success, color: '#10B981' },
                   { label: '跳过', value: result.skipped, color: '#F59E0B' },
                   { label: '失败', value: result.failed, color: '#EF4444' },
@@ -448,7 +448,7 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
               {/* 错误明细 */}
               {result.errors.length > 0 && (
                 <div className="max-h-48 overflow-y-auto space-y-1.5">
-                  <p className="text-xs font-semibold text-[#1A1A1A] uppercase tracking-wide mb-2">错误明细</p>
+                  <p className="text-xs font-semibold text-[#334155] uppercase tracking-wide mb-2">错误明细</p>
                   {result.errors.map((err, i) => (
                     <div key={i} className="flex items-start gap-2.5 bg-red-50 rounded-lg px-3 py-2.5 text-xs">
                       {err.row > 0 && (
@@ -471,7 +471,7 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
           <div className="flex justify-end px-6 py-4 border-t border-[#F0EDE8] bg-[#FAFAF9] rounded-b-2xl">
             <button
               onClick={onClose}
-              className="px-5 py-2 text-sm rounded-xl bg-[#1A1A1A] text-white hover:bg-[#333] transition-colors"
+              className="px-5 py-2 text-sm rounded-xl bg-slate-700 text-white hover:bg-slate-800 transition-colors"
             >
               完成
             </button>
@@ -487,7 +487,7 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
 function StatPill({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F2EFE9] rounded-full">
-      <span className="text-sm font-bold text-[#1A1A1A]">{value}</span>
+      <span className="text-sm font-bold text-[#334155]">{value}</span>
       <span className="text-xs" style={{ color: '#8A8A8A' }}>{label}</span>
     </div>
   )
@@ -594,12 +594,12 @@ export default function FaqPage() {
   })
 
   return (
-    <div className="px-8 py-8 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
+    <div className="px-8 py-8 flex-1 overflow-y-auto glass-card rounded-2xl">
 
       {/* ── 标题栏 ── */}
       <div className="flex items-start justify-between mb-6" style={settle(0)}>
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">FAQ 管理</h1>
+          <h1 className="text-2xl font-bold text-[#334155]">FAQ 管理</h1>
           <p className="mt-1 text-sm" style={{ color: '#8A8A8A' }}>
             预设标准问答对，自动向量化参与 RAG 检索，提升回答准确率
           </p>
@@ -611,7 +611,7 @@ export default function FaqPage() {
             <div ref={menuRef} className="relative">
               <button
                 onClick={() => setMenuOpen(v => !v)}
-                className="flex items-center gap-2 px-3.5 py-2.5 border border-[#E8E4DC] text-[#1A1A1A] text-sm rounded-xl hover:bg-[#F8F6F2] transition-colors"
+                className="flex items-center gap-2 px-3.5 py-2.5 border border-[#E8E4DC] text-[#334155] text-sm rounded-xl hover:bg-[#F8F6F2] transition-colors"
               >
                 <Download size={14} />
                 导入/导出
@@ -624,20 +624,20 @@ export default function FaqPage() {
                 >
                   <button
                     onClick={() => { faqApi.downloadTemplate(selectedKb); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#1A1A1A] hover:bg-[#F8F6F2] transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#334155] hover:bg-[#F8F6F2] transition-colors text-left"
                   >
                     <FileText size={14} className="text-[#8A8A8A]" />下载模板
                   </button>
                   <button
                     onClick={() => { faqApi.exportExcel(selectedKb); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#1A1A1A] hover:bg-[#F8F6F2] transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#334155] hover:bg-[#F8F6F2] transition-colors text-left"
                   >
                     <Download size={14} className="text-[#8A8A8A]" />导出 Excel
                   </button>
                   <div className="my-1 border-t border-[#F0EDE8]" />
                   <button
                     onClick={() => { setImportOpen(true); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#1A1A1A] hover:bg-[#F8F6F2] transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#334155] hover:bg-[#F8F6F2] transition-colors text-left"
                   >
                     <Upload size={14} className="text-[#8A8A8A]" />从 Excel 导入
                   </button>
@@ -647,7 +647,7 @@ export default function FaqPage() {
             {/* 新增 FAQ */}
             <button
               onClick={() => setCreateOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 transition-colors"
             >
               <Plus size={15} />新增 FAQ
             </button>
@@ -663,7 +663,7 @@ export default function FaqPage() {
           <select
             value={selectedKb}
             onChange={e => { setSelectedKb(e.target.value); setCategoryFilter('全部'); setSearchText('') }}
-            className="border border-[#E8E4DC] rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#1A1A1A] bg-white min-w-[140px]"
+            className="border border-[#E8E4DC] rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 bg-white min-w-[140px]"
           >
             <option value="">— 请选择 —</option>
             {kbs?.map(kb => <option key={kb.id} value={kb.name}>{kb.name}</option>)}
@@ -682,7 +682,7 @@ export default function FaqPage() {
                 value={searchText}
                 onChange={e => { setSearchText(e.target.value); setCategoryFilter('全部') }}
                 placeholder="AI 语义搜索 FAQ..."
-                className="w-full border border-[#E8E4DC] rounded-xl pl-9 pr-20 py-2 text-sm outline-none focus:ring-2 focus:ring-[#1A1A1A] bg-white transition-colors"
+                className="w-full border border-[#E8E4DC] rounded-xl pl-9 pr-20 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 bg-white transition-colors"
               />
               {/* AI 标识 */}
               <div className={`absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
@@ -717,7 +717,7 @@ export default function FaqPage() {
       {selectedKb && allCategories.length > 0 && !isAiSearch && (
         <div className="flex items-center gap-2 mb-5 flex-wrap">
           {['全部', ...allCategories].map(cat => {
-            const color = cat === '全部' ? '#1A1A1A' : getCategoryColor(cat, allCategories)
+            const color = cat === '全部' ? '#334155' : getCategoryColor(cat, allCategories)
             const active = categoryFilter === cat
             return (
               <button
@@ -744,10 +744,10 @@ export default function FaqPage() {
       {!selectedKb && (
         <div className="flex flex-col items-center justify-center py-32 gap-4">
           <div className="w-16 h-16 rounded-2xl bg-[#F2EFE9] flex items-center justify-center">
-            <MessageSquareQuote size={28} className="text-[#1A1A1A]" strokeWidth={1.4} />
+            <MessageSquareQuote size={28} className="text-[#334155]" strokeWidth={1.4} />
           </div>
           <div className="text-center space-y-1">
-            <p className="text-sm font-semibold text-[#1A1A1A]">选择一个知识库开始管理 FAQ</p>
+            <p className="text-sm font-semibold text-[#334155]">选择一个知识库开始管理 FAQ</p>
             <p className="text-xs" style={{ color: '#A0A0A0' }}>FAQ 将自动向量化，在对话时作为高质量检索源</p>
           </div>
         </div>
@@ -771,10 +771,10 @@ export default function FaqPage() {
       {selectedKb && !isLoading && !error && !isSearching && displayFaqs.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <div className="w-14 h-14 rounded-2xl bg-[#F2EFE9] flex items-center justify-center">
-            <MessageSquareQuote size={24} className="text-[#1A1A1A]" strokeWidth={1.4} />
+            <MessageSquareQuote size={24} className="text-[#334155]" strokeWidth={1.4} />
           </div>
           <div className="text-center space-y-1">
-            <p className="text-sm font-semibold text-[#1A1A1A]">
+            <p className="text-sm font-semibold text-[#334155]">
               {isAiSearch
                 ? `未找到与"${rewrittenQuery || searchText}"相关的 FAQ`
                 : categoryFilter !== '全部'
@@ -792,7 +792,7 @@ export default function FaqPage() {
           {!isAiSearch && categoryFilter === '全部' && (
             <button
               onClick={() => setCreateOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 transition-colors"
             >
               <Plus size={14} />新增第一条 FAQ
             </button>

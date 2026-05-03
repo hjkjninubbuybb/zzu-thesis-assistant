@@ -51,7 +51,7 @@ function formatSize(bytes: number) {
 
 function StatusIcon({ status }: { status: FileStatus }) {
   if (status === 'pending')   return <Clock size={13} className="text-gray-400" />
-  if (status === 'uploading') return <Loader2 size={13} className="animate-spin text-[#1A1A1A]" />
+  if (status === 'uploading') return <Loader2 size={13} className="animate-spin text-[#334155]" />
   if (status === 'done')      return <CheckCircle size={13} className="text-emerald-500" />
   return <AlertCircle size={13} className="text-red-500" />
 }
@@ -74,7 +74,7 @@ function ConfirmDialog({ name, onConfirm, onCancel, loading }: {
 }) {
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 animate-apple-fade">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
+      <div className="glass-card rounded-xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
         <h3 className="text-base font-semibold text-gray-900">确认删除</h3>
         <p className="mt-2 text-sm text-gray-500">
           将删除知识库 <span className="font-medium text-gray-800">"{name}"</span> 及其所有文档，此操作不可撤销。
@@ -115,7 +115,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 animate-apple-fade">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
+      <div className="glass-card rounded-xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-gray-900">新建知识库</h3>
           <button onClick={onClose}><X size={18} className="text-gray-400 hover:text-gray-600" /></button>
@@ -124,7 +124,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">名称 <span className="text-red-500">*</span></label>
             <input
-              className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#1A1A1A] ${nameError ? 'border-red-400' : 'border-gray-300'}`}
+              className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 ${nameError ? 'border-red-400' : 'border-gray-300'}`}
               placeholder="字母/数字/下划线/中文"
               value={name}
               onChange={e => { setName(e.target.value); if (nameError) setNameError('') }}
@@ -136,7 +136,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">描述</label>
             <input
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#1A1A1A]"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400"
               placeholder="可选"
               value={desc}
               onChange={e => setDesc(e.target.value)}
@@ -146,7 +146,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
         </div>
         <div className="mt-5 flex gap-3 justify-end">
           <button onClick={onClose} className="px-4 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50">取消</button>
-          <button onClick={handleSubmit} disabled={mutation.isPending} className="px-4 py-2 text-sm rounded-md bg-[#1A1A1A] text-white hover:bg-[#333] disabled:opacity-60 flex items-center gap-2">
+          <button onClick={handleSubmit} disabled={mutation.isPending} className="px-4 py-2 text-sm rounded-md bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60 flex items-center gap-2">
             {mutation.isPending && <Loader2 size={14} className="animate-spin" />}
             创建
           </button>
@@ -233,18 +233,18 @@ function DocumentPanel({ kbName, onToast }: {
     <div className="mx-0 mb-2 rounded-2xl border border-[#F0EDE8] bg-[#FDFCFA] overflow-hidden">
       {/* 上传区 */}
       <div className="p-5 border-b border-[#F0EDE8]">
-        <p className="text-xs font-semibold text-[#1A1A1A] mb-3">上传文档</p>
+        <p className="text-xs font-semibold text-[#334155] mb-3">上传文档</p>
 
         <div
           onDragOver={e => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${dragOver ? 'border-[#1A1A1A] bg-[#F2EFE9]' : 'border-[#E8E4DE] hover:border-[#C8C4BE]'}`}
+          className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${dragOver ? 'border-slate-400 bg-[#F2EFE9]' : 'border-[#E8E4DE] hover:border-[#C8C4BE]'}`}
         >
           <input ref={fileInputRef} type="file" accept=".pdf,.txt,.md,.docx,.doc" multiple className="hidden" onChange={e => { if (e.target.files?.length) addFiles(e.target.files); e.target.value = '' }} />
           <Upload size={20} className="mx-auto mb-2" style={{ color: '#8A8A8A' }} />
-          <p className="text-sm" style={{ color: '#8A8A8A' }}>拖拽文件到此处，或 <span className="text-[#1A1A1A] font-medium">点击选择</span></p>
+          <p className="text-sm" style={{ color: '#8A8A8A' }}>拖拽文件到此处，或 <span className="text-[#334155] font-medium">点击选择</span></p>
           <p className="text-xs mt-1" style={{ color: '#AAAAAA' }}>支持 .pdf / .txt / .md / .docx / .doc，可多选</p>
         </div>
 
@@ -258,7 +258,7 @@ function DocumentPanel({ kbName, onToast }: {
                 <span className="text-xs shrink-0" style={{ color: '#8A8A8A' }}>{formatSize(item.file.size)}</span>
                 {item.status === 'uploading' && (
                   <div className="w-20 bg-gray-200 rounded-full h-1 shrink-0">
-                    <div className="bg-[#1A1A1A] h-1 rounded-full transition-all" style={{ width: `${item.progress}%` }} />
+                    <div className="bg-slate-700 h-1 rounded-full transition-all" style={{ width: `${item.progress}%` }} />
                   </div>
                 )}
                 {item.status === 'done' && item.chunks !== undefined && (
@@ -284,7 +284,7 @@ function DocumentPanel({ kbName, onToast }: {
               <button
                 key={val}
                 onClick={() => setParams(p => ({ ...p, doc_type: val }))}
-                className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${params.doc_type === val ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'border-[#E8E4DE] text-gray-700 hover:bg-[#F2EFE9]'}`}
+                className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${params.doc_type === val ? 'bg-slate-700 text-white border-slate-400' : 'border-[#E8E4DE] text-gray-700 hover:bg-[#F2EFE9]'}`}
               >
                 {label}
               </button>
@@ -308,7 +308,7 @@ function DocumentPanel({ kbName, onToast }: {
               <select
                 value={params.splitter_type}
                 onChange={e => setParams(p => ({ ...p, splitter_type: e.target.value as SplitterType }))}
-                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#1A1A1A]"
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-slate-400"
               >
                 <option value="recursive">Recursive（推荐）</option>
                 <option value="token">Token</option>
@@ -346,7 +346,7 @@ function DocumentPanel({ kbName, onToast }: {
           <button
             onClick={startUpload}
             disabled={pendingCount === 0 || uploading}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
             {uploading ? '入库中...' : `上传入库${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
@@ -362,7 +362,7 @@ function DocumentPanel({ kbName, onToast }: {
 
       {/* 文档列表 */}
       <div className="p-5">
-        <p className="text-xs font-semibold text-[#1A1A1A] mb-3">
+        <p className="text-xs font-semibold text-[#334155] mb-3">
           已入库文档{docs ? ` (${docs.length})` : ''}
         </p>
 
@@ -381,7 +381,7 @@ function DocumentPanel({ kbName, onToast }: {
             {docs.map(doc => (
               <div key={doc.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#F0EDE8] bg-white hover:bg-[#F8F6F2] transition-colors">
                 <FileText size={14} className="text-gray-400 shrink-0" />
-                <span className="text-sm text-[#1A1A1A] font-medium truncate flex-1 min-w-0">{doc.file_name}</span>
+                <span className="text-sm text-[#334155] font-medium truncate flex-1 min-w-0">{doc.file_name}</span>
                 <span className="text-xs shrink-0 px-2 py-0.5 rounded-full bg-[#F2EFE9] text-gray-600">
                   {DOC_TYPE_LABELS[doc.doc_type as DocType] ?? doc.doc_type}
                 </span>
@@ -563,15 +563,15 @@ export default function KnowledgeBasePage() {
   })
 
   return (
-    <div className="px-8 py-8 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm">
+    <div className="px-8 py-8 flex-1 overflow-y-auto glass-card rounded-2xl">
       <div className="flex items-center justify-between mb-6" style={settle(0)}>
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">知识库</h1>
+          <h1 className="text-2xl font-bold text-[#334155]">知识库</h1>
           <p className="mt-1 text-sm" style={{ color: '#8A8A8A' }}>管理知识库，分别为管理端和学生端指定使用的知识库</p>
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm rounded-xl hover:bg-[#333] transition-colors apple-press"
+          className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 transition-colors apple-press"
         >
           <Plus size={15} />新建知识库
         </button>
@@ -618,7 +618,7 @@ export default function KnowledgeBasePage() {
       {kbs && kbs.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="w-12 h-12 rounded-2xl bg-[#F2EFE9] flex items-center justify-center">
-            <Database size={22} className="text-[#1A1A1A]" strokeWidth={1.6} />
+            <Database size={22} className="text-[#334155]" strokeWidth={1.6} />
           </div>
           <p className="text-sm font-semibold text-gray-800">暂无知识库</p>
           <p className="text-xs" style={{ color: '#8A8A8A' }}>点击右上角「新建知识库」开始</p>
@@ -639,7 +639,7 @@ export default function KnowledgeBasePage() {
                   highlighted
                     ? 'bg-white border-gray-300'
                     : isExpanded
-                      ? 'border-[#1A1A1A] bg-white'
+                      ? 'border-slate-400 bg-white'
                       : 'border-[#F0EDE8] bg-white hover:bg-[#F8F6F2]'
                 }`}>
                   <div
@@ -650,7 +650,7 @@ export default function KnowledgeBasePage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-[#1A1A1A]">{kb.name}</p>
+                      <p className="text-sm font-semibold text-[#334155]">{kb.name}</p>
                       {isAdminKb && (
                         <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-full border border-emerald-200">
                           <BookOpen size={9} />管理端
@@ -667,7 +667,7 @@ export default function KnowledgeBasePage() {
                     </p>
                   </div>
                   <div className="text-center w-16 shrink-0">
-                    <p className="text-lg font-bold text-[#1A1A1A]">{kb.doc_count}</p>
+                    <p className="text-lg font-bold text-[#334155]">{kb.doc_count}</p>
                     <p className="text-xs" style={{ color: '#8A8A8A' }}>篇文档</p>
                   </div>
                   <p className="text-xs w-24 text-right shrink-0" style={{ color: '#8A8A8A' }}>
@@ -716,7 +716,7 @@ export default function KnowledgeBasePage() {
                     )}
                     <button
                       onClick={() => setExpandedKb(isExpanded ? null : kb.name)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${isExpanded ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]' : 'border-[#F0EDE8] text-[#1A1A1A] hover:bg-[#F2EFE9]'}`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${isExpanded ? 'bg-slate-700 text-white border-slate-400' : 'border-[#F0EDE8] text-[#334155] hover:bg-[#F2EFE9]'}`}
                     >
                       <FileText size={12} />
                       {isExpanded ? '收起' : '管理文档'}

@@ -48,7 +48,7 @@ export default function StudentFaqPage() {
   }, [allFaqs, selectedCategory, searchText])
 
   return (
-    <div className="p-7 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm border border-[#D9DEE5]">
+    <div className="p-7 flex-1 overflow-y-auto glass-card rounded-2xl">
       {/* Header */}
       <div className="mb-6" style={cardStyle(0)}>
         <h1 className="text-xl font-semibold text-[#202938] tracking-tight">常见问题</h1>

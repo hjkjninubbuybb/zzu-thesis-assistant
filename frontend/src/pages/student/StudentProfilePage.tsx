@@ -32,7 +32,7 @@ export default function StudentProfilePage() {
   ]
 
   return (
-    <div className="p-7 flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm border border-[#D9DEE5]">
+    <div className="p-7 flex-1 overflow-y-auto glass-card rounded-2xl">
       <div className="max-w-lg mx-auto">
         {/* 头像 + 姓名 */}
         <div className="flex flex-col items-center mb-8" style={cardStyle(0)}>
@@ -47,7 +47,7 @@ export default function StudentProfilePage() {
 
         {/* 个人信息卡 */}
         <div
-          className="bg-white rounded-2xl border border-[#D9DEE5] p-5 mb-5"
+          className="glass-card rounded-2xl p-5 mb-5"
           style={cardStyle(100)}
         >
           <h2 className="text-sm font-semibold text-[#202938] mb-4">个人信息</h2>
@@ -104,7 +104,7 @@ function ChangePasswordCard() {
 
   return (
     <div
-      className="bg-white rounded-2xl border border-[#D9DEE5] p-5"
+      className="glass-card rounded-2xl p-5"
       style={cardStyle(200)}
     >
       <div className="flex items-center gap-2 mb-4">
