@@ -21,6 +21,7 @@ const ADMIN_TEACHER_NAV = [
   { to: '/admin/analytics', label: '使用统计', icon: BarChart2 },
 ]
 
+
 const ROLE_LABELS: Record<string, string> = {
   admin: '管理员',
   teacher: '教师',

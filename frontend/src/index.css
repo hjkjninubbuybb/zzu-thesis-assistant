@@ -3,19 +3,19 @@
 
 @theme {
   --color-background: hsl(38 25% 94%); /* 调暖一点点，增加质感 */
-  --color-foreground: hsl(0 0% 9%);
+  --color-foreground: hsl(215 25% 15%);
   --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(0 0% 9%);
+  --color-card-foreground: hsl(215 25% 15%);
   --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(0 0% 9%);
-  --color-primary: hsl(0 0% 9%);
+  --color-popover-foreground: hsl(215 25% 15%);
+  --color-primary: hsl(215 25% 27%);
   --color-primary-foreground: hsl(0 0% 98%);
   --color-secondary: hsl(38 18% 95%);
-  --color-secondary-foreground: hsl(0 0% 9%);
+  --color-secondary-foreground: hsl(215 25% 15%);
   --color-muted: hsl(38 15% 93%);
   --color-muted-foreground: hsl(0 0% 48%);
   --color-accent: hsl(38 20% 94%);
-  --color-accent-foreground: hsl(0 0% 9%);
+  --color-accent-foreground: hsl(215 25% 15%);
   --color-destructive: hsl(5 76% 58%);
   --color-destructive-foreground: hsl(0 0% 98%);
   --color-border: hsl(38 12% 86%);
@@ -412,7 +412,7 @@ body {
 }
 
 .prose-academic strong {
-  color: #1A1A1A;
+  color: #334155;
   font-weight: 600;
   background: linear-gradient(120deg, rgba(37, 99, 235, 0.08) 0%, rgba(37, 99, 235, 0.08) 100%);
   padding: 0 2px;

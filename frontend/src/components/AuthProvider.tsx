@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (!ready) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'hsl(38,22%,91%)' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid #e0dbd3', borderTopColor: '#1a1a1a', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        <div style={{ width: 32, height: 32, border: '3px solid #e0dbd3', borderTopColor: '#334155', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
