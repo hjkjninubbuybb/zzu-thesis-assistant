@@ -34,88 +34,64 @@ interface Blob {
 // 4 个 idle 动画 + 互质周期（53/67/79/89 全为质数）+ 大随机起步偏移
 // → 三球永不同步重复构图，肉眼几乎察觉不到运动但又"活着"
 const WARM_BLOBS: Blob[] = [
-  // 暖琥珀（呼应 Logo 黑 + 暖米背景）
+  // 琥珀金 - 微调：降透明度，增模糊
+  {
+    size: 550,
+    position: { left: '-5%', top: '-10%' },
+    color: 'rgba(255, 200, 50, 0.65)', 
+    blur: 60,
+    anim: 'blobIdleA',
+    duration: '48s',
+    delay: '-5s',
+  },
+  // 珊瑚红
   {
     size: 520,
-    position: { left: '-8%', top: '-14%' },
-    color: 'rgba(240, 192, 80, 0.55)',
-    blur: 40,
-    anim: 'blobIdleA',
-    duration: '53s',
-    delay: '-13s',
-  },
-  // 砖红（OverviewPage 已使用此色）
-  {
-    size: 480,
-    position: { right: '-6%', top: '18%' },
-    color: 'rgba(232, 110, 90, 0.42)',
-    blur: 50,
+    position: { right: '2%', top: '15%' },
+    color: 'rgba(255, 90, 60, 0.55)', 
+    blur: 70,
     anim: 'blobIdleB',
-    duration: '67s',
-    delay: '-29s',
+    duration: '55s',
+    delay: '-15s',
   },
-  // 墨灰（深色锚点）
+  // 墨灰
+  {
+    size: 450,
+    position: { left: '30%', bottom: '-5%' },
+    color: 'rgba(40, 35, 30, 0.35)',
+    blur: 65,
+    anim: 'blobIdleC',
+    duration: '65s',
+    delay: '-25s',
+  },
+  // 环境补色
   {
     size: 420,
-    position: { left: '32%', bottom: '-14%' },
-    color: 'rgba(50, 46, 40, 0.32)',
-    blur: 44,
-    anim: 'blobIdleC',
-    duration: '79s',
-    delay: '-41s',
-  },
-  // 冷灰中和暖色，避免发糊
-  {
-    size: 380,
-    position: { right: '22%', bottom: '-8%' },
-    color: 'rgba(125, 138, 160, 0.30)',
-    blur: 48,
+    position: { right: '15%', bottom: '5%' },
+    color: 'rgba(100, 150, 255, 0.35)',
+    blur: 60,
     anim: 'blobIdleD',
-    duration: '89s',
-    delay: '-7s',
+    duration: '58s',
+    delay: '-10s',
   },
 ]
 
 const COOL_BLOBS: Blob[] = [
-  // 学生端：靛蓝主调
   {
-    size: 520,
-    position: { left: '-8%', top: '-14%' },
-    color: 'rgba(96, 130, 240, 0.40)',
-    blur: 40,
+    size: 550,
+    position: { left: '-5%', top: '-10%' },
+    color: 'rgba(60, 140, 255, 0.55)',
+    blur: 60,
     anim: 'blobIdleA',
-    duration: '53s',
-    delay: '-13s',
+    duration: '48s',
   },
-  // 紫
   {
-    size: 460,
-    position: { right: '-6%', top: '16%' },
-    color: 'rgba(150, 110, 220, 0.35)',
-    blur: 50,
+    size: 500,
+    position: { right: '5%', top: '20%' },
+    color: 'rgba(160, 100, 255, 0.45)',
+    blur: 70,
     anim: 'blobIdleB',
-    duration: '67s',
-    delay: '-29s',
-  },
-  // 青
-  {
-    size: 400,
-    position: { left: '34%', bottom: '-12%' },
-    color: 'rgba(80, 180, 200, 0.32)',
-    blur: 44,
-    anim: 'blobIdleC',
-    duration: '79s',
-    delay: '-41s',
-  },
-  // 浅粉点缀
-  {
-    size: 360,
-    position: { right: '24%', bottom: '-8%' },
-    color: 'rgba(232, 150, 200, 0.28)',
-    blur: 48,
-    anim: 'blobIdleD',
-    duration: '89s',
-    delay: '-7s',
+    duration: '55s',
   },
 ]
 
@@ -125,11 +101,9 @@ export default function BlobBackdrop({
   className = '',
 }: BlobBackdropProps) {
   const blobs = variant === 'cool' ? COOL_BLOBS : WARM_BLOBS
-  // hero 模式整体放大并提高饱和
-  const scale = intensity === 'hero' ? 1.35 : 1
-  const targetOpacity = intensity === 'hero' ? 1 : 0.85
+  const scale = intensity === 'hero' ? 1.4 : 1
+  const targetOpacity = 1 // 全力显示
 
-  // 挂载后再淡入到目标透明度，避免色块"砰"地出现
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true))
@@ -142,7 +116,8 @@ export default function BlobBackdrop({
       className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}
       style={{
         opacity: mounted ? targetOpacity : 0,
-        transition: 'opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1)',
+        transition: 'opacity 1.5s cubic-bezier(0.25, 1, 0.5, 1)',
+        backgroundColor: 'var(--color-background)'
       }}
     >
       {blobs.map((b, i) => (
@@ -152,8 +127,10 @@ export default function BlobBackdrop({
           style={{
             width: b.size * scale,
             height: b.size * scale,
-            background: `radial-gradient(circle at 50% 50%, ${b.color} 0%, transparent 70%)`,
+            // 核心更实，消散更慢
+            background: `radial-gradient(circle at 45% 45%, ${b.color} 0%, transparent 85%)`,
             filter: `blur(${b.blur}px)`,
+            mixBlendMode: 'normal',
             animation: `${b.anim} ${b.duration} ease-in-out ${b.delay ?? '0s'} infinite`,
             ...b.position,
           }}

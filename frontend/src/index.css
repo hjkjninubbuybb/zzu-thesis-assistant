@@ -308,28 +308,38 @@ body {
     0 6px 28px -14px rgba(20, 30, 60, 0.16);
 }
 
-/* ───── Idle drift — 大背景光晕用，Apple 风慢速漂移 ─────
-   位移 56–84px / 周期 53–89s 互质 / 无 scale 跳变 / 透明度极弱呼吸
-   单峰 keyframe + ease-in-out → 正弦式潮汐，无明显节奏点 */
+/* ───── Fluid Liquid Motion — 高级流体漂移 ─────
+   使用多阶段 keyframes，结合平移、缩放和极细微的形变错觉，模拟高级流体/熔岩灯效果 */
+
+/* ───── Fluid Liquid Motion — 高级流体大范围漂移 ─────
+   使用 vw/vh 单位确保光团在不同屏幕上都能产生明显的“游走”感 */
 
 @keyframes blobIdleA {
-  0%, 100% { transform: translate3d(0, 0, 0);        opacity: 0.85; }
-  50%      { transform: translate3d(72px, -56px, 0); opacity: 1; }
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  33%  { transform: translate(15vw, -10vh) scale(1.1); opacity: 1; }
+  66%  { transform: translate(-5vw, 15vh) scale(0.9); opacity: 0.9; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
 }
 
 @keyframes blobIdleB {
-  0%, 100% { transform: translate3d(0, 0, 0);        opacity: 0.90; }
-  50%      { transform: translate3d(-84px, 64px, 0); opacity: 1; }
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  33%  { transform: translate(-12vw, 15vh) scale(0.95); opacity: 1; }
+  66%  { transform: translate(8vw, -8vh) scale(1.05); opacity: 0.85; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.9; }
 }
 
 @keyframes blobIdleC {
-  0%, 100% { transform: translate3d(0, 0, 0);        opacity: 0.80; }
-  50%      { transform: translate3d(58px, 78px, 0);  opacity: 0.95; }
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  33%  { transform: translate(10vw, 12vh) scale(1.05); opacity: 0.95; }
+  66%  { transform: translate(-8vw, -10vh) scale(0.9); opacity: 0.85; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
 }
 
 @keyframes blobIdleD {
-  0%, 100% { transform: translate3d(0, 0, 0);         opacity: 0.85; }
-  50%      { transform: translate3d(-66px, -48px, 0); opacity: 1; }
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.85; }
+  33%  { transform: translate(-15vw, -12vh) scale(1.1); opacity: 1; }
+  66%  { transform: translate(10vw, 5vh) scale(0.95); opacity: 0.8; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.85; }
 }
 
 /* 用户系统启用「减少动效」时，光晕完全静止（保留视觉，去掉运动） */
