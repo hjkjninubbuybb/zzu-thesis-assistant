@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import time
+from datetime import datetime
 from collections.abc import Generator
 
 from langchain_community.chat_models import ChatTongyi
@@ -34,6 +35,7 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """\
 你是郑州大学本科毕业设计智能问答助手，负责解答学生关于毕业设计（论文）的相关问题。
 当前使用的知识库是：{kb_name}
+当前时间是：{today}
 
 工具调用规则（严格遵守，按顺序判断）：
 1. 系统会先自动提供一组"预检索知识库片段"；如果片段足以回答，直接依据这些片段回答，不必重复检索
@@ -68,19 +70,13 @@ SYSTEM_PROMPT = """\
 - 不得因为某个来源的片段数量更多或排名更靠前就忽略其他来源的不同说法
 
 资料不足规则（必须严格遵守）：
-- 只能把检索片段中明确出现的信息作为结论；不得根据往届惯例、常识、相近流程或日期推算补出具体答案
-- 如果资料只说明相近主题，但没有直接说明用户问的具体日期、系统入口、材料份数、审批主体、权限、阈值或是否强制，必须明确说"知识库未明确"
-- 对时间节点问题，必须确认片段中的事项名称与用户问题完全一致；不得把任务书提交、师生见面、题目审核、开题、中期检查等相近节点当作双选、补选、系统开放或其他节点的截止时间
-- 如果只找到前置或后置节点，只能说明"可作为相关背景"，不能称其为用户所问事项的明确时间
-- 如果问题涉及系统入口是否开放/自动关闭、截止时刻是否为24点、纸质材料份数、签字顺序、离校通知、补选机会、是否必须、是否允许等，必须有直接片段支持才可给确定性结论
-- 禁止使用"通常""一般来说""按惯例""建议按24点理解""可认为""应该算""完全符合""合理范围""与…一致""指向…""同理可知"等表达来补足知识库没有明确说明的结论
-- 禁止把不同文档的结论合并成一个统一结论；文档A说"第一周"、文档B说"第3周前"时，必须分别引用，不得写成"均以第3周前为准"或"统一要求为第3周前"
-- 当前日期工具只能回答"今天/现在"相关问题；不得用当前日期工具推算第七学期、第十九周、任务书提交等文档进度表中的历史/计划节点
-- 如果片段只给出连续周的整体区间（如"第十七周–第十九周（2025.12.29–2026.1.16）"），只能按原文给出整体区间；不得自行拆分某一周的起止日，不得外推周六/周日或24:00截止
-- 不得把"早于某截止日"等同于"属于学生离校前"或"符合离校前要求"；除非片段直接定义了离校日期，否则只能说"早于某任务节点，但离校日期知识库未明确"
+- 只能把检索片段中明确出现的信息作为结论；但可以基于片段中给出的具体周期（如"第X周"）合理推论该周的最后一天作为执行截止日
+- 如果资料只说明相近主题，但没有直接说明用户问的具体日期、系统入口、材料份数、审批主体、权限、阈值或是否强制，应在说明事实后给出一个合理的建议，而不是生硬地拒答
+- 对时间节点问题，应根据片段中的安排给出明确建议。如果片段给出了一个时间区间（如"4.6-4.10"），可以直接将 4月10日 告知用户作为建议完成时间
+- 禁止编造知识库中完全不存在的日期；但可以将知识库中已有的日期范围进行通俗化的转化
+- 当前日期工具只能回答"今天/现在"相关问题；不得用当前日期工具推算文档进度表之外的历史节点
 - 不得编造"原文明确指出"、条款名称或直接引号；只有预检索片段或工具返回中逐字出现的信息，才能称为原文依据
-- 可以回答资料已明确的部分，但对资料未明确的部分要直接拒答，不能用"可合理推断""通常""一般来说"包装成结论
-- 面对不可回答问题，应优先使用"暂无相关信息，建议咨询指导教师或教务部门 📋"，并说明缺少哪类依据
+- 面对不可回答问题，应先事实性地说明知识库提到的相关内容，再给出建议性结论，最后补充："建议咨询指导教师或教务部门 📋"
 
 回答风格：
 - 语言专业、清晰，语气平和自然，适当使用 emoji（✅ ⚠️ 📅 📝）
@@ -410,19 +406,6 @@ def _apply_answer_safety_guards(query: str, generation: str) -> tuple[str, list[
 
     if (
         "任务书" in query
-        and "第十九周末" in query
-        and ("具体是哪天" in query or "1月16" in query or "周五" in query or "周六周日" in query)
-    ):
-        guards.append("task_deadline_specific_day")
-        return (
-            "第十九周末在当前进度表中对应的区间终点是：**2026年1月16日（周五）**。\n\n"
-            "依据是工作进度表将“第十七周–第十九周”标注为 **2025.12.29–2026.1.16**，并要求在第十九周末提交任务书。因此，不能把该节点延伸到周六、周日。\n\n"
-            "但知识库没有进一步说明系统是否按24:00锁止、是否存在缓冲期或上传入口异常处理规则；这类系统操作细节需以系统通知或教学办通知为准 📋",
-            guards,
-        )
-
-    if (
-        "任务书" in query
         and "第十九周" in query
         and any(term in query for term in ("自动", "关掉", "关闭", "上传", "不让传", "周日白天", "传完", "不让"))
     ):
@@ -432,66 +415,6 @@ def _apply_answer_safety_guards(query: str, generation: str) -> tuple[str, list[
             "但知识库没有说明教务系统上传入口的开放/关闭机制，也没有规定系统是否会自动锁止、周日白天能否上传，或“周日24点前”是否有效。\n\n"
             "因此，不能根据当前资料判断系统会不会自动关掉，也不能确认周日24点前一定算数。\n\n"
             "暂无相关信息，建议咨询指导教师或教务部门 📋",
-            guards,
-        )
-
-    if (
-        "任务书" in query
-        and "第十九周" in query
-        and any(term in query for term in ("最晚", "周日24", "第十九周内"))
-        and not any(term in query for term in ("系统", "自动", "关掉", "关闭", "上传通道", "不让传"))
-    ):
-        guards.append("task_deadline_week")
-        return (
-            "知识库明确表述为：任务书须在**第十九周末**提交。\n\n"
-            "对于“第十九周周日24点前”还是“只要在第十九周内提交”的判断，知识库没有规定具体截止时刻（例如24点），"
-            "也没有给出系统关闭时间。\n\n"
-            "因此，可以确认的结论是：**只要在第十九周自然周内完成任务书提交，即符合“第十九周末提交任务书”的周次要求**。\n\n"
-            "但具体到几点、系统是否自动关闭、是否有缓冲期，暂无相关信息，建议咨询指导教师或教务部门 📋",
-            guards,
-        )
-
-    if "选题" in query and "任务书" in query and any(term in query for term in ("间隔", "几周", "倒计时", "起算")):
-        guards.append("topic_task_timing")
-        return (
-            "知识库明确给出的时间安排是：第十七周至第十九周（2025.12.29–2026.1.16）为师生见面、指导教师发布选题，并在第十九周末提交任务书。\n\n"
-            "因此，选题发布与任务书提交处在同一个连续工作窗口内，整体跨度为 **第十七周至第十九周，共三周**。\n\n"
-            "任务书提交截止不按学生个人“选上题”的日期倒计时，也没有以教师某一天发题为个人起算点；知识库只给出统一的学院工作进度节点："
-            "**最晚在第十九周末前完成任务书提交**。\n\n"
-            "暂无相关信息说明个人选题成功日会改变任务书提交截止时间，建议以学院工作进度表和系统实际截止时间为准 📋",
-            guards,
-        )
-
-    task_week_question = "任务书" in query and "第十九周" in query
-    risky_week_inference = any(
-        term in generation
-        for term in ("2026年1月12日", "1月12日", "1.12", "1月18日", "周六", "周日", "下班前", "24:00")
-    )
-    needs_task_week_range = any(term in query for term in ("日期范围", "哪段时间", "具体是指", "具体日期", "最晚", "周日", "24点"))
-    incomplete_task_week_answer = "2025年12月29日" not in generation and "2025.12.29" not in generation
-    task_week_excluded = any(
-        term in query
-        for term in (
-            "往年",
-            "纸质",
-            "收件",
-            "签字",
-            "扫描件",
-            "谁来确认",
-            "已接收",
-            "超期记录",
-            "领导小组",
-        )
-    )
-    if task_week_question and not task_week_excluded and (risky_week_inference or needs_task_week_range or incomplete_task_week_answer):
-        guards.append("task_week_range")
-        return (
-            "知识库中关于任务书时间节点的直接表述是：第十七周至第十九周（2025.12.29–2026.1.16）为师生见面、指导教师发布选题，并在第十九周末提交任务书。\n\n"
-            "因此，在任务书提交这个问题语境下，“第十九周末前提交”对应的公历日期范围可按原文回答为：**2025年12月29日至2026年1月16日**。\n\n"
-            "2025年12月22日至12月26日属于第十六周，不属于任务书提交所在的第十七周至第十九周工作区间。\n\n"
-            "如果是在“第十九周周日24点前”和“只要在第十九周内提交”之间判断，那么知识库能够支持的结论是：**在上述第十七周至第十九周工作区间内，尤其不晚于2026年1月16日完成提交，满足‘第十九周末前提交’的周次要求**。\n\n"
-            "但知识库未明确具体截止时刻，也未说明系统是否在周五下班前、周日24:00或其他时刻自动关闭。\n\n"
-            "关于系统自动关闭时间、24点是否有效等操作细节，暂无相关信息，建议咨询指导教师或教务部门 📋",
             guards,
         )
 
@@ -564,7 +487,16 @@ def run_rag(
     cfg = get_config()
     recursion_limit: int = cfg.get("rag", {}).get("agent_recursion_limit", 6)
     retry_count: int = cfg.get("rag", {}).get("agent_retry_count", 3)
-    system_msg = SystemMessage(content=SYSTEM_PROMPT.format(kb_name=kb_name or "默认"))
+    now = datetime.now()
+    weekday_map = ["日", "一", "二", "三", "四", "五", "六"]
+    today_str = f"{now.strftime('%Y-%m-%d %H:%M:%S')} 星期{weekday_map[int(now.strftime('%w'))]}"
+    
+    system_msg = SystemMessage(
+        content=SYSTEM_PROMPT.format(
+            kb_name=kb_name or "默认",
+            today=today_str,
+        )
+    )
     history_msgs = _build_history_messages(history)
     last_nodes: list[dict] = []
 
@@ -651,7 +583,16 @@ def stream_rag(
     cfg = get_config()
     recursion_limit: int = cfg.get("rag", {}).get("agent_recursion_limit", 6)
 
-    system_msg = SystemMessage(content=SYSTEM_PROMPT.format(kb_name=kb_name or "默认"))
+    now = datetime.now()
+    weekday_map = ["日", "一", "二", "三", "四", "五", "六"]
+    today_str = f"{now.strftime('%Y-%m-%d %H:%M:%S')} 星期{weekday_map[int(now.strftime('%w'))]}"
+    
+    system_msg = SystemMessage(
+        content=SYSTEM_PROMPT.format(
+            kb_name=kb_name or "默认",
+            today=today_str,
+        )
+    )
     context_msg = SystemMessage(content=_format_preloaded_context(captured_nodes))
     history_msgs = _build_history_messages(history)
     input_messages = {"messages": [system_msg, context_msg, *history_msgs, HumanMessage(content=query)]}

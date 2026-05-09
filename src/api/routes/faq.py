@@ -62,10 +62,20 @@ def _upsert_faq_vector(
 
 
 @router.get("/{kb_name}", response_model=list[FAQItem])
-async def list_faqs(kb_name: str, current_user: dict = Depends(get_current_user)) -> list[dict]:
+async def list_faqs(
+    kb_name: str,
+    status: str | None = QueryParam(None, pattern=r"^(draft|pending|approved|rejected)$"),
+    current_user: dict = Depends(get_current_user),
+) -> list[dict]:
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
-    return _doc_store.list_faqs(kb_name)
+
+    # 学生只能看到已通过的
+    effective_status = status
+    if current_user["role"] == "student":
+        effective_status = "approved"
+
+    return _doc_store.list_faqs(kb_name, status=effective_status)
 
 
 @router.post("/{kb_name}", response_model=FAQItem)
@@ -73,26 +83,32 @@ async def create_faq(kb_name: str, body: FAQCreate, current_user: dict = Depends
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
 
-    # 先写 MySQL（无 vector_id）
+    # 教师提交默认为待审核，管理员提交默认为已通过
+    status = "approved" if current_user["role"] == "admin" else "pending"
+
+    # 先 write MySQL（无 vector_id）
     row = _doc_store.add_faq(
         kb_name=kb_name,
         question=body.question,
         answer=body.answer,
         category=body.category,
         sort_order=body.sort_order,
+        author_id=current_user["id"],
+        status=status,
     )
     faq_id = row["id"]
-    vector_id = str(uuid.uuid4())
 
-    # 异步 embed + upsert Qdrant
-    try:
-        await asyncio.to_thread(
-            _upsert_faq_vector,
-            kb_name, body.question, body.answer, faq_id, vector_id,
-        )
-        row = _doc_store.update_faq(faq_id, vector_id=vector_id)
-    except Exception as e:
-        logger.warning("[faq] embed/index 失败，FAQ 已保存但未向量化: %s", e)
+    # 只有已通过的才向量化
+    if status == "approved":
+        vector_id = str(uuid.uuid4())
+        try:
+            await asyncio.to_thread(
+                _upsert_faq_vector,
+                kb_name, body.question, body.answer, faq_id, vector_id,
+            )
+            row = _doc_store.update_faq(faq_id, vector_id=vector_id)
+        except Exception as e:
+            logger.warning("[faq] embed/index 失败，FAQ 已保存但未向量化: %s", e)
 
     return row
 
@@ -103,10 +119,20 @@ async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate, current_user: d
     if not existing or existing["kb_name"] != kb_name:
         raise HTTPException(status_code=404, detail="FAQ 不存在")
 
+    # 权限检查：教师只能修改自己提报的
+    if current_user["role"] == "teacher" and existing["author_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="无权修改他人的 FAQ 申请")
+
     updates = body.model_dump(exclude_none=True)
 
-    # Q 或 A 改变时重新 embed（复用同一 vector_id，触发 upsert 覆盖）
-    if "question" in updates or "answer" in updates:
+    # 审核状态流转联动向量库
+    becoming_approved = updates.get("status") == "approved" and existing.get("status") != "approved"
+    becoming_unapproved = updates.get("status") in ("pending", "rejected", "draft") and existing.get("status") == "approved"
+
+    current_status = updates.get("status") or existing["status"]
+
+    # Q 或 A 改变时，或者是刚通过审核时，重新 embed
+    if current_status == "approved" and ("question" in updates or "answer" in updates or becoming_approved):
         new_q = updates.get("question", existing["question"])
         new_a = updates.get("answer", existing["answer"])
         vector_id = existing.get("vector_id") or str(uuid.uuid4())
@@ -119,8 +145,17 @@ async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate, current_user: d
         except Exception as e:
             logger.warning("[faq] re-embed 失败: %s", e)
 
-    # enabled 切换联动 Qdrant
-    if "enabled" in updates:
+    if becoming_unapproved:
+        vid = existing.get("vector_id")
+        if vid:
+            try:
+                await asyncio.to_thread(_vec_store.delete_by_ids, kb_name, [vid])
+                updates["vector_id"] = None
+            except Exception as e:
+                logger.warning("[faq] 移除审核状态时删除向量失败: %s", e)
+
+    # enabled 切换联动 Qdrant (仅限已通过的 FAQ)
+    if "enabled" in updates and current_status == "approved":
         becoming_disabled = not updates["enabled"] and bool(existing.get("enabled"))
         becoming_enabled = updates["enabled"] and not bool(existing.get("enabled"))
 
@@ -195,7 +230,8 @@ async def search_faqs(
         if not isinstance(faq_id, int) or faq_id in seen:
             continue
         row = _doc_store.get_faq(faq_id)
-        if row and row["kb_name"] == kb_name and row.get("enabled"):
+        # 必须是已启用且审核通过的
+        if row and row["kb_name"] == kb_name and row.get("enabled") and row.get("status") == "approved":
             items.append(row)
             seen.add(faq_id)
 

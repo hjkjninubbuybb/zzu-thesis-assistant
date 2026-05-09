@@ -2,13 +2,30 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, Pencil, Trash2, X, Loader2, MessageSquareQuote,
-  ToggleLeft, ToggleRight, AlertCircle, ChevronDown,
+  ToggleLeft, ToggleRight, ChevronDown,
   Search, Hash, Sparkles, Upload, Download, FileText, CheckCircle2,
+  Clock, User,
 } from 'lucide-react'
 import { knowledgeApi, faqApi, extractError } from '@/lib/api'
 import type { FAQItem, FAQCreate, FAQUpdate, FAQImportResult } from '@/types/api'
+import { useAuth } from '@/hooks/useAuth'
 
-// ── 分类颜色 ──────────────────────────────────────────────
+// ── 状态标签 ──────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: FAQItem['status'] }) {
+  const map = {
+    draft:    { label: '草稿', color: 'bg-slate-100 text-slate-500' },
+    pending:  { label: '待审核', color: 'bg-amber-100 text-amber-600' },
+    approved: { label: '已发布', color: 'bg-emerald-100 text-emerald-600' },
+    rejected: { label: '已驳回', color: 'bg-red-100 text-red-600' },
+  }
+  const config = map[status] || map.pending
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${config.color}`}>
+      {config.label}
+    </span>
+  )
+}
 
 const PALETTE = ['#E85D4A', '#F0C040', '#5EE67A', '#60A5FA', '#C084FC', '#FB923C', '#34D399', '#F472B6']
 
@@ -177,131 +194,107 @@ function ConfirmDeleteDialog({ question, onConfirm, onCancel, loading }: {
 
 // ── FAQ 卡片 ───────────────────────────────────────────────
 
-function FaqCard({ faq, index, categoryColor, onEdit, onDelete, onToggle }: {
+function FaqCard({ faq, index, categoryColor, onEdit, onDelete, onToggle, onApprove }: {
   faq: FAQItem
   index: number
   categoryColor: string
   onEdit: (faq: FAQItem) => void
   onDelete: (faq: FAQItem) => void
   onToggle: (faq: FAQItem) => void
+  onApprove: (faq: FAQItem) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const { user, isAdmin } = useAuth()
+  const isOwner = faq.author_id === user?.id
+  const canManage = isAdmin || isOwner
 
   return (
     <div
       className={`group relative glass-card rounded-2xl transition-all duration-200 overflow-hidden ${
-        faq.enabled
-          ? ''
-          : 'opacity-50'
+        faq.enabled ? '' : 'opacity-50'
       }`}
       style={{ animation: `appleSettleIn 0.7s cubic-bezier(0.25, 1, 0.5, 1) ${Math.min(120 + index * 55, 600)}ms both` }}
     >
-      {/* 分类色条 */}
       <div
         className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl transition-all"
         style={{ backgroundColor: faq.category ? categoryColor : 'transparent' }}
       />
 
       <div className="flex items-start gap-4 px-5 py-4 pl-6">
-        {/* 序号 */}
         <span className="shrink-0 w-6 h-6 rounded-md bg-[#F2EFE9] text-xs font-semibold text-[#8A8A8A] flex items-center justify-center mt-0.5">
           {index + 1}
         </span>
 
-        {/* 内容区 */}
         <div className="flex-1 min-w-0">
-          {/* 问题行 */}
           <div className="flex items-start justify-between gap-3">
-            <button
-              onClick={() => setExpanded(v => !v)}
-              className="flex-1 text-left group/q"
-            >
-              <p className="text-sm font-semibold text-[#334155] leading-snug group-hover/q:text-[#333] transition-colors">
-                {faq.question}
-              </p>
-            </button>
-
-            {/* 操作栏（hover 时显示） */}
-            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={() => onToggle(faq)}
-                title={faq.enabled ? '禁用（从向量库移除）' : '启用（重新写入向量库）'}
-                className="p-1.5 rounded-lg hover:bg-[#F2EFE9] transition-colors"
-              >
-                {faq.enabled
-                  ? <ToggleRight size={17} className="text-emerald-500" />
-                  : <ToggleLeft size={17} className="text-gray-400" />
-                }
-              </button>
-              <button
-                onClick={() => onEdit(faq)}
-                title="编辑"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-[#334155] hover:bg-[#F2EFE9] transition-colors"
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                onClick={() => onDelete(faq)}
-                title="删除"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          </div>
-
-          {/* 答案预览 */}
-          {!expanded && (
-            <button
-              onClick={() => setExpanded(true)}
-              className="mt-1.5 text-left w-full"
-            >
-              <p className="text-xs truncate" style={{ color: '#A0A0A0' }}>{faq.answer}</p>
-            </button>
-          )}
-          {/* 展开的答案 — 平滑手风琴 */}
-          <div className={`accordion-body ${expanded ? 'open' : ''}`}>
-            <div>
-              <div className="mt-3 bg-[#F8F6F2] rounded-xl p-4 border border-[#F0EDE8]">
-                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#5A5A5A' }}>
-                  {faq.answer}
+            <div className="flex-1 min-w-0">
+              <button onClick={() => setExpanded(v => !v)} className="text-left group/q w-full">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <StatusBadge status={faq.status} />
+                  {faq.category && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-white/50 border border-black/5 text-[#8A8A8A]">
+                      {faq.category}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm font-semibold text-[#334155] leading-snug group-hover/q:text-[#333] transition-colors truncate">
+                  {faq.question}
                 </p>
-              </div>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              {isAdmin && faq.status === 'pending' && (
+                <button
+                  onClick={() => onApprove(faq)}
+                  title="通过审核"
+                  className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors"
+                >
+                  <CheckCircle2 size={16} />
+                </button>
+              )}
+              {canManage && (
+                <>
+                  <button
+                    onClick={() => onToggle(faq)}
+                    title={faq.enabled ? '禁用' : '启用'}
+                    className="p-1.5 rounded-lg hover:bg-[#F2EFE9] transition-colors"
+                  >
+                    {faq.enabled ? <ToggleRight size={17} className="text-emerald-500" /> : <ToggleLeft size={17} className="text-gray-400" />}
+                  </button>
+                  <button
+                    onClick={() => onEdit(faq)}
+                    title="编辑"
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-[#334155] hover:bg-[#F2EFE9] transition-colors"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    onClick={() => onDelete(faq)}
+                    title="删除"
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </>
+              )}
+              <ChevronDown
+                size={16}
+                className={`text-[#C0BDB8] transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
+              />
             </div>
           </div>
 
-          {/* 底部元信息 */}
-          <div className="flex items-center gap-3 mt-2.5">
-            {faq.category && (
-              <span
-                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium"
-                style={{ backgroundColor: `${categoryColor}18`, color: categoryColor }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: categoryColor }} />
-                {faq.category}
-              </span>
-            )}
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
-              faq.enabled
-                ? 'bg-emerald-50 text-emerald-600'
-                : 'bg-gray-100 text-gray-500'
-            }`}>
-              {faq.enabled ? '已启用' : '已禁用'}
-            </span>
+          <div className={`transition-all duration-300 overflow-hidden ${expanded ? 'max-h-96 mt-3 opacity-100' : 'max-h-0 opacity-0'}`}>
+            <div className="p-4 bg-[#F8F6F2] rounded-xl border border-[#E8E4DC] text-sm text-[#4A4A4A] leading-relaxed whitespace-pre-wrap">
+              {faq.answer}
+            </div>
+            <div className="mt-2 flex items-center gap-4 text-[10px] text-[#A0A0A0]">
+              <span className="flex items-center gap-1"><Clock size={10} /> 更新于 {new Date(faq.updated_at).toLocaleDateString()}</span>
+              {faq.author_id && <span className="flex items-center gap-1"><User size={10} /> 提报者 ID: {faq.author_id}</span>}
+            </div>
           </div>
         </div>
-
-        {/* 展开箭头 */}
-        <button
-          onClick={() => setExpanded(v => !v)}
-          className="shrink-0 p-1.5 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-[#F2EFE9] transition-colors mt-0.5"
-        >
-          <ChevronDown
-            size={14}
-            className="transition-transform duration-300"
-            style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0)' }}
-          />
-        </button>
       </div>
     </div>
   )
@@ -355,7 +348,6 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4 animate-apple-fade">
       <div className="glass-card rounded-2xl w-full max-w-md animate-apple-pop">
-        {/* 标题 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0EDE8]">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-[#F2EFE9] flex items-center justify-center">
@@ -371,7 +363,6 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
         </div>
 
         <div className="px-6 py-5">
-          {/* phase: idle — 选择文件 */}
           {phase === 'idle' && (
             <>
               <div
@@ -392,20 +383,13 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
                 </div>
               </div>
               <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleFileChange} />
-
               <div className="mt-4 flex items-center justify-center gap-1 text-xs" style={{ color: '#8A8A8A' }}>
                 <span>没有模板？</span>
-                <button
-                  onClick={() => faqApi.downloadTemplate(kbName)}
-                  className="text-[#334155] font-medium underline underline-offset-2 hover:opacity-70 transition-opacity"
-                >
-                  下载填写模板
-                </button>
+                <button onClick={() => faqApi.downloadTemplate(kbName)} className="text-[#334155] font-medium underline underline-offset-2 hover:opacity-70 transition-opacity">下载填写模板</button>
               </div>
             </>
           )}
 
-          {/* phase: uploading */}
           {phase === 'uploading' && (
             <div className="flex flex-col items-center gap-4 py-8">
               <Loader2 size={32} className="animate-spin text-[#334155]" />
@@ -416,10 +400,8 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
             </div>
           )}
 
-          {/* phase: result */}
           {phase === 'result' && result && (
             <div className="space-y-4">
-              {/* 统计条 */}
               <div className="grid grid-cols-4 gap-2 text-center">
                 {[
                   { label: '总行数', value: result.total, color: '#334155' },
@@ -433,27 +415,12 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
                   </div>
                 ))}
               </div>
-
-              {/* 成功提示 */}
-              {result.success > 0 && result.failed === 0 && result.skipped === result.total - result.success && (
-                <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 rounded-xl px-4 py-3">
-                  <CheckCircle2 size={16} />
-                  {result.success === result.total
-                    ? `全部 ${result.success} 条 FAQ 导入成功`
-                    : `${result.success} 条导入成功`
-                  }
-                </div>
-              )}
-
-              {/* 错误明细 */}
               {result.errors.length > 0 && (
                 <div className="max-h-48 overflow-y-auto space-y-1.5">
                   <p className="text-xs font-semibold text-[#334155] uppercase tracking-wide mb-2">错误明细</p>
                   {result.errors.map((err, i) => (
                     <div key={i} className="flex items-start gap-2.5 bg-red-50 rounded-lg px-3 py-2.5 text-xs">
-                      {err.row > 0 && (
-                        <span className="shrink-0 font-mono text-red-400">第{err.row}行</span>
-                      )}
+                      {err.row > 0 && <span className="shrink-0 font-mono text-red-400">第{err.row}行</span>}
                       <span className="text-red-600 flex-1 leading-relaxed">
                         {err.question && <span className="font-medium text-red-700">"{err.question}" — </span>}
                         {err.reason}
@@ -466,15 +433,9 @@ function ImportDialog({ kbName, onClose, onImported, showToast }: ImportDialogPr
           )}
         </div>
 
-        {/* 底部按钮 */}
         {phase === 'result' && (
           <div className="flex justify-end px-6 py-4 border-t border-[#F0EDE8] bg-[#FAFAF9] rounded-b-2xl">
-            <button
-              onClick={onClose}
-              className="px-5 py-2 text-sm rounded-xl bg-slate-700 text-white hover:bg-slate-800 transition-colors"
-            >
-              完成
-            </button>
+            <button onClick={onClose} className="px-5 py-2 text-sm rounded-xl bg-slate-700 text-white hover:bg-slate-800 transition-colors">完成</button>
           </div>
         )}
       </div>
@@ -496,8 +457,10 @@ function StatPill({ label, value }: { label: string; value: number }) {
 // ── 主页面 ─────────────────────────────────────────────────
 
 export default function FaqPage() {
+  const { isAdmin } = useAuth()
   const [selectedKb, setSelectedKb] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('全部')
+  const [statusFilter, setStatusFilter] = useState('全部')
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -509,42 +472,29 @@ export default function FaqPage() {
   const menuRef = useRef<HTMLDivElement>(null)
 
   const qc = useQueryClient()
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
-  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast({ msg, type })
-    setTimeout(() => setToast(null), 3000)
-  }
-
-  // 搜索词防抖（500ms）
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchText.trim()), 500)
     return () => clearTimeout(timer)
   }, [searchText])
 
-  // 点击外部关闭下拉菜单
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
     }
     if (menuOpen) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [menuOpen])
 
   const { data: kbs } = useQuery({ queryKey: ['knowledge-bases'], queryFn: knowledgeApi.list })
-
   const { data: faqs = [], isLoading, error } = useQuery({
     queryKey: ['faqs', selectedKb],
     queryFn: () => faqApi.list(selectedKb),
     enabled: !!selectedKb,
   })
 
-  // AI 语义搜索（debounced，仅在有搜索词时触发）
-  const {
-    data: searchData,
-    isFetching: isSearching,
-  } = useQuery({
+  const { data: searchData, isFetching: isSearching } = useQuery({
     queryKey: ['faqs-search', selectedKb, debouncedSearch],
     queryFn: () => faqApi.search(selectedKb, debouncedSearch),
     enabled: !!selectedKb && debouncedSearch.length > 0,
@@ -552,13 +502,11 @@ export default function FaqPage() {
   })
 
   const isAiSearch = debouncedSearch.length > 0
-  const rewrittenQuery = searchData?.rewritten_query ?? ''
-
   const invalidate = () => qc.invalidateQueries({ queryKey: ['faqs', selectedKb] })
 
   const createMutation = useMutation({
     mutationFn: (body: FAQCreate) => faqApi.create(selectedKb, body),
-    onSuccess: () => { invalidate(); setCreateOpen(false); showToast('FAQ 已创建并正在向量化') },
+    onSuccess: () => { invalidate(); setCreateOpen(false); showToast('FAQ 已提交审核') },
     onError: (e) => showToast(extractError(e), 'error'),
   })
 
@@ -574,283 +522,107 @@ export default function FaqPage() {
     onError: (e) => showToast(extractError(e), 'error'),
   })
 
-  // 所有分类（去重，保持顺序）
-  const allCategories = useMemo(
-    () => Array.from(new Set(faqs.map(f => f.category).filter(Boolean))),
-    [faqs]
-  )
+  const allCategories = useMemo(() => Array.from(new Set(faqs.map(f => f.category).filter(Boolean))), [faqs])
 
-  // 展示的列表：AI 搜索结果 or 本地分类筛选
   const displayFaqs = useMemo(() => {
-    if (isAiSearch) return searchData?.items ?? []
-    if (categoryFilter !== '全部') return faqs.filter(f => f.category === categoryFilter)
-    return faqs
-  }, [isAiSearch, searchData, faqs, categoryFilter])
+    let items = isAiSearch ? (searchData?.items ?? []) : faqs
+    if (!isAiSearch && categoryFilter !== '全部') items = items.filter(f => f.category === categoryFilter)
+    if (!isAiSearch && statusFilter !== '全部') {
+      const statusMap: any = { '已发布': 'approved', '待审核': 'pending', '已驳回': 'rejected', '草稿': 'draft' }
+      items = items.filter(f => f.status === statusMap[statusFilter])
+    }
+    return items
+  }, [isAiSearch, searchData, faqs, categoryFilter, statusFilter])
 
-  const enabledCount = faqs.filter(f => f.enabled).length
-
-  const settle = (d: number): React.CSSProperties => ({
-    animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
-  })
+  const settle = (d: number): React.CSSProperties => ({ animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both` })
 
   return (
-    <div className="px-8 py-8 flex-1 overflow-y-auto glass-card rounded-2xl">
-
-      {/* ── 标题栏 ── */}
+    <div className="px-8 py-8 flex-1 overflow-y-auto glass-card rounded-2xl custom-scrollbar">
       <div className="flex items-start justify-between mb-6" style={settle(0)}>
         <div>
           <h1 className="text-2xl font-bold text-[#334155]">FAQ 管理</h1>
-          <p className="mt-1 text-sm" style={{ color: '#8A8A8A' }}>
-            预设标准问答对，自动向量化参与 RAG 检索，提升回答准确率
-          </p>
+          <p className="mt-1 text-sm text-[#8A8A8A]">预设标准问答对，自动向量化参与 RAG 检索</p>
         </div>
-
         {selectedKb && (
           <div className="flex items-center gap-2 shrink-0">
-            {/* 导入/导出下拉菜单 */}
-            <div ref={menuRef} className="relative">
-              <button
-                onClick={() => setMenuOpen(v => !v)}
-                className="flex items-center gap-2 px-3.5 py-2.5 border border-[#E8E4DC] text-[#334155] text-sm rounded-xl hover:bg-[#F8F6F2] transition-colors"
-              >
-                <Download size={14} />
-                导入/导出
-                <ChevronDown size={12} className={`transition-transform duration-150 ${menuOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {menuOpen && (
-                <div
-                  className="absolute right-0 top-full mt-1 bg-white border border-[#F0EDE8] rounded-xl shadow-lg z-30 overflow-hidden w-44 py-1"
-                  style={{ animation: 'applePopIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both', transformOrigin: 'top right' }}
-                >
-                  <button
-                    onClick={() => { faqApi.downloadTemplate(selectedKb); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#334155] hover:bg-[#F8F6F2] transition-colors text-left"
-                  >
-                    <FileText size={14} className="text-[#8A8A8A]" />下载模板
-                  </button>
-                  <button
-                    onClick={() => { faqApi.exportExcel(selectedKb); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#334155] hover:bg-[#F8F6F2] transition-colors text-left"
-                  >
-                    <Download size={14} className="text-[#8A8A8A]" />导出 Excel
-                  </button>
-                  <div className="my-1 border-t border-[#F0EDE8]" />
-                  <button
-                    onClick={() => { setImportOpen(true); setMenuOpen(false) }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#334155] hover:bg-[#F8F6F2] transition-colors text-left"
-                  >
-                    <Upload size={14} className="text-[#8A8A8A]" />从 Excel 导入
-                  </button>
-                </div>
-              )}
-            </div>
-            {/* 新增 FAQ */}
-            <button
-              onClick={() => setCreateOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 transition-colors"
-            >
-              <Plus size={15} />新增 FAQ
-            </button>
+            {isAdmin && (
+              <div ref={menuRef} className="relative">
+                <button onClick={() => setMenuOpen(v => !v)} className="flex items-center gap-2 px-3.5 py-2.5 border border-[#E8E4DC] text-[#334155] text-sm rounded-xl hover:bg-[#F8F6F2] transition-colors">
+                  <Download size={14} />导入/导出<ChevronDown size={12} className={`transition-transform duration-150 ${menuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-[#F0EDE8] rounded-xl shadow-lg z-30 overflow-hidden w-44 py-1 animate-apple-pop" style={{ transformOrigin: 'top right' }}>
+                    <button onClick={() => { faqApi.downloadTemplate(selectedKb); setMenuOpen(false) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#334155] hover:bg-[#F8F6F2] transition-colors text-left"><FileText size={14} className="text-[#8A8A8A]" />下载模板</button>
+                    <button onClick={() => { faqApi.exportExcel(selectedKb); setMenuOpen(false) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#334155] hover:bg-[#F8F6F2] transition-colors text-left"><Download size={14} className="text-[#8A8A8A]" />导出 Excel</button>
+                    <div className="my-1 border-t border-[#F0EDE8]" />
+                    <button onClick={() => { setImportOpen(true); setMenuOpen(false) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#334155] hover:bg-[#F8F6F2] transition-colors text-left"><Upload size={14} className="text-[#8A8A8A]" />从 Excel 导入</button>
+                  </div>
+                )}
+              </div>
+            )}
+            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 transition-colors"><Plus size={15} />新增 FAQ</button>
           </div>
         )}
       </div>
 
-      {/* ── 工具栏 ── */}
       <div className="flex items-center gap-3 mb-5 flex-wrap" style={settle(80)}>
-        {/* 知识库选择 */}
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-sm font-medium" style={{ color: '#8A8A8A' }}>知识库</span>
-          <select
-            value={selectedKb}
-            onChange={e => { setSelectedKb(e.target.value); setCategoryFilter('全部'); setSearchText('') }}
-            className="border border-[#E8E4DC] rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 bg-white min-w-[140px]"
-          >
+          <span className="text-sm font-medium text-[#8A8A8A]">知识库</span>
+          <select value={selectedKb} onChange={e => { setSelectedKb(e.target.value); setCategoryFilter('全部'); setStatusFilter('全部'); setSearchText('') }} className="border border-[#E8E4DC] rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 bg-white min-w-[140px]">
             <option value="">— 请选择 —</option>
             {kbs?.map(kb => <option key={kb.id} value={kb.name}>{kb.name}</option>)}
           </select>
         </div>
-
         {selectedKb && (
           <>
-            {/* 搜索框（AI 语义搜索） */}
             <div className="relative flex-1 max-w-sm">
-              {isSearching
-                ? <Loader2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A8A8A] animate-spin" />
-                : <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              }
-              <input
-                value={searchText}
-                onChange={e => { setSearchText(e.target.value); setCategoryFilter('全部') }}
-                placeholder="AI 语义搜索 FAQ..."
-                className="w-full border border-[#E8E4DC] rounded-xl pl-9 pr-20 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 bg-white transition-colors"
-              />
-              {/* AI 标识 */}
-              <div className={`absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
-                isAiSearch
-                  ? 'bg-violet-100 text-violet-600'
-                  : 'bg-[#F2EFE9] text-[#8A8A8A]'
-              }`}>
-                <Sparkles size={10} />
-                AI
-              </div>
+              {isSearching ? <Loader2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A8A8A] animate-spin" /> : <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />}
+              <input value={searchText} onChange={e => { setSearchText(e.target.value); setCategoryFilter('全部') }} placeholder="AI 语义搜索 FAQ..." className="w-full border border-[#E8E4DC] rounded-xl pl-9 pr-12 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 bg-white transition-colors" />
+              <div className={`absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${isAiSearch ? 'bg-violet-100 text-violet-600' : 'bg-[#F2EFE9] text-[#8A8A8A]'}`}><Sparkles size={10} />AI</div>
             </div>
-
-            {/* 统计 pills */}
             <div className="flex items-center gap-2 ml-auto">
               <StatPill label="条 FAQ" value={faqs.length} />
-              <StatPill label="已启用" value={enabledCount} />
-              {allCategories.length > 0 && <StatPill label="个分类" value={allCategories.length} />}
+              <StatPill label="已发布" value={faqs.filter(f => f.status === 'approved').length} />
             </div>
           </>
         )}
       </div>
 
-      {/* ── AI 改写词提示 ── */}
-      {isAiSearch && !isSearching && rewrittenQuery && rewrittenQuery !== searchText.trim() && (
-        <div className="flex items-center gap-1.5 mb-4 text-xs" style={{ color: '#8A8A8A' }}>
-          <Sparkles size={11} className="text-violet-400 shrink-0" />
-          已改写为：<span className="text-violet-600 font-medium">"{rewrittenQuery}"</span>
-        </div>
-      )}
-
-      {/* ── 分类筛选 Tabs（AI 搜索时隐藏） ── */}
-      {selectedKb && allCategories.length > 0 && !isAiSearch && (
-        <div className="flex items-center gap-2 mb-5 flex-wrap">
-          {['全部', ...allCategories].map(cat => {
-            const color = cat === '全部' ? '#334155' : getCategoryColor(cat, allCategories)
-            const active = categoryFilter === cat
-            return (
-              <button
-                key={cat}
-                onClick={() => setCategoryFilter(cat)}
-                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${
-                  active
-                    ? 'border-transparent text-white shadow-sm'
-                    : 'bg-white border-[#E8E4DC] hover:bg-[#F8F6F2] text-gray-600'
-                }`}
-                style={active ? { backgroundColor: color } : {}}
-              >
-                {cat !== '全部' && (
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? 'rgba(255,255,255,0.8)' : color }} />
-                )}
-                {cat}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* ── 状态：未选知识库 ── */}
-      {!selectedKb && (
-        <div className="flex flex-col items-center justify-center py-32 gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-[#F2EFE9] flex items-center justify-center">
-            <MessageSquareQuote size={28} className="text-[#334155]" strokeWidth={1.4} />
+      {selectedKb && (
+        <div className="flex flex-col gap-4 mb-5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-medium text-[#8A8A8A] mr-2">分类:</span>
+            {['全部', ...allCategories].map(cat => (
+              <button key={cat} onClick={() => setCategoryFilter(cat)} className={`text-xs px-3 py-1.5 rounded-full border transition-all ${categoryFilter === cat ? 'bg-slate-700 text-white border-transparent' : 'bg-white border-[#E8E4DC] text-gray-600 hover:bg-[#F8F6F2]'}`}>{cat}</button>
+            ))}
           </div>
-          <div className="text-center space-y-1">
-            <p className="text-sm font-semibold text-[#334155]">选择一个知识库开始管理 FAQ</p>
-            <p className="text-xs" style={{ color: '#A0A0A0' }}>FAQ 将自动向量化，在对话时作为高质量检索源</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-medium text-[#8A8A8A] mr-2">状态:</span>
+            {['全部', '待审核', '已发布', '已驳回', '草稿'].map(s => (
+              <button key={s} onClick={() => setStatusFilter(s)} className={`text-xs px-3 py-1.5 rounded-full border transition-all ${statusFilter === s ? 'bg-slate-700 text-white border-transparent' : 'bg-white border-[#E8E4DC] text-gray-600 hover:bg-[#F8F6F2]'}`}>{s}</button>
+            ))}
           </div>
         </div>
       )}
 
-      {/* ── 加载中 ── */}
-      {selectedKb && isLoading && (
-        <div className="flex items-center gap-2 text-sm py-24 justify-center" style={{ color: '#8A8A8A' }}>
-          <Loader2 size={16} className="animate-spin" />加载中...
-        </div>
-      )}
-
-      {/* ── 错误 ── */}
-      {selectedKb && error && (
-        <div className="flex items-center gap-2 text-sm text-red-500 py-4">
-          <AlertCircle size={16} />加载失败，请检查后端服务
-        </div>
-      )}
-
-      {/* ── 空状态 ── */}
-      {selectedKb && !isLoading && !error && !isSearching && displayFaqs.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#F2EFE9] flex items-center justify-center">
-            <MessageSquareQuote size={24} className="text-[#334155]" strokeWidth={1.4} />
-          </div>
-          <div className="text-center space-y-1">
-            <p className="text-sm font-semibold text-[#334155]">
-              {isAiSearch
-                ? `未找到与"${rewrittenQuery || searchText}"相关的 FAQ`
-                : categoryFilter !== '全部'
-                  ? `「${categoryFilter}」分类下暂无 FAQ`
-                  : '还没有 FAQ'
-              }
-            </p>
-            <p className="text-xs" style={{ color: '#A0A0A0' }}>
-              {isAiSearch || categoryFilter !== '全部'
-                ? '尝试换个关键词或清空搜索'
-                : '点击右上角「新增 FAQ」添加第一条标准问答'
-              }
-            </p>
-          </div>
-          {!isAiSearch && categoryFilter === '全部' && (
-            <button
-              onClick={() => setCreateOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 transition-colors"
-            >
-              <Plus size={14} />新增第一条 FAQ
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── FAQ 列表 ── */}
       {selectedKb && !isLoading && !error && displayFaqs.length > 0 && (
         <div className="space-y-2">
           {displayFaqs.map((faq, i) => (
             <FaqCard
-              key={faq.id}
-              faq={faq}
-              index={i}
+              key={faq.id} faq={faq} index={i}
               categoryColor={faq.category ? getCategoryColor(faq.category, allCategories) : '#D1D5DB'}
-              onEdit={setEditTarget}
-              onDelete={setDeleteTarget}
+              onEdit={setEditTarget} onDelete={setDeleteTarget}
               onToggle={f => updateMutation.mutate({ id: f.id, body: { enabled: !f.enabled } })}
+              onApprove={f => updateMutation.mutate({ id: f.id, body: { status: 'approved' } })}
             />
           ))}
         </div>
       )}
 
-      {/* ── 对话框 ── */}
-      {createOpen && (
-        <FaqDialog
-          title="新增 FAQ"
-          loading={createMutation.isPending}
-          onClose={() => setCreateOpen(false)}
-          onSubmit={data => createMutation.mutate(data)}
-        />
-      )}
-      {editTarget && (
-        <FaqDialog
-          title="编辑 FAQ"
-          initial={editTarget}
-          loading={updateMutation.isPending}
-          onClose={() => setEditTarget(null)}
-          onSubmit={data => updateMutation.mutate({ id: editTarget.id, body: data })}
-        />
-      )}
-      {deleteTarget && (
-        <ConfirmDeleteDialog
-          question={deleteTarget.question}
-          loading={deleteMutation.isPending}
-          onCancel={() => setDeleteTarget(null)}
-          onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
-        />
-      )}
-      {importOpen && (
-        <ImportDialog
-          kbName={selectedKb}
-          onClose={() => setImportOpen(false)}
-          onImported={invalidate}
-          showToast={showToast}
-        />
-      )}
+      {createOpen && <FaqDialog title="新增 FAQ" loading={createMutation.isPending} onClose={() => setCreateOpen(false)} onSubmit={data => createMutation.mutate(data)} />}
+      {editTarget && <FaqDialog title="编辑 FAQ" initial={editTarget} loading={updateMutation.isPending} onClose={() => setEditTarget(null)} onSubmit={data => updateMutation.mutate({ id: editTarget.id, body: data })} />}
+      {deleteTarget && <ConfirmDeleteDialog question={deleteTarget.question} loading={deleteMutation.isPending} onCancel={() => setDeleteTarget(null)} onConfirm={() => deleteMutation.mutate(deleteTarget.id)} />}
+      {importOpen && <ImportDialog kbName={selectedKb} onClose={() => setImportOpen(false)} onImported={invalidate} showToast={showToast} />}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   )
