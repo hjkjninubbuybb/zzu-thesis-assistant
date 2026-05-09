@@ -4,7 +4,8 @@ import type {
   FAQItem, FAQCreate, FAQUpdate, FAQSearchResponse, FAQImportResult,
   ConversationInfo, ConversationMessage,
   LoginResponse, UserInfo, UserCreate, UserUpdate, PaginatedUsers,
-  StudentProfileCreate, ApiKeyInfo, AnalyticsSummary,
+  StudentProfileCreate, TeacherProfileCreate, ApiKeyInfo, AnalyticsSummary,
+  QARequestInfo, QARequestCreate,
 } from '@/types/api'
 import { getAccessToken, getRefreshToken, saveAuth, clearAuth, getCurrentPortal } from '@/lib/auth'
 
@@ -120,6 +121,51 @@ export const userApi = {
     client.delete<{ message: string }>(`/users/${id}`).then(r => r.data),
   resetPassword: (id: number, newPassword: string) =>
     client.put<{ message: string }>(`/users/${id}/reset-password`, { new_password: newPassword }).then(r => r.data),
+
+  // 教师相关
+  downloadTeacherTemplate: () => {
+    client.get('/users/teachers/template', { responseType: 'blob' }).then(r => {
+      const url = URL.createObjectURL(r.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = '教师账号导入模板.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    })
+  },
+  exportTeachers: () => {
+    client.get('/users/teachers/export', { responseType: 'blob' }).then(r => {
+      const url = URL.createObjectURL(r.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `教师账号_${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    })
+  },
+  importTeachers: (file: File, defaultPassword?: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    if (defaultPassword) form.append('default_password', defaultPassword)
+    return client.post<{ total: number; success: number; skipped: number; failed: number; errors: unknown[] }>(
+      '/users/teachers/import', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60_000,
+      }
+    ).then(r => r.data)
+  },
+  updateTeacherProfile: (id: number, body: TeacherProfileCreate) =>
+    client.put(`/users/${id}/profile`, { teacher_profile: body }).then(r => r.data),
+
+  // 师生关系
+  listMentorStudents: (mentorId: number) =>
+    client.get<UserInfo[]>(`/users/mentors/${mentorId}/students`).then(r => r.data),
+  addMentorRelations: (mentorId: number, studentIds: number[]) =>
+    client.post<{ message: string }>('/users/mentors/relations', { mentor_id: mentorId, student_ids: studentIds }).then(r => r.data),
+  removeMentorRelation: (mentorId: number, studentId: number) =>
+    client.delete<{ message: string }>(`/users/mentors/${mentorId}/students/${studentId}`).then(r => r.data),
+  getMyMentor: () => client.get<UserInfo>('/users/me/mentor').then(r => r.data),
+
   downloadTemplate: () => {
     client.get('/users/students/template', { responseType: 'blob' }).then(r => {
       const url = URL.createObjectURL(r.data)
@@ -294,4 +340,14 @@ export const conversationApi = {
     client.post<ConversationMessage>(`/conversation/${convId}/messages`, msg).then(r => r.data),
   submitFeedback: (messageId: number, rating: 'up' | 'down') =>
     client.post<{ message_id: number; rating: string }>(`/conversation/messages/${messageId}/feedback`, { rating }).then(r => r.data),
+}
+
+// ── 答疑请求 API ──────────────────────────────────────────
+
+export const ticketApi = {
+  list: () => client.get<QARequestInfo[]>('/tickets').then(r => r.data),
+  get: (id: number) => client.get<QARequestInfo>(`/tickets/${id}`).then(r => r.data),
+  create: (body: QARequestCreate) => client.post<QARequestInfo>('/tickets', body).then(r => r.data),
+  reply: (id: number, answer: string) => client.post<QARequestInfo>(`/tickets/${id}/reply`, { answer }).then(r => r.data),
+  close: (id: number) => client.post<QARequestInfo>(`/tickets/${id}/close`).then(r => r.data),
 }

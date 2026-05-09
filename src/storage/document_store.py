@@ -112,25 +112,30 @@ class DocumentStore:
         category: str = "",
         sort_order: int = 0,
         vector_id: str | None = None,
+        author_id: int | None = None,
+        status: str = "approved",
     ) -> dict:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 cur.execute(
                     """INSERT INTO faqs
-                       (kb_name, question, answer, category, sort_order, enabled, vector_id, created_at, updated_at)
-                       VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s)""",
-                    (kb_name, question, answer, category, sort_order, vector_id, now, now),
+                       (kb_name, question, answer, category, sort_order, enabled, vector_id, author_id, status, created_at, updated_at)
+                       VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s)""",
+                    (kb_name, question, answer, category, sort_order, vector_id, author_id, status, now, now),
                 )
                 conn.commit()
                 cur.execute("SELECT * FROM faqs WHERE id = %s", (cur.lastrowid,))
                 return cur.fetchone()
 
-    def list_faqs(self, kb_name: str, enabled_only: bool = False) -> list[dict]:
+    def list_faqs(self, kb_name: str, enabled_only: bool = False, status: str | None = None) -> list[dict]:
         sql = "SELECT * FROM faqs WHERE kb_name = %s"
         params: list = [kb_name]
         if enabled_only:
             sql += " AND enabled = 1"
+        if status:
+            sql += " AND status = %s"
+            params.append(status)
         sql += " ORDER BY sort_order ASC, id ASC"
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -144,7 +149,7 @@ class DocumentStore:
                 return cur.fetchone()
 
     def update_faq(self, faq_id: int, **kwargs) -> dict | None:
-        allowed = {"question", "answer", "category", "sort_order", "enabled", "vector_id"}
+        allowed = {"question", "answer", "category", "sort_order", "enabled", "vector_id", "status", "author_id"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return self.get_faq(faq_id)
@@ -334,4 +339,66 @@ class DocumentStore:
                 cur.execute(
                     "SELECT * FROM message_feedback WHERE message_id = %s", (message_id,)
                 )
+                return cur.fetchone()
+
+    # ── 导师答疑请求 (QA Requests) ────────────────────────────────
+
+    def create_qa_request(
+        self,
+        student_id: int,
+        mentor_id: int,
+        conversation_id: int,
+        message_id: int,
+        question: str,
+    ) -> dict:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO qa_requests (student_id, mentor_id, conversation_id, message_id, question)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (student_id, mentor_id, conversation_id, message_id, question),
+                )
+                conn.commit()
+                cur.execute("SELECT * FROM qa_requests WHERE id = %s", (cur.lastrowid,))
+                return cur.fetchone()
+
+    def update_qa_request(self, request_id: int, answer: str, status: str = "replied") -> dict | None:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                cur.execute(
+                    "UPDATE qa_requests SET answer = %s, status = %s, replied_at = %s WHERE id = %s",
+                    (answer, status, now, request_id),
+                )
+                conn.commit()
+                cur.execute("SELECT * FROM qa_requests WHERE id = %s", (request_id,))
+                return cur.fetchone()
+
+    def list_qa_requests(
+        self,
+        mentor_id: int | None = None,
+        student_id: int | None = None,
+        status: str | None = None,
+    ) -> list[dict]:
+        sql = "SELECT * FROM qa_requests WHERE 1=1"
+        params: list = []
+        if mentor_id:
+            sql += " AND mentor_id = %s"
+            params.append(mentor_id)
+        if student_id:
+            sql += " AND student_id = %s"
+            params.append(student_id)
+        if status:
+            sql += " AND status = %s"
+            params.append(status)
+        sql += " ORDER BY created_at DESC"
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                return cur.fetchall()
+
+    def get_qa_request(self, request_id: int) -> dict | None:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM qa_requests WHERE id = %s", (request_id,))
                 return cur.fetchone()

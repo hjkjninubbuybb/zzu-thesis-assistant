@@ -5,6 +5,7 @@ import {
   HelpCircle,
   User,
   LogOut,
+  Ticket,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -12,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth'
 const STUDENT_NAV = [
   { to: '/student', label: '首页', icon: Home, end: true },
   { to: '/student/chat', label: '智能问答', icon: MessagesSquare },
+  { to: '/student/tickets', label: '答疑记录', icon: Ticket },
   { to: '/student/faq', label: '常见问题', icon: HelpCircle },
   { to: '/student/profile', label: '我的', icon: User },
 ]

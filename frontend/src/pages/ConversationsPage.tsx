@@ -4,9 +4,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowUp, Loader2, ChevronDown, ChevronUp, Trash2, AlertCircle,
   Download, Plus, ThumbsUp, ThumbsDown, BookOpen, ShieldAlert,
-  Pencil, Check, X as XIcon,
+  Pencil, Check, X as XIcon, HelpCircle,
 } from 'lucide-react'
-import { knowledgeApi, faqApi, conversationApi } from '@/lib/api'
+import { knowledgeApi, faqApi, conversationApi, ticketApi } from '@/lib/api'
 
 import { useAuth } from '@/hooks/useAuth'
 import { getAccessToken, getRefreshToken, saveAuth, clearAuth, getCurrentPortal } from '@/lib/auth'
@@ -219,9 +219,14 @@ function SourcesPanel({ sources }: { sources: SourceItem[] }) {
 // ── 智能 Markdown 渲染（带内嵌引用支持） ──────────────────
 
 function AcademicMarkdown({ content, sources }: { content: string, sources?: SourceItem[] }) {
-  // 简单的正则处理：将 [1] [2] 替换为特定的标记，以便渲染为组件
+  // 处理 AI 生成的带有空格的 sandbox 链接，例如 [点击下载：xxx.pdf](sandbox:/mnt/data/xxx.pdf)
+  // 将其转换为 [点击下载：xxx.pdf](#sandbox:xxx.pdf) 以便正常解析和拦截
+  let processedContent = content.replace(/\[(.*?)\]\(sandbox:\/mnt\/data\/(.*?)\)/g, (_, p1, p2) => {
+    return `[${p1}](#sandbox:${encodeURIComponent(p2)})`
+  })
+
   // 匹配形如 [1] [2,3] 的引用标记
-  const parts = content.split(/(\[\d+(?:,\s*\d+)*\])/g)
+  const parts = processedContent.split(/(\[\d+(?:,\s*\d+)*\])/g)
 
   return (
     <div className="prose prose-sm prose-academic max-w-none">
@@ -247,7 +252,35 @@ function AcademicMarkdown({ content, sources }: { content: string, sources?: Sou
             </span>
           )
         }
-        return <ReactMarkdown key={i} components={{ p: 'span' }}>{part}</ReactMarkdown>
+        return (
+          <ReactMarkdown 
+            key={i} 
+            components={{ 
+              p: 'span',
+              a: ({ node, href, children, ...props }) => {
+                if (href?.startsWith('#sandbox:')) {
+                  const filename = decodeURIComponent(href.replace('#sandbox:', ''))
+                  return (
+                    <a 
+                      href="#" 
+                      onClick={(e) => { 
+                        e.preventDefault()
+                        alert(`【演示文件下载】\n\n文件名: ${filename}\n\n注：此为 AI 生成的演示下载链接，实际物理文件并未在此演示环境中持久化。`) 
+                      }}
+                      className="text-blue-600 hover:text-blue-700 underline underline-offset-2 font-medium"
+                      {...props as any}
+                    >
+                      {children}
+                    </a>
+                  )
+                }
+                return <a href={href} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-700 underline underline-offset-2 font-medium" {...props as any}>{children}</a>
+              }
+            }}
+          >
+            {part}
+          </ReactMarkdown>
+        )
       })}
     </div>
   )
@@ -255,14 +288,16 @@ function AcademicMarkdown({ content, sources }: { content: string, sources?: Sou
 
 // ── 反馈按钮 ──────────────────────────────────────────────
 
-function FeedbackButtons({
+function MessageActions({
   dbMessageId,
   feedback,
   onFeedback,
+  onAskTutor,
 }: {
   dbMessageId?: number
   feedback?: 'up' | 'down' | null
   onFeedback: (rating: 'up' | 'down') => void
+  onAskTutor?: () => void
 }) {
   if (!dbMessageId) return null
   return (
@@ -289,6 +324,17 @@ function FeedbackButtons({
       >
         <ThumbsDown size={13} />
       </button>
+
+      {onAskTutor && (
+        <button
+          onClick={onAskTutor}
+          className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-md text-[10px] text-blue-600 bg-blue-50/50 hover:bg-blue-50 hover:text-blue-700 transition-colors border border-blue-100/50 hover:border-blue-200"
+          title="求助导师"
+        >
+          <HelpCircle size={12} />
+          <span className="font-medium">求助导师</span>
+        </button>
+      )}
     </div>
   )
 }
@@ -299,11 +345,13 @@ const MessageBubble = memo(function MessageBubble({
   msg,
   onFeedback,
   onSuggestionClick,
+  onAskTutor,
   isStudent,
 }: {
   msg: ChatMessage
   onFeedback: (msgId: number, rating: 'up' | 'down') => void
   onSuggestionClick?: (text: string) => void
+  onAskTutor?: (msg: ChatMessage) => void
   isStudent?: boolean
 }) {
   if (msg.role === 'user') {
@@ -356,10 +404,11 @@ const MessageBubble = memo(function MessageBubble({
               )}
 
               <div className="flex items-center justify-between mt-4">
-                <FeedbackButtons
+                <MessageActions
                   dbMessageId={msg.dbMessageId}
                   feedback={msg.feedback}
                   onFeedback={(rating) => msg.dbMessageId && onFeedback(msg.dbMessageId, rating)}
+                  onAskTutor={() => onAskTutor?.(msg)}
                 />
               </div>
             </div>
@@ -792,6 +841,8 @@ export default function ConversationsPage() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([])
+  const [helpMsg, setHelpMsg] = useState<ChatMessage | null>(null)
+  const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -1151,6 +1202,7 @@ export default function ConversationsPage() {
                     msg={msg}
                     onFeedback={handleFeedback}
                     onSuggestionClick={sendMessage}
+                    onAskTutor={isStudent ? setHelpMsg : undefined}
                     isStudent={isStudent}
                   />
                 ))}
@@ -1192,7 +1244,130 @@ export default function ConversationsPage() {
             </div>
           </div>
         </div>
+
+        {helpMsg && activeConvId && (
+          <TutorHelpModal
+            msg={helpMsg}
+            convId={activeConvId}
+            onClose={() => setHelpMsg(null)}
+            onSuccess={(msg) => {
+              setHelpMsg(null)
+              setToast({ msg, type: 'success' })
+            }}
+          />
+        )}
+
+        {toast && (
+          <Toast
+            message={toast.msg}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
       </div>
+    </div>
+  )
+}
+
+// ── 导师求助弹窗 ──────────────────────────────────────────
+
+function TutorHelpModal({
+  msg,
+  convId,
+  onClose,
+  onSuccess,
+}: {
+  msg: ChatMessage
+  convId: number
+  onClose: () => void
+  onSuccess: (msg: string) => void
+}) {
+  const [question, setQuestion] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async () => {
+    if (!question.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      await ticketApi.create({
+        conversation_id: convId,
+        message_id: msg.dbMessageId!,
+        question: question.trim(),
+      })
+      onSuccess('请求已发送给导师')
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || '发送失败，请稍后重试'
+      setError(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm animate-apple-fade">
+      <div className="glass-card rounded-2xl w-full max-w-md mx-4 overflow-hidden animate-apple-pop shadow-2xl border border-white/20">
+        <div className="px-6 py-4 border-b border-[#F0EDE8] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+              <HelpCircle size={16} />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-700">求助导师</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><XIcon size={18} /></button>
+        </div>
+        
+        <div className="p-6 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AI 的回答（参考）</label>
+            <div className="bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-500 line-clamp-3 border border-gray-100 italic leading-relaxed">
+              {msg.content}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">描述您的问题 <span className="text-red-400">*</span></label>
+            <textarea
+              autoFocus
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
+              placeholder="请详细描述 AI 回答中不足的地方，或您进一步的问题..."
+              rows={4}
+              className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none shadow-inner"
+            />
+          </div>
+          {error && <p className="text-xs text-red-500 animate-shake">{error}</p>}
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50/50 border-t border-[#F0EDE8] flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors">取消</button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !question.trim()}
+            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md active:scale-[0.98]"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <HelpCircle size={14} />}
+            发送求助
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── 通用 Toast ───────────────────────────────────────────
+
+function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000)
+    return () => clearTimeout(timer)
+  }, [onClose])
+
+  return (
+    <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2.5 rounded-2xl shadow-xl text-white text-sm z-[110] animate-apple-toast ${type === 'success' ? 'bg-slate-800' : 'bg-red-600'}`}>
+      <span>{message}</span>
+      <button onClick={onClose} className="opacity-70 hover:opacity-100 transition-opacity"><XIcon size={14} /></button>
     </div>
   )
 }

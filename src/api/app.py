@@ -14,6 +14,7 @@ from src.api.routes.auth import router as auth_router
 from src.api.routes.config import router as config_router
 from src.api.routes.conversation import router as conversation_router
 from src.api.routes.faq import router as faq_router
+from src.api.routes.ticket import router as ticket_router
 from src.api.routes.user import router as user_router
 
 app = FastAPI(title="RAG 1.0 API", version="1.0.0")
@@ -44,6 +45,7 @@ app.include_router(chat.router)
 app.include_router(config_router)
 app.include_router(conversation_router)
 app.include_router(faq_router)
+app.include_router(ticket_router)
 
 
 # ── 使用统计端点（内联，避免 import 缓存问题）────────────────
