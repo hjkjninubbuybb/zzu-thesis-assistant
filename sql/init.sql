@@ -114,6 +114,45 @@ CREATE TABLE IF NOT EXISTS faqs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='FAQ表';
 
 
+-- ── 师生关系表 ────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS mentor_student_relations (
+    mentor_id  BIGINT UNSIGNED NOT NULL,
+    student_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (mentor_id, student_id),
+    FOREIGN KEY (mentor_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='师生关系映射表';
+
+
+-- ── 导师答疑请求 ──────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS qa_requests (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    student_id      BIGINT UNSIGNED NOT NULL              COMMENT '发起学生',
+    mentor_id       BIGINT UNSIGNED NOT NULL              COMMENT '指派导师',
+    conversation_id BIGINT UNSIGNED NOT NULL              COMMENT '源对话',
+    message_id      BIGINT UNSIGNED NOT NULL              COMMENT '源消息（学生的问题）',
+    question        TEXT            NOT NULL              COMMENT '问题副本',
+    answer          TEXT            DEFAULT NULL          COMMENT '人工回复内容',
+    status          ENUM('pending','replied','closed') NOT NULL DEFAULT 'pending' COMMENT '状态',
+    created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    replied_at      DATETIME        DEFAULT NULL,
+    FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (mentor_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (message_id) REFERENCES conversation_messages(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='导师答疑请求表';
+
+
+-- ── FAQ 增加审核状态 ──────────────────────────────────────────
+
+ALTER TABLE faqs ADD COLUMN author_id BIGINT UNSIGNED DEFAULT NULL COMMENT '提报人';
+ALTER TABLE faqs ADD COLUMN status ENUM('draft', 'pending', 'approved', 'rejected') NOT NULL DEFAULT 'approved' COMMENT '审核状态';
+ALTER TABLE faqs ADD CONSTRAINT fk_faq_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL;
+
+
 -- ── 系统设置 ──────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS system_settings (

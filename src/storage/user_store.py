@@ -201,3 +201,51 @@ class UserStore:
                     (user_id, limit),
                 )
                 return cur.fetchall()
+
+    # ── 师生关系 ──────────────────────────────────────────────
+
+    def add_mentor_relation(self, mentor_id: int, student_id: int) -> None:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT IGNORE INTO mentor_student_relations (mentor_id, student_id) VALUES (%s, %s)",
+                    (mentor_id, student_id),
+                )
+                conn.commit()
+
+    def remove_mentor_relation(self, mentor_id: int, student_id: int) -> None:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM mentor_student_relations WHERE mentor_id = %s AND student_id = %s",
+                    (mentor_id, student_id),
+                )
+                conn.commit()
+
+    def list_mentor_students(self, mentor_id: int) -> list[dict]:
+        """列出导师名下的学生。"""
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT u.*, sp.student_id, sp.grade, sp.major, sp.class_name 
+                       FROM users u 
+                       JOIN mentor_student_relations msr ON u.id = msr.student_id
+                       LEFT JOIN student_profiles sp ON u.id = sp.user_id
+                       WHERE msr.mentor_id = %s""",
+                    (mentor_id,),
+                )
+                return cur.fetchall()
+
+    def get_student_mentor(self, student_id: int) -> dict | None:
+        """获取学生的指导教师。"""
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT u.*, tp.employee_id, tp.department, tp.title 
+                       FROM users u 
+                       JOIN mentor_student_relations msr ON u.id = msr.mentor_id
+                       LEFT JOIN teacher_profiles tp ON u.id = tp.user_id
+                       WHERE msr.student_id = %s""",
+                    (student_id,),
+                )
+                return cur.fetchone()

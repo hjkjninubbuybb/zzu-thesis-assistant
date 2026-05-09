@@ -111,6 +111,8 @@ export interface FAQItem {
   category: string
   sort_order: number
   enabled: boolean
+  status: 'draft' | 'pending' | 'approved' | 'rejected'
+  author_id?: number
   created_at: string
   updated_at: string
 }
@@ -128,6 +130,7 @@ export interface FAQUpdate {
   category?: string
   sort_order?: number
   enabled?: boolean
+  status?: 'draft' | 'pending' | 'approved' | 'rejected'
 }
 
 export interface FAQSearchResponse {
@@ -147,6 +150,27 @@ export interface FAQImportResult {
   skipped: number
   failed: number
   errors: FAQImportError[]
+}
+
+// ── 导师答疑请求 (Tickets) ────────────────────────────────
+
+export interface QARequestInfo {
+  id: number
+  student_id: number
+  mentor_id: number
+  conversation_id: number
+  message_id: number
+  question: string
+  answer: string | null
+  status: 'pending' | 'replied' | 'closed'
+  created_at: string
+  replied_at: string | null
+}
+
+export interface QARequestCreate {
+  conversation_id: number
+  message_id: number
+  question: string
 }
 
 // ── 用户认证 ──────────────────────────────────────────────

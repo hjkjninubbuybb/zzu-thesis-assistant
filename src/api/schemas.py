@@ -94,6 +94,7 @@ class FAQUpdate(BaseModel):
     category: str | None = Field(default=None, max_length=64)
     sort_order: int | None = Field(default=None, ge=0)
     enabled: bool | None = None
+    status: Literal["draft", "pending", "approved", "rejected"] | None = None
 
 
 class FAQItem(BaseModel):
@@ -104,6 +105,8 @@ class FAQItem(BaseModel):
     category: str
     sort_order: int
     enabled: bool
+    status: str = "approved"
+    author_id: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -127,6 +130,31 @@ class FAQImportResult(BaseModel):
     skipped: int
     failed: int
     errors: list[FAQImportError]
+
+
+# ── 导师答疑请求 (QA Requests) ────────────────────────────────
+
+class QARequestCreate(BaseModel):
+    conversation_id: int
+    message_id: int
+    question: str
+
+
+class QARequestReply(BaseModel):
+    answer: str
+
+
+class QARequestInfo(BaseModel):
+    id: int
+    student_id: int
+    mentor_id: int
+    conversation_id: int
+    message_id: int
+    question: str
+    answer: str | None = None
+    status: str
+    created_at: datetime
+    replied_at: datetime | None = None
 
 
 # ── 对话历史 ─────────────────────────────────────────────
@@ -206,6 +234,11 @@ class PaginatedUsers(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class MentorRelationRequest(BaseModel):
+    mentor_id: int
+    student_ids: list[int]
 
 
 class StudentProfileCreate(BaseModel):

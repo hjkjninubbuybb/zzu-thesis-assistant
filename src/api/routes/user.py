@@ -12,8 +12,9 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 
-from src.api.auth import hash_password, require_admin, require_teacher_or_admin
+from src.api.auth import get_current_user, hash_password, require_admin, require_teacher_or_admin
 from src.api.schemas import (
+    MentorRelationRequest,
     MessageResponse,
     PaginatedUsers,
     ResetPasswordRequest,
@@ -306,3 +307,155 @@ async def import_students_excel(
         "failed": len(failed),
         "errors": failed,
     }
+
+
+# ── 教师账号 Excel 导入/导出 ──────────────────────────────────
+
+_TCH_COLS = ["姓名", "工号*", "院系", "职称", "初始密码（留空自动生成）"]
+_TCH_COL_WIDTH = [14, 18, 22, 18, 28]
+
+
+def _build_teacher_workbook(rows: list[dict] | None) -> Workbook:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "教师账号"
+
+    header_fill = PatternFill("solid", fgColor="1A1A1A")
+    header_font = Font(color="FFFFFF", bold=True, size=10)
+    for ci, (col, width) in enumerate(_TCH_COLS, 1):
+        cell = ws.cell(row=1, column=ci, value=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.column_dimensions[cell.column_letter].width = _TCH_COL_WIDTH[ci - 1]
+
+    if rows is None:
+        ws.append(["张老师", "T001", "计算机学院", "副教授", ""])
+    else:
+        for r in rows:
+            ws.append([
+                r.get("display_name", ""),
+                r.get("employee_id", ""),
+                r.get("department", ""),
+                r.get("title", ""),
+                "",
+            ])
+    return wb
+
+
+@router.get("/teachers/template")
+def download_teacher_template(current_user: dict = Depends(require_admin)):
+    """下载教师批量导入模板。"""
+    wb = _build_teacher_workbook(rows=None)
+    return _make_xlsx_response(wb, "教师账号导入模板.xlsx")
+
+
+@router.get("/teachers/export")
+def export_teachers_excel(current_user: dict = Depends(require_admin)):
+    """导出所有教师账号。"""
+    items, _ = _us.list_users(role="teacher", page=1, page_size=10000)
+    rows = []
+    for u in items:
+        profile = _us.get_teacher_profile(u["id"]) or {}
+        rows.append({
+            "display_name": u["display_name"],
+            "employee_id": profile.get("employee_id", ""),
+            "department": profile.get("department", ""),
+            "title": profile.get("title", ""),
+        })
+    filename = f"教师账号_{date.today().strftime('%Y%m%d')}.xlsx"
+    return _make_xlsx_response(_build_teacher_workbook(rows), filename)
+
+
+@router.post("/teachers/import")
+async def import_teachers_excel(
+    file: UploadFile = File(...),
+    default_password: str = Form(default=""),
+    current_user: dict = Depends(require_admin),
+) -> dict:
+    """从 Excel 批量导入教师账号（管理员专用）。"""
+    if not (file.filename or "").lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式")
+
+    content = await file.read()
+    try:
+        wb = load_workbook(io.BytesIO(content), data_only=True)
+        ws = wb.active
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Excel 解析失败：{e}") from e
+
+    success, skipped, failed = 0, 0, []
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not row or not row[0]:
+            continue
+        display_name, emp_id, dept, title = [str(x).strip() if x else "" for x in row[:4]]
+        password = str(row[4]).strip() if len(row) > 4 and row[4] else (default_password or _random_password())
+
+        if not emp_id:
+            failed.append({"row": row_idx, "employee_id": emp_id, "reason": "工号不能为空"})
+            continue
+        if _us.get_user_by_employee_id(emp_id):
+            skipped += 1
+            continue
+
+        try:
+            user = _us.create_user(emp_id, hash_password(password), display_name, "teacher")
+            _us.upsert_teacher_profile(user["id"], emp_id, dept, title)
+            success += 1
+        except Exception as e:
+            failed.append({"row": row_idx, "employee_id": emp_id, "reason": str(e)})
+
+    return {"total": success + skipped + len(failed), "success": success, "skipped": skipped, "failed": len(failed), "errors": failed}
+
+
+# ── 师生关系管理 ──────────────────────────────────────────────
+
+@router.get("/mentors/{mentor_id}/students", response_model=list[UserInfo])
+def list_mentor_students(mentor_id: int, current_user: dict = Depends(require_teacher_or_admin)):
+    """列出指定导师名下的学生。"""
+    if current_user["role"] == "teacher" and current_user["id"] != mentor_id:
+        raise HTTPException(status_code=403, detail="无权查看其他导师的学生")
+    
+    students = _us.list_mentor_students(mentor_id)
+    return [_to_user_info(u, {
+        "student_id": u["student_id"],
+        "grade": u["grade"],
+        "major": u["major"],
+        "class_name": u["class_name"]
+    }) for u in students]
+
+
+@router.post("/mentors/relations", response_model=MessageResponse)
+def add_mentor_relations(body: MentorRelationRequest, current_user: dict = Depends(require_admin)):
+    """批量绑定师生关系（管理员专用）。"""
+    mentor = _us.get_user_by_id(body.mentor_id)
+    if not mentor or mentor["role"] != "teacher":
+        raise HTTPException(status_code=400, detail="指定的导师 ID 无效或非教师角色")
+    
+    for sid in body.student_ids:
+        _us.add_mentor_relation(body.mentor_id, sid)
+    return {"message": f"成功为导师 {mentor['display_name']} 绑定 {len(body.student_ids)} 名学生"}
+
+
+@router.delete("/mentors/{mentor_id}/students/{student_id}", response_model=MessageResponse)
+def remove_mentor_relation(mentor_id: int, student_id: int, current_user: dict = Depends(require_admin)):
+    """解除师生关系（管理员专用）。"""
+    _us.remove_mentor_relation(mentor_id, student_id)
+    return {"message": "解绑成功"}
+
+
+@router.get("/me/mentor", response_model=UserInfo)
+def get_my_mentor(current_user: dict = Depends(get_current_user)):
+    """获取我的指导教师（学生专用）。"""
+    if current_user["role"] != "student":
+        raise HTTPException(status_code=400, detail="该接口仅供学生使用")
+    
+    mentor = _us.get_student_mentor(current_user["id"])
+    if not mentor:
+        raise HTTPException(status_code=404, detail="您尚未分配指导教师")
+    
+    return _to_user_info(mentor, {
+        "employee_id": mentor["employee_id"],
+        "department": mentor["department"],
+        "title": mentor["title"]
+    })
