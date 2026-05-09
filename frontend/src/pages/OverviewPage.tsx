@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { knowledgeApi, analyticsApi, configApi } from '@/lib/api'
 import type { KBInfo, SystemConfig } from '@/types/api'
+import { useAuth } from '@/hooks/useAuth'
 
 /* ══════════════════════ Animation hooks ══════════════════════ */
 
@@ -361,13 +362,16 @@ function SegmentBar({ filled, total, color, animate, baseDelay }: { filled: numb
 const KB_COLORS = ['#E85D4A', '#F0C040', '#5EE67A', '#60A5FA', '#C084FC', '#FB923C']
 function KBListCard({ kbs, animate }: { kbs: KBInfo[]; animate: boolean }) {
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const maxDocs = Math.max(...kbs.map((kb) => kb.doc_count), 1)
   const SEG_TOTAL = 10
   return (
     <div className="glass-card rounded-2xl p-5 flex flex-col gap-4 hover-lift h-full">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[#1A1A1A]">知识库列表明细</h3>
-        <button onClick={() => navigate('/admin/knowledge')} className="flex items-center gap-1 text-xs text-[#9A9A9A] hover:text-[#1A1A1A] transition-colors px-2 py-1 rounded-lg hover:bg-[#F2EFE9]"><Plus size={12} />管理</button>
+        {isAdmin && (
+          <button onClick={() => navigate('/admin/knowledge')} className="flex items-center gap-1 text-xs text-[#9A9A9A] hover:text-[#1A1A1A] transition-colors px-2 py-1 rounded-lg hover:bg-[#F2EFE9]"><Plus size={12} />管理</button>
+        )}
       </div>
       <div className="flex flex-col gap-1">
         {kbs.map((kb, i) => {
@@ -392,6 +396,7 @@ function KBListCard({ kbs, animate }: { kbs: KBInfo[]; animate: boolean }) {
 
 /* ══════════════════════ Main page ══════════════════════ */
 export default function OverviewPage() {
+  const { isAdmin } = useAuth()
   const { data: kbs, isLoading: kbLoading } = useQuery({ queryKey: ['knowledge-bases'], queryFn: knowledgeApi.list })
   const { data: analytics, isLoading: statsLoading } = useQuery({ queryKey: ['analytics-summary'], queryFn: analyticsApi.summary })
   const { data: config } = useQuery({ queryKey: ['system-config'], queryFn: configApi.get })
@@ -425,12 +430,14 @@ export default function OverviewPage() {
 
       {!isLoading && (
         <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2" style={cardStyle(80)}>
+          <div className={isAdmin ? "col-span-2" : "col-span-3"} style={cardStyle(80)}>
             <BlobCard animate={blobReady} kbCount={kbs?.length || 0} docCount={analytics?.doc_count || 0} faqCount={analytics?.faq_count || 0} />
           </div>
-          <div className="col-span-1" style={cardStyle(160)}>
-            <SystemStatusCard animate={statusReady} config={config} activeKbName={activeKb?.kb_name} />
-          </div>
+          {isAdmin && (
+            <div className="col-span-1" style={cardStyle(160)}>
+              <SystemStatusCard animate={statusReady} config={config} activeKbName={activeKb?.kb_name} />
+            </div>
+          )}
           <div className="col-span-1 flex flex-col gap-4">
             <div style={cardStyle(240)}>
               <SatisfactionCard upPct={upPct} feedbackCount={upTotal} animate={satReady} />

@@ -8,17 +8,21 @@ import {
   BarChart2,
   Settings,
   LogOut,
+  Ticket,
+  UsersRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 
-const ADMIN_TEACHER_NAV = [
-  { to: '/admin', label: '概览', icon: LayoutDashboard, end: true },
-  { to: '/admin/conversations', label: '对话', icon: MessagesSquare },
-  { to: '/admin/knowledge', label: '知识库', icon: Database },
-  { to: '/admin/faq', label: 'FAQ 管理', icon: MessageSquareQuote },
-  { to: '/admin/students', label: '学生账号', icon: Users },
-  { to: '/admin/analytics', label: '使用统计', icon: BarChart2 },
+const NAV_ITEMS = [
+  { to: '/admin', label: '概览', icon: LayoutDashboard, end: true, roles: ['admin', 'teacher'] },
+  { to: '/admin/conversations', label: '对话', icon: MessagesSquare, roles: ['admin', 'teacher'] },
+  { to: '/admin/tickets', label: '答疑请求', icon: Ticket, roles: ['admin', 'teacher'] },
+  { to: '/admin/knowledge', label: '知识库', icon: Database, roles: ['admin'] },
+  { to: '/admin/faq', label: 'FAQ 管理', icon: MessageSquareQuote, roles: ['admin', 'teacher'] },
+  { to: '/admin/teachers', label: '教师管理', icon: UsersRound, roles: ['admin'] },
+  { to: '/admin/students', label: '学生账号', icon: Users, roles: ['admin', 'teacher'] },
+  { to: '/admin/analytics', label: '使用统计', icon: BarChart2, roles: ['admin', 'teacher'] },
 ]
 
 
@@ -58,9 +62,9 @@ function NavItem({
 }
 
 export default function Sidebar() {
-  const { user, isStudent, logout } = useAuth()
+  const { user, isAdmin, logout } = useAuth()
   const navigate = useNavigate()
-  const navItems = ADMIN_TEACHER_NAV
+  const navItems = NAV_ITEMS.filter(item => item.roles.includes(user?.role ?? ''))
 
   const handleLogout = () => {
     logout()
@@ -93,7 +97,7 @@ export default function Sidebar() {
       {/* Bottom: Settings + Avatar */}
       <div className="flex flex-col px-2 pb-5 gap-1">
         <div className="mx-2 mb-2 h-px bg-white/40" />
-        {!isStudent && <NavItem to="/admin/settings" label="系统配置" icon={Settings} />}
+        {isAdmin && <NavItem to="/admin/settings" label="系统配置" icon={Settings} />}
 
         {/* 用户信息 + 退出 */}
         <div className="flex items-center gap-2 px-3 py-2 mt-1 bg-white/30 rounded-xl mx-1">

@@ -87,7 +87,7 @@ def try_faq_match(
         if not isinstance(faq_id, int) or faq_id in seen:
             continue
         row = ds.get_faq(faq_id)
-        if row and row.get("enabled"):
+        if row and row.get("enabled") and row.get("status") == "approved":
             results.append({
                 "question": row["question"],
                 "answer": row["answer"],
