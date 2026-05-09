@@ -212,7 +212,7 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
             sources = [
                 {
                     "node_id": n["node_id"],
-                    "text": n["text"][:200],
+                    "text": n["text"],
                     "source_file": n.get("source_file", ""),
                     "score": round(n.get("score", 0.0), 4),
                 }
