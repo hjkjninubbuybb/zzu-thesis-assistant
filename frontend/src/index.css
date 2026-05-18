@@ -1,0 +1,494 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --color-background: hsl(38 25% 94%); /* 调暖一点点，增加质感 */
+  --color-foreground: hsl(215 25% 15%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(215 25% 15%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(215 25% 15%);
+  --color-primary: hsl(215 25% 27%);
+  --color-primary-foreground: hsl(0 0% 98%);
+  --color-secondary: hsl(38 18% 95%);
+  --color-secondary-foreground: hsl(215 25% 15%);
+  --color-muted: hsl(38 15% 93%);
+  --color-muted-foreground: hsl(0 0% 48%);
+  --color-accent: hsl(38 20% 94%);
+  --color-accent-foreground: hsl(215 25% 15%);
+  --color-destructive: hsl(5 76% 58%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+  --color-border: hsl(38 12% 86%);
+  --color-input: hsl(38 12% 86%);
+  --color-ring: hsl(0 0% 9%);
+  --radius: 0.75rem;
+}
+
+/* ───── Student theme override ───── */
+[data-theme="student"] {
+  --color-background: hsl(215 35% 96%); /* 更清透的浅蓝白 */
+  --color-foreground: hsl(215 28% 17%);
+  --color-secondary: hsl(215 20% 96%);
+  --color-muted: hsl(215 12% 94%);
+  --color-muted-foreground: hsl(215 10% 48%);
+  --color-accent: hsl(220 72% 96%);
+  --color-accent-foreground: hsl(220 72% 50%);
+  --color-border: hsl(215 18% 88%);
+  --color-input: hsl(215 18% 88%);
+  --color-ring: hsl(220 72% 50%);
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ───── Apple-style easing variables ───── */
+
+:root {
+  --apple-ease: cubic-bezier(0.25, 1, 0.5, 1);
+  --apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  /* iOS sheet 曲线 — 慢启动 + 长尾收住，有"分量感"不 snappy，无过冲 */
+  --apple-pop-ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ───── Keyframe animations ───── */
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apple 风格 — 模糊 → 清晰的对焦感（macOS Spotlight / Quick Look 招牌效果） */
+@keyframes appleSettleIn {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.96) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 遮罩层渐显 */
+@keyframes appleFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* 模态框 — 平滑落定（去掉过冲回弹，避免"弹一下"的廉价感） */
+@keyframes applePopIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+/* 聊天气泡 — 水平弹入 */
+@keyframes appleSlideRight {
+  from { opacity: 0; transform: translateX(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes appleSlideLeft {
+  from { opacity: 0; transform: translateX(-16px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* Toast — 底部平滑滑入（去掉过冲，更"系统感"） */
+@keyframes appleToastIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 行/列表项 — 轻盈入场 */
+@keyframes appleFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes blobFloat {
+  0%,
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(10px, -12px) scale(1.06);
+  }
+  66% {
+    transform: translate(-8px, 7px) scale(0.95);
+  }
+}
+
+@keyframes blobFloat2 {
+  0%,
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(-12px, 8px) scale(1.04);
+  }
+  66% {
+    transform: translate(9px, -10px) scale(0.97);
+  }
+}
+
+@keyframes blobFloat3 {
+  0%,
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  50% {
+    transform: translate(6px, -6px) scale(1.08);
+  }
+}
+
+@keyframes segFill {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes ringGrow {
+  from {
+    stroke-dasharray: 0 999;
+  }
+}
+
+@keyframes dotPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.75);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% center;
+  }
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* Utility classes */
+.animate-fade-up {
+  animation: fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-apple-settle {
+  animation: appleSettleIn 0.7s var(--apple-pop-ease) both;
+}
+
+.animate-apple-pop {
+  animation: applePopIn 0.5s var(--apple-pop-ease) both;
+}
+
+.animate-apple-toast {
+  animation: appleToastIn 0.45s var(--apple-pop-ease) both;
+}
+
+.animate-apple-slide-r {
+  animation: appleSlideRight 0.5s var(--apple-ease) both;
+}
+
+.animate-apple-slide-l {
+  animation: appleSlideLeft 0.5s var(--apple-ease) both;
+}
+
+.animate-apple-fade {
+  animation: appleFadeIn 0.4s ease both;
+}
+
+/* 手风琴 — grid-template-rows 平滑过渡 */
+.accordion-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.5s var(--apple-ease),
+              opacity 0.45s ease;
+}
+
+.accordion-body.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.accordion-body > div {
+  overflow: hidden;
+}
+
+/* Apple 按压反馈 */
+.apple-press {
+  transition: transform 0.2s var(--apple-ease);
+}
+
+.apple-press:active {
+  transform: scale(0.97);
+}
+
+.hover-lift {
+  transition: transform 0.2s var(--apple-ease),
+    box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.10);
+}
+
+/* ───── Glassmorphism utilities ─────
+   配合 BlobBackdrop 使用：半透明卡 + backdrop-filter 让背后光晕透出
+   保留当前暖米/冷蓝两套配色，不引入新色 */
+
+.glass-card {
+  background-color: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 12px 36px -16px rgba(40, 32, 20, 0.18);
+}
+
+/* 略弱版本：用于 sidebar / 顶层壳，保留较高可读性 */
+.glass-soft {
+  background-color: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 6px 28px -14px rgba(40, 32, 20, 0.16);
+}
+
+[data-theme="student"] .glass-card {
+  background-color: rgba(255, 255, 255, 0.66);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 12px 36px -16px rgba(20, 30, 60, 0.18);
+}
+
+[data-theme="student"] .glass-soft {
+  background-color: rgba(255, 255, 255, 0.84);
+  border-color: rgba(255, 255, 255, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 6px 28px -14px rgba(20, 30, 60, 0.16);
+}
+
+/* ───── Fluid Liquid Motion — 高级流体漂移 ─────
+   使用多阶段 keyframes，结合平移、缩放和极细微的形变错觉，模拟高级流体/熔岩灯效果 */
+
+/* ───── Fluid Liquid Motion — 高级流体大范围漂移 ─────
+   使用 vw/vh 单位确保光团在不同屏幕上都能产生明显的“游走”感 */
+
+@keyframes blobIdleA {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  33%  { transform: translate(15vw, -10vh) scale(1.1); opacity: 1; }
+  66%  { transform: translate(-5vw, 15vh) scale(0.9); opacity: 0.9; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
+}
+
+@keyframes blobIdleB {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  33%  { transform: translate(-12vw, 15vh) scale(0.95); opacity: 1; }
+  66%  { transform: translate(8vw, -8vh) scale(1.05); opacity: 0.85; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.9; }
+}
+
+@keyframes blobIdleC {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  33%  { transform: translate(10vw, 12vh) scale(1.05); opacity: 0.95; }
+  66%  { transform: translate(-8vw, -10vh) scale(0.9); opacity: 0.85; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
+}
+
+@keyframes blobIdleD {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.85; }
+  33%  { transform: translate(-15vw, -12vh) scale(1.1); opacity: 1; }
+  66%  { transform: translate(10vw, 5vh) scale(0.95); opacity: 0.8; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.85; }
+}
+
+/* 用户系统启用「减少动效」时，光晕完全静止（保留视觉，去掉运动） */
+@media (prefers-reduced-motion: reduce) {
+  .blob-idle { animation: none !important; }
+}
+
+/* ───── 对话页专用动效 ───── */
+
+/* 复用现有 appleFadeUp keyframe，暴露 utility 类用于会话列表 / 建议按钮 stagger */
+.animate-apple-fade-up {
+  animation: appleFadeUp 0.5s var(--apple-pop-ease) both;
+}
+
+/* AI 流式光标 — Claude 风方块闪烁，0.8s 节奏避开 animate-pulse 的 1s 整数 */
+@keyframes cursorBlink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.cursor-blink {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  vertical-align: -2px;
+  animation: cursorBlink 0.8s steps(1) infinite;
+}
+
+/* 状态文字扫光 — "正在检索/思考"专用，复用现有 @keyframes shimmer */
+.text-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(154, 154, 154, 0.55) 0%,
+    rgba(26, 26, 26, 0.95) 50%,
+    rgba(154, 154, 154, 0.55) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* 空状态中央 logo 缓慢呼吸 */
+@keyframes idleBreath {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+  50%      { transform: scale(1.06); box-shadow: 0 8px 30px -8px rgba(0, 0, 0, 0.12); }
+}
+.animate-idle-breath {
+  animation: idleBreath 3.6s ease-in-out infinite;
+}
+
+/* ───── Academic Markdown Styles ───── */
+
+.prose-academic {
+  --tw-prose-body: var(--color-foreground);
+  --tw-prose-headings: var(--color-foreground);
+  --tw-prose-lead: var(--color-muted-foreground);
+  --tw-prose-links: #2563EB;
+  --tw-prose-bold: var(--color-foreground);
+  --tw-prose-counters: var(--color-muted-foreground);
+  --tw-prose-bullets: var(--color-muted-foreground);
+  --tw-prose-hr: var(--color-border);
+  --tw-prose-quotes: var(--color-foreground);
+  --tw-prose-quote-borders: var(--color-border);
+  --tw-prose-captions: var(--color-muted-foreground);
+  --tw-prose-code: var(--color-foreground);
+  --tw-prose-pre-code: var(--color-foreground);
+  --tw-prose-pre-bg: var(--color-secondary);
+  --tw-prose-th-borders: var(--color-border);
+  --tw-prose-td-borders: var(--color-border);
+}
+
+.prose-academic p {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  line-height: 1.6;
+}
+
+.prose-academic strong {
+  color: #334155;
+  font-weight: 600;
+  background: linear-gradient(120deg, rgba(37, 99, 235, 0.08) 0%, rgba(37, 99, 235, 0.08) 100%);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+[data-theme="student"] .prose-academic strong {
+  color: #2563EB;
+}
+
+.prose-academic blockquote {
+  font-style: normal;
+  font-weight: 400;
+  border-left-width: 3px;
+  border-left-color: #2563EB;
+  background-color: rgba(37, 99, 235, 0.04);
+  padding: 0.5rem 1rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.prose-academic code {
+  font-weight: 500;
+  background-color: var(--color-secondary);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-size: 0.875em;
+}
+
+.prose-academic code::before,
+.prose-academic code::after {
+  content: "";
+}
+
+/* ───── Citation Marker ───── */
+.citation-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #2563EB;
+  font-size: 10px;
+  font-weight: 700;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  margin-left: 2px;
+  vertical-align: super;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.citation-marker:hover {
+  background-color: #2563EB;
+  color: white;
+  transform: scale(1.1);
+}
+
+/* prefers-reduced-motion 兼容：呼吸停掉、shimmer 降级为普通深灰文，光标保留闪烁（功能性指示） */
+@media (prefers-reduced-motion: reduce) {
+  .animate-idle-breath { animation: none; }
+  .text-shimmer {
+    animation: none;
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+    color: rgba(26, 26, 26, 0.7);
+    -webkit-text-fill-color: initial;
+  }
+}

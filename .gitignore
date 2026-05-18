@@ -21,3 +21,7 @@ diagnose.py
 
 # Claude
 .claude/
+
+# Frontend
+frontend/node_modules/
+dist/

@@ -1,34 +1,27 @@
 """混合检索：向量检索 + BM25，RRF 融合。"""
 
 import logging
-import os
 
 import jieba
 import bm25s
 from bm25s.tokenization import Tokenizer as BM25Tokenizer
-from llama_index.embeddings.dashscope import (
-    DashScopeEmbedding,
-    DashScopeTextEmbeddingModels,
-)
 
-from src.config import get_config, get_dashscope_api_key
+from src.config import get_config
+from src.core.embedding import get_embed_model
 from src.storage.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
+_corpus_cache: dict[str, list[dict]] = {}
 
-def _get_embed_model() -> DashScopeEmbedding:
-    cfg = get_config()
-    model_name = cfg["embedding"].get("model", "text-embedding-v3")
-    model_map = {
-        "text-embedding-v3": DashScopeTextEmbeddingModels.TEXT_EMBEDDING_V3,
-        "text-embedding-v2": DashScopeTextEmbeddingModels.TEXT_EMBEDDING_V2,
-    }
-    return DashScopeEmbedding(
-        model_name=model_map.get(model_name, DashScopeTextEmbeddingModels.TEXT_EMBEDDING_V3),
-        text_type="query",
-        api_key=get_dashscope_api_key(),
-    )
+
+def invalidate_corpus_cache(kb_name: str) -> None:
+    """文档上传/删除后调用，清除对应知识库的 BM25 语料缓存。"""
+    removed = _corpus_cache.pop(kb_name, None)
+    if removed is not None:
+        logger.info("[corpus_cache] 已清除知识库 '%s' 的缓存（%d 节点）", kb_name, len(removed))
+    else:
+        logger.debug("[corpus_cache] 知识库 '%s' 无缓存可清除", kb_name)
 
 
 class VectorRetriever:
@@ -38,7 +31,7 @@ class VectorRetriever:
         self.kb_name = kb_name
         self.top_k = top_k
         self._vs = vector_store or VectorStore()
-        self._embed_model = _get_embed_model()
+        self._embed_model = get_embed_model(text_type="query")
 
     def retrieve(self, query: str) -> list[dict]:
         query_vector = self._embed_model.get_query_embedding(query)
@@ -78,6 +71,9 @@ class BM25Retriever:
         query_tokens = self._tokenizer.tokenize([query], update_vocab=False, return_as="ids")
         k = min(self.top_k, len(self.nodes))
         results, scores = self._bm25.retrieve(query_tokens, k=k)
+
+        if not len(results) or not len(results[0]):
+            return []
 
         out = []
         for idx, score in zip(results[0], scores[0]):
@@ -143,14 +139,22 @@ class HybridRetriever:
 
 
 def fetch_corpus(kb_name: str, vector_store: VectorStore | None = None) -> list[dict]:
-    """从 Qdrant 获取 collection 的全量语料（用于 BM25 索引）。"""
+    """从 Qdrant 获取全量语料（用于 BM25 索引），结果按知识库名称缓存。
+
+    Note:
+        单进程内存缓存。文档上传/删除后须调用 invalidate_corpus_cache(kb_name) 清除缓存。
+    """
+    if kb_name in _corpus_cache:
+        logger.debug("[corpus_cache] 命中: kb='%s', %d 节点", kb_name, len(_corpus_cache[kb_name]))
+        return _corpus_cache[kb_name]
+
+    logger.info("[corpus_cache] 未命中，从 Qdrant 拉取: kb='%s'", kb_name)
     vs = vector_store or VectorStore()
-    # 用零向量 + 大 top_k 获取所有向量（适合小规模知识库）
     cfg = get_config()
     dim = cfg["embedding"]["dimension"]
     zero_vec = [0.0] * dim
     results = vs.search(kb_name, zero_vec, top_k=10000)
-    return [
+    corpus = [
         {
             "node_id": r.get("node_id", r["id"]),
             "text": r["text"],
@@ -158,3 +162,6 @@ def fetch_corpus(kb_name: str, vector_store: VectorStore | None = None) -> list[
         }
         for r in results
     ]
+    _corpus_cache[kb_name] = corpus
+    logger.info("[corpus_cache] 已缓存: kb='%s', %d 节点", kb_name, len(corpus))
+    return corpus

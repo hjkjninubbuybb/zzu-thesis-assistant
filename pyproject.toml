@@ -10,8 +10,6 @@ dependencies = [
     # Web framework
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
-    # UI
-    "gradio>=5.0.0",
     # LLM & Embedding
     "langchain-community>=0.3.0",
     "langchain-core>=0.3.0",
@@ -33,16 +31,27 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0",
-    "python-dotenv>=1.0.0",
+    # Auth
+    "python-jose[cryptography] (>=3.3.0)",
+    "passlib[bcrypt] (>=1.7.4)",
+    "bcrypt (>=3.0.0,<4.0.0)",
+    # MySQL
+    "pymysql (>=1.1.0)",
+    "dbutils (>=3.1.0)",
     # Misc
-    "httpx>=0.27.0",
     "python-multipart>=0.0.9",
     "sse-starlette>=2.0.0",
-    "aiosqlite>=0.20.0",
+    "openpyxl>=3.1.0",
+    "python-docx (>=1.2.0,<2.0.0)",
+    "langchain-openai (>=1.2.1,<2.0.0)",
 ]
 
 [tool.poetry]
 packages = [{include = "src"}]
+
+[tool.poetry.scripts]
+start = "src.main:run"
+dev = "src.main:dev"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
