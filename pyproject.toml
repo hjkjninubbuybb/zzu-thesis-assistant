@@ -43,6 +43,7 @@ dependencies = [
     "sse-starlette>=2.0.0",
     "openpyxl>=3.1.0",
     "python-docx (>=1.2.0,<2.0.0)",
+    "langchain-openai (>=1.2.1,<2.0.0)",
 ]
 
 [tool.poetry]
