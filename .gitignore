@@ -22,6 +22,12 @@ diagnose.py
 # Claude
 .claude/
 
+# macOS
+.DS_Store
+
+# Dev evaluation reports
+reports/
+
 # Frontend
 frontend/node_modules/
 dist/
