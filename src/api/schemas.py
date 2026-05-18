@@ -49,6 +49,16 @@ class DocInfo(BaseModel):
     created_at: datetime
 
 
+class DocDetail(DocInfo):
+    summary: str | None = None
+    content: str | None = None
+
+
+class DocUpdate(BaseModel):
+    summary: str | None = None
+    content: str | None = None
+
+
 class IndexRequest(BaseModel):
     splitter_type: str = Field(default="recursive", pattern=r"^(recursive|token|sentence)$")
     chunk_size: int = Field(default=256, ge=64, le=1024)
@@ -170,6 +180,17 @@ class ConversationInfo(BaseModel):
     title: str
     created_at: datetime
     updated_at: datetime
+
+
+class ConversationCursor(BaseModel):
+    id: int
+    updated_at: str
+
+
+class PaginatedConversations(BaseModel):
+    items: list[ConversationInfo]
+    has_more: bool
+    next_cursor: ConversationCursor | None = None
 
 
 class ConversationTitleUpdate(BaseModel):
