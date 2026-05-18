@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, MoreHorizontal, UserCheck, UserX, KeyRound, Trash2, Download, Upload, FileDown, Pencil } from 'lucide-react'
 import { userApi, extractError } from '@/lib/api'
-import type { UserInfo, UserCreate, StudentProfileCreate } from '@/types/api'
+import type { UserInfo, UserCreate, StudentProfileCreate, ImportResult } from '@/types/api'
 import { useAuth } from '@/hooks/useAuth'
 
 // ── 创建学生弹窗 ────────────────────────────────────────────
@@ -213,9 +213,11 @@ export default function StudentsPage() {
   const [resetTarget, setResetTarget] = useState<UserInfo | null>(null)
   const [editTarget, setEditTarget] = useState<UserInfo | null>(null)
   const [menuOpen, setMenuOpen] = useState<number | null>(null)
-  const [importResult, setImportResult] = useState<{ total: number; success: number; skipped: number; failed: number; errors: unknown[] } | null>(null)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [importing, setImporting] = useState(false)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const relationFileInputRef = useRef<HTMLInputElement>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['users', 'student', page],
@@ -242,7 +244,24 @@ export default function StudentsPage() {
       setImportResult(result)
       qc.invalidateQueries({ queryKey: ['users'] })
     } catch (err) {
-      setImportResult({ total: 0, success: 0, skipped: 0, failed: 1, errors: [extractError(err)] })
+      setImportResult({ total: 0, success: 0, skipped: 0, failed: 1, errors: [{ row: 0, reason: extractError(err) }] })
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleImportRelations = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const result = await userApi.importMentorRelations(file)
+      setImportResult({ ...result, skipped: 0 })
+      qc.invalidateQueries({ queryKey: ['users'] })
+    } catch (err) {
+      setImportResult({ total: 0, success: 0, skipped: 0, failed: 1, errors: [{ row: 0, reason: extractError(err) }] })
     } finally {
       setImporting(false)
       e.target.value = ''
@@ -274,18 +293,43 @@ export default function StudentsPage() {
         </div>
         {isAdmin && (
           <div className="flex items-center gap-2">
-            <button onClick={() => userApi.downloadTemplate()}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm text-[#334155] rounded-xl hover:bg-[#F8F6F2] transition-colors">
-              <FileDown size={14} /> 下载模板
-            </button>
+            <div className="relative group">
+              <button className="flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm text-[#334155] rounded-xl hover:bg-[#F8F6F2] transition-colors">
+                <FileDown size={14} /> 下载模板
+              </button>
+              <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-20 bg-white border border-[#F0EDE8] rounded-xl shadow-xl py-1 min-w-[160px]">
+                <button onClick={() => userApi.downloadTemplate()} className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-[#4A4A4A] hover:bg-[#F8F6F2] transition-colors">
+                  学生账号模板
+                </button>
+                <button onClick={() => userApi.downloadRelationsTemplate()} className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-[#4A4A4A] hover:bg-[#F8F6F2] transition-colors">
+                  师生关系模板
+                </button>
+              </div>
+            </div>
+            
             <button onClick={() => userApi.exportStudents()}
               className="flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm text-[#334155] rounded-xl hover:bg-[#F8F6F2] transition-colors">
               <Download size={14} /> 导出
             </button>
-            <label className={`flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm rounded-xl cursor-pointer transition-colors ${importing ? 'opacity-50 cursor-not-allowed' : 'text-[#334155] hover:bg-[#F8F6F2]'}`}>
-              <Upload size={14} /> {importing ? '导入中...' : '批量导入'}
-              <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleImport} disabled={importing} />
-            </label>
+
+            <div className="relative group">
+              <button disabled={importing} className={`flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm rounded-xl transition-colors ${importing ? 'opacity-50 cursor-not-allowed' : 'text-[#334155] hover:bg-[#F8F6F2]'}`}>
+                <Upload size={14} /> {importing ? '导入中...' : '批量导入'}
+              </button>
+              {!importing && (
+                <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-20 bg-white border border-[#F0EDE8] rounded-xl shadow-xl py-1 min-w-[160px]">
+                  <label className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-[#4A4A4A] hover:bg-[#F8F6F2] cursor-pointer transition-colors">
+                    导入学生账号
+                    <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleImport} />
+                  </label>
+                  <label className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-[#4A4A4A] hover:bg-[#F8F6F2] cursor-pointer transition-colors">
+                    导入师生关系
+                    <input ref={relationFileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleImportRelations} />
+                  </label>
+                </div>
+              )}
+            </div>
+
             <button onClick={() => setShowCreate(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 transition-colors shadow-sm active:scale-[0.98]">
               <Plus size={15} /> 添加学生
