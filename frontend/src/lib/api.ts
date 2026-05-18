@@ -1,11 +1,11 @@
 import axios from 'axios'
 import type {
-  KBInfo, KBCreate, ActiveKBInfo, DocInfo, UploadParams, SystemConfig, ConfigUpdate,
+  KBInfo, KBCreate, ActiveKBInfo, DocInfo, DocDetail, DocUpdate, UploadParams, SystemConfig, ConfigUpdate,
   FAQItem, FAQCreate, FAQUpdate, FAQSearchResponse, FAQImportResult,
-  ConversationInfo, ConversationMessage,
+  ConversationInfo, ConversationMessage, PaginatedConversations,
   LoginResponse, UserInfo, UserCreate, UserUpdate, PaginatedUsers,
   StudentProfileCreate, TeacherProfileCreate, ApiKeyInfo, AnalyticsSummary,
-  QARequestInfo, QARequestCreate,
+  QARequestInfo, QARequestCreate, ImportResult
 } from '@/types/api'
 import { getAccessToken, getRefreshToken, saveAuth, clearAuth, getCurrentPortal } from '@/lib/auth'
 
@@ -147,7 +147,7 @@ export const userApi = {
     const form = new FormData()
     form.append('file', file)
     if (defaultPassword) form.append('default_password', defaultPassword)
-    return client.post<{ total: number; success: number; skipped: number; failed: number; errors: unknown[] }>(
+    return client.post<ImportResult>(
       '/users/teachers/import', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 60_000,
@@ -165,6 +165,27 @@ export const userApi = {
   removeMentorRelation: (mentorId: number, studentId: number) =>
     client.delete<{ message: string }>(`/users/mentors/${mentorId}/students/${studentId}`).then(r => r.data),
   getMyMentor: () => client.get<UserInfo>('/users/me/mentor').then(r => r.data),
+
+  downloadRelationsTemplate: () => {
+    client.get('/users/mentors/relations/template', { responseType: 'blob' }).then(r => {
+      const url = URL.createObjectURL(r.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = '师生关系导入模板.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    })
+  },
+  importMentorRelations: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return client.post<ImportResult>(
+      '/users/mentors/relations/import', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60_000,
+      }
+    ).then(r => r.data)
+  },
 
   downloadTemplate: () => {
     client.get('/users/students/template', { responseType: 'blob' }).then(r => {
@@ -190,7 +211,7 @@ export const userApi = {
     const form = new FormData()
     form.append('file', file)
     if (defaultPassword) form.append('default_password', defaultPassword)
-    return client.post<{ total: number; success: number; skipped: number; failed: number; errors: unknown[] }>(
+    return client.post<ImportResult>(
       '/users/students/import', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 60_000,
@@ -225,6 +246,15 @@ export const documentApi = {
   list: (kbName: string) =>
     client.get<DocInfo[]>(`/document/${kbName}`).then(r => r.data),
 
+  get: (kbName: string, docId: number) =>
+    client.get<DocDetail>(`/document/${kbName}/${docId}`).then(r => r.data),
+
+  update: (kbName: string, docId: number, body: DocUpdate) =>
+    client.put<DocDetail>(`/document/${kbName}/${docId}`, body).then(r => r.data),
+
+  reindex: (kbName: string, docId: number) =>
+    client.post<DocInfo>(`/document/${kbName}/${docId}/reindex`).then(r => r.data),
+
   upload: (
     kbName: string,
     file: File,
@@ -251,6 +281,13 @@ export const documentApi = {
 
   delete: (kbName: string, docId: number) =>
     client.delete<{ message: string }>(`/document/${kbName}/${docId}`).then(r => r.data),
+
+  getDownloadToken: (downloadUrl: string) => {
+    // downloadUrl 形如 "/api/document/{kbName}/download/{docId}"
+    // 去掉 /api 前缀，将 /download/ 替换为 /download-token/
+    const path = downloadUrl.replace(/^\/api/, '').replace('/download/', '/download-token/')
+    return client.post<{ token: string; expires_in: number }>(path).then(r => r.data)
+  },
 }
 
 // ── 配置 API ──────────────────────────────────────────────
@@ -258,11 +295,15 @@ export const documentApi = {
 export const configApi = {
   get: () => client.get<SystemConfig>('/config').then(r => r.data),
   update: (body: ConfigUpdate) => client.post<SystemConfig>('/config', body).then(r => r.data),
-  getApiKey: () => client.get<ApiKeyInfo>('/config/api-key').then(r => r.data),
-  updateApiKey: (apiKey: string) =>
-    client.put<{ message: string; has_key: boolean }>('/config/api-key', { api_key: apiKey }).then(r => r.data),
+  getApiKey: () => client.get<ApiKeyInfo & { api_base_url: string }>('/config/api-key').then(r => r.data),
+  updateApiKey: (apiKey: string, apiBaseUrl?: string) =>
+    client.put<{ message: string; has_key: boolean }>('/config/api-key', { 
+      api_key: apiKey,
+      api_base_url: apiBaseUrl 
+    }).then(r => r.data),
   testApiKey: () =>
-    client.post<{ ok: boolean; message: string }>('/config/api-key/test').then(r => r.data),
+    client.post<{ ok: boolean; message: string; models?: string[] }>('/config/api-key/test').then(r => r.data),
+  getModels: () => client.get<string[]>('/config/models').then(r => r.data),
 }
 
 // ── FAQ API ───────────────────────────────────────────────
@@ -324,8 +365,8 @@ export const analyticsApi = {
 // ── 对话 API ──────────────────────────────────────────────
 
 export const conversationApi = {
-  list: (kbName?: string) =>
-    client.get<ConversationInfo[]>('/conversation', { params: kbName ? { kb_name: kbName } : {} }).then(r => r.data),
+  list: (params?: { kb_name?: string; cursor_id?: number; cursor_updated_at?: string; limit?: number }) =>
+    client.get<PaginatedConversations>('/conversation', { params }).then(r => r.data),
   create: (kbName: string, title?: string) =>
     client.post<ConversationInfo>('/conversation', { kb_name: kbName, title: title ?? '新对话' }).then(r => r.data),
   get: (convId: number) =>

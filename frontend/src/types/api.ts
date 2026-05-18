@@ -1,5 +1,5 @@
 export type DocType = 'policy' | 'manual' | 'form'
-export type SplitterType = 'recursive' | 'token' | 'sentence' | 'semantic' | 'table_aware'
+export type SplitterType = 'recursive' | 'token' | 'sentence' | 'semantic' | 'table_aware' | 'manual_step'
 
 export interface KBInfo {
   id: number
@@ -29,9 +29,21 @@ export interface DocInfo {
   file_size: number
   chunk_count: number
   chunk_size: number
+  chunk_overlap_ratio: number
+  splitter_type: SplitterType
   doc_type: DocType
   status: string
   created_at: string
+}
+
+export interface DocDetail extends DocInfo {
+  summary: string | null
+  content: string | null
+}
+
+export interface DocUpdate {
+  summary?: string
+  content?: string
 }
 
 export interface UploadParams {
@@ -88,6 +100,17 @@ export interface ConversationInfo {
   title: string
   created_at: string
   updated_at: string
+}
+
+export interface ConversationCursor {
+  id: number
+  updated_at: string
+}
+
+export interface PaginatedConversations {
+  items: ConversationInfo[]
+  has_more: boolean
+  next_cursor: ConversationCursor | null
 }
 
 export interface ConversationMessage {
@@ -150,6 +173,21 @@ export interface FAQImportResult {
   skipped: number
   failed: number
   errors: FAQImportError[]
+}
+
+export interface ImportError {
+  row: number
+  student_id?: string
+  employee_id?: string
+  reason: string
+}
+
+export interface ImportResult {
+  total: number
+  success: number
+  skipped: number
+  failed: number
+  errors: ImportError[]
 }
 
 // ── 导师答疑请求 (Tickets) ────────────────────────────────
@@ -244,8 +282,15 @@ export interface PaginatedUsers {
 
 // ── 系统配置 ──────────────────────────────────────────────
 
+export interface DocTypeSplitterParams {
+  type?: string
+  chunk_size?: number
+  chunk_overlap_ratio?: number
+  enable_cleaning?: boolean
+}
+
 export interface SystemConfig {
-  llm: { model: string }
+  llm: { model: string; fast_model: string; api_base_url?: string }
   embedding: { model: string; dimension: number; embed_batch_size: number }
   splitter: {
     strategy?: string
@@ -253,10 +298,24 @@ export interface SystemConfig {
     chunk_overlap_ratio: number
     buffer_size?: number
     breakpoint_percentile_threshold?: number
+    policy?: DocTypeSplitterParams
+    manual?: DocTypeSplitterParams
+    form?:   DocTypeSplitterParams
   }
   retrieval: { vector_top_k: number; bm25_top_k: number; hybrid_top_k: number; rrf_k: number }
   reranker: { model: string; top_n: number }
-  rag: { max_reformulations: number }
+  rag: {
+    max_reformulations: number
+    agent_recursion_limit: number
+    agent_retry_count: number
+  }
+}
+
+export interface DocTypeSplitterUpdate {
+  splitter_type?: string
+  chunk_size?: number
+  chunk_overlap_ratio?: number
+  enable_cleaning?: boolean
 }
 
 export interface SplitterConfigUpdate {
@@ -265,9 +324,13 @@ export interface SplitterConfigUpdate {
   chunk_overlap_ratio?: number
   buffer_size?: number
   breakpoint_percentile_threshold?: number
+  policy?: DocTypeSplitterUpdate
+  manual?: DocTypeSplitterUpdate
+  form?:   DocTypeSplitterUpdate
 }
 
 export interface ConfigUpdate {
+  llm_base_url?: string
   llm_model?: string
   llm_fast_model?: string
   embedding_model?: string
@@ -279,6 +342,8 @@ export interface ConfigUpdate {
   reranker_model?: string
   reranker_top_n?: number
   max_reformulations?: number
+  agent_recursion_limit?: number
+  agent_retry_count?: number
 }
 
 export interface ApiKeyInfo {
