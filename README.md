@@ -22,61 +22,162 @@
 
 ---
 
-## 快速启动
+## 本地部署指南
 
-### 前提条件
+### 第一步：安装前置工具
 
-- Python ≥ 3.10
-- Node ≥ 18
-- Docker（macOS 推荐 Colima）
-- Poetry（`pip install poetry`）
-- DashScope API Key（[申请地址](https://dashscope.aliyun.com/)）
+根据你的操作系统选择对应命令：
 
-### 启动步骤
+#### macOS
 
 ```bash
-# 1. 启动 Qdrant + MySQL（首次需等 MySQL 初始化，约 30 秒）
+# 安装 Homebrew（如果还没有）
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 安装 Python、Node、Docker（Colima 是轻量级 Docker 运行时，推荐）
+brew install python@3.11 node colima docker docker-compose
+
+# 安装 Poetry（Python 包管理工具）
+pip3 install poetry
+```
+
+#### Windows
+
+```powershell
+# 以管理员身份打开 PowerShell，安装 Python 和 Node
+winget install Python.Python.3.11
+winget install OpenJS.NodeJS.LTS
+
+# 安装 Poetry
+pip install poetry
+
+# Docker Desktop（图形界面，安装后启动即可）
+# 下载：https://www.docker.com/products/docker-desktop/
+```
+
+> **Windows 用户提示**：推荐使用 WSL2（Windows Subsystem for Linux）+ Ubuntu 环境，体验更接近 Linux，避免路径和换行符问题。
+
+#### Ubuntu / Debian Linux
+
+```bash
+sudo apt update
+sudo apt install python3.11 python3-pip nodejs npm docker.io docker-compose -y
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER   # 免 sudo 使用 docker（需重新登录生效）
+pip3 install poetry
+```
+
+---
+
+### 第二步：获取 DashScope API Key
+
+本项目 LLM / Embedding / VLM 全部依赖阿里云 DashScope：
+
+1. 访问 [https://dashscope.aliyun.com/](https://dashscope.aliyun.com/) 注册登录
+2. 进入「API-KEY 管理」，创建一个 Key（格式：`sk-xxxx...`）
+3. 记录这个 Key，后续配置中需要用到
+
+---
+
+### 第三步：克隆项目
+
+```bash
+git clone https://github.com/hjkjninubbuybb/zzu-thesis-rag.git
+cd zzu-thesis-rag
+```
+
+---
+
+### 第四步：启动数据库容器
+
+项目依赖 Qdrant（向量数据库）和 MySQL 8.0，通过 Docker Compose 一键启动：
+
+```bash
+# macOS（Colima）需先启动 Docker 运行时
+colima start
+
+# 启动容器（首次会自动拉取镜像，MySQL 初始化约需 30 秒）
 docker-compose up -d
-# macOS + Colima:
-# DOCKER_HOST=unix://$HOME/.colima/default/docker.sock docker-compose up -d
 
-# 2. 创建 .env 文件（放项目根目录）
-cat > .env << EOF
-DASHSCOPE_API_KEY=sk-xxxx
-# 可选（有默认值）:
-# MYSQL_HOST=localhost
-# MYSQL_USER=rag_user
-# MYSQL_PASSWORD=rag_pass_123
-# AUTH_SECRET_KEY=change-me-in-production-please
-EOF
-
-# 3. 安装后端依赖
-poetry install
-
-# 4. 启动后端（开发模式，热重载）
-poetry run dev
-
-# 如需重新构建前端（前端有改动时）
-cd frontend && npm install && npm run build
+# 验证两个容器是否正常运行
+docker ps
+# 应看到 qdrant 和 mysql 两个容器状态为 Up
 ```
 
-### 访问地址
+> **macOS Colima 用户**：如果遇到 `Cannot connect to the Docker daemon` 报错，需要设置环境变量：
+> ```bash
+> export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
+> ```
 
-| 端点 | 地址 | 说明 |
-|------|------|------|
-| 管理端 | http://localhost:5173/admin | 开发模式（Vite） |
-| 学生端 | http://localhost:5173/student | 开发模式（Vite） |
-| API 文档 | http://localhost:8000/docs | Swagger UI |
-| 后端 API | http://localhost:8000 | 生产模式同端口 |
+---
 
-默认管理员账号：`admin` / `admin123`（首次启动自动创建）
-
-### 生产模式
+### 第五步：安装后端依赖
 
 ```bash
-cd frontend && npm run build    # 构建前端到 dist/
-poetry run start                # 后端绑定 0.0.0.0:8000，静态托管 dist/
+poetry install
 ```
+
+Poetry 会自动创建虚拟环境并安装所有依赖（约 2-3 分钟）。
+
+---
+
+### 第六步：构建前端
+
+```bash
+cd frontend
+npm install        # 安装前端依赖
+npm run build      # 构建产物到 dist/
+cd ..
+```
+
+---
+
+### 第七步：启动服务
+
+```bash
+# 生产模式（推荐首次体验）：前后端同一端口，访问 http://localhost:8000
+poetry run start
+
+# 开发模式（热重载，适合二次开发）：前端 :5173，后端 :8000
+poetry run dev
+```
+
+---
+
+### 第八步：首次配置
+
+1. 打开浏览器访问 **http://localhost:8000/admin**（生产模式）或 **http://localhost:5173/admin**（开发模式）
+2. 使用默认管理员账号登录：用户名 `admin`，密码 `admin123`
+3. 进入「**系统设置**」页面，填入你的 DashScope API Key
+4. 进入「**知识库**」页面，创建一个知识库
+5. 进入「**文档管理**」页面，上传你的文档（支持 PDF、Word、TXT）
+6. 等待索引完成后，切换到学生端 `/student` 即可开始提问
+
+---
+
+### 访问地址汇总
+
+| 端点 | 生产模式 | 开发模式 |
+|------|---------|---------|
+| 管理端 | http://localhost:8000/admin | http://localhost:5173/admin |
+| 学生端 | http://localhost:8000/student | http://localhost:5173/student |
+| API 文档 | http://localhost:8000/docs | http://localhost:8000/docs |
+
+默认管理员：`admin` / `admin123`
+
+---
+
+### 常见问题
+
+| 问题 | 解决方法 |
+|------|---------|
+| `Cannot connect to the Docker daemon` | macOS：运行 `colima start`；Windows：启动 Docker Desktop |
+| MySQL 连接失败 / 启动报错 | 等待 30-60 秒让 MySQL 完成初始化，再重启服务 |
+| `poetry: command not found` | 重新打开终端，或将 `~/.local/bin` 加入 PATH |
+| 端口 8000 已被占用 | `lsof -i :8000` 查找占用进程，kill 后重试 |
+| API Key 无效 | 确认 Key 以 `sk-` 开头，且 DashScope 账户有足够余额 |
+| 上传文档后没有响应 | 检查 API Key 是否已在设置页面正确填入 |
+| Windows 路径问题 | 推荐使用 WSL2 + Ubuntu 环境运行项目 |
 
 ---
 
