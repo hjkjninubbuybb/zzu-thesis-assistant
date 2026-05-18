@@ -75,6 +75,32 @@ def decode_token(token: str, token_type: str = "access") -> dict:
     return payload
 
 
+# ── 下载令牌 ─────────────────────────────────────────────────
+
+_DOWNLOAD_TOKEN_EXPIRE_MINUTES = 2
+
+
+def create_download_token(doc_id: int, kb_name: str) -> str:
+    """生成 2 分钟有效的一次性下载令牌（无需登录态即可下载）。"""
+    return _make_token(
+        {"type": "download", "doc_id": doc_id, "kb_name": kb_name},
+        timedelta(minutes=_DOWNLOAD_TOKEN_EXPIRE_MINUTES),
+    )
+
+
+def verify_download_token(token: str, doc_id: int, kb_name: str) -> None:
+    """校验下载令牌：类型、doc_id、kb_name 三者必须全部匹配。"""
+    cfg = _auth_cfg()
+    try:
+        payload = jwt.decode(token, cfg["secret_key"], algorithms=[cfg["algorithm"]])
+    except JWTError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"无效下载令牌: {e}") from e
+    if payload.get("type") != "download":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="令牌类型错误")
+    if payload.get("doc_id") != doc_id or payload.get("kb_name") != kb_name:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="令牌与文件不匹配")
+
+
 # ── 用户认证 ─────────────────────────────────────────────────
 
 def authenticate_user(username: str, password: str) -> dict | None:
