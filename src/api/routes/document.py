@@ -7,12 +7,18 @@ import tempfile
 import urllib.parse
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
-from src.api.auth import require_teacher_or_admin
-from src.api.schemas import DocInfo, MessageResponse
-from src.core.indexing import index_document, delete_document
+from src.api.auth import (
+    require_teacher_or_admin,
+    get_current_user,
+    create_download_token,
+    verify_download_token,
+    decode_token,
+)
+from src.api.schemas import DocInfo, DocDetail, DocUpdate, MessageResponse
+from src.core.indexing import index_document, delete_document, reindex_document
 from src.core.retrieval import invalidate_corpus_cache
 from src.parsers import SUPPORTED_EXTS
 from src.parsers.converter import CONVERTIBLE_EXTS, convert_to_pdf
@@ -39,6 +45,60 @@ def list_documents(kb_name: str, _: dict = Depends(require_teacher_or_admin)):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
     docs = _ds.list_documents(kb_name)
     return [DocInfo(**d) for d in docs]
+
+
+@router.get("/{kb_name}/{doc_id}", response_model=DocDetail)
+def get_document_detail(kb_name: str, doc_id: int, _: dict = Depends(require_teacher_or_admin)):
+    """获取文档详情（含摘要和清洗后的内容）。"""
+    doc = _ds.get_document(doc_id)
+    if not doc or doc["kb_name"] != kb_name:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    return DocDetail(**doc)
+
+
+@router.put("/{kb_name}/{doc_id}", response_model=DocDetail)
+def update_document(
+    kb_name: str,
+    doc_id: int,
+    body: DocUpdate,
+    _: dict = Depends(require_teacher_or_admin),
+):
+    """更新文档摘要或清洗后的内容。"""
+    doc = _ds.get_document(doc_id)
+    if not doc or doc["kb_name"] != kb_name:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    
+    _ds.update_document(doc_id, summary=body.summary, content=body.content)
+    updated_doc = _ds.get_document(doc_id)
+    return DocDetail(**updated_doc)
+
+
+@router.post("/{kb_name}/{doc_id}/reindex", response_model=DocInfo)
+async def reindex_document_endpoint(
+    kb_name: str,
+    doc_id: int,
+    _: dict = Depends(require_teacher_or_admin),
+):
+    """基于当前数据库中的 content 重新对文档进行切分和向量化。"""
+    if not _ds.get_kb(kb_name):
+        raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
+    
+    try:
+        result = await asyncio.to_thread(
+            reindex_document,
+            kb_name=kb_name,
+            doc_id=doc_id,
+            vector_store=_vs,
+            doc_store=_ds,
+        )
+        doc = _ds.get_document(doc_id)
+        invalidate_corpus_cache(kb_name)
+        return DocInfo(**doc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("[%s] 重新索引失败: %s", kb_name, e)
+        raise HTTPException(status_code=500, detail=f"重新索引失败: {e}")
 
 
 @router.post("/{kb_name}/upload", response_model=DocInfo)
@@ -121,9 +181,44 @@ async def upload_document(
             pdf_tmp.unlink(missing_ok=True)
 
 
+@router.post("/{kb_name}/download-token/{doc_id}")
+def get_download_token(
+    kb_name: str,
+    doc_id: int,
+    _: dict = Depends(get_current_user),
+):
+    """为指定文档签发一个 2 分钟有效的下载令牌。
+
+    前端凭此令牌拼接到下载 URL 的 ?token= 参数，浏览器可直接跳转下载，
+    无需在请求头中携带 Authorization。
+    """
+    doc = _ds.get_document(doc_id)
+    if not doc or doc["kb_name"] != kb_name:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    token = create_download_token(doc_id, kb_name)
+    return {"token": token, "expires_in": 120}
+
+
 @router.get("/{kb_name}/download/{doc_id}")
-def download_document(kb_name: str, doc_id: int, _: dict = Depends(require_teacher_or_admin)):
-    """下载已上传的原始文件。"""
+def download_document(
+    kb_name: str,
+    doc_id: int,
+    token: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+):
+    """下载已上传的原始文件。
+
+    支持两种认证方式（二选一）：
+    - ?token=xxx  : 由 /download-token/{doc_id} 签发的短期下载令牌（推荐，供浏览器直接跳转）
+    - Authorization: Bearer xxx : 普通登录 token（兼容旧调用方式）
+    """
+    if token:
+        verify_download_token(token, doc_id, kb_name)
+    elif authorization and authorization.startswith("Bearer "):
+        decode_token(authorization[len("Bearer "):], token_type="access")
+    else:
+        raise HTTPException(status_code=401, detail="需要认证：请提供 ?token= 或 Authorization header")
+
     doc = _ds.get_document(doc_id)
     if not doc or doc["kb_name"] != kb_name:
         raise HTTPException(status_code=404, detail="文档不存在")
