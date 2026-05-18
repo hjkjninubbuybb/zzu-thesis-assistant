@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from sse_starlette.sse import EventSourceResponse
@@ -203,9 +204,14 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
             await thread_task
 
             # 3. 发送完整答案（兼容现有前端）
+            answer_text = "".join(token_parts)
+            # 当 Agent 已通过 file 事件发送文件卡片时，清除 answer 文字里
+            # LLM 生成的冗余 Markdown 链接 [text](url) → text
+            if file_items:
+                answer_text = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', answer_text)
             yield {
                 "event": "answer",
-                "data": json.dumps({"text": "".join(token_parts)}, ensure_ascii=False),
+                "data": json.dumps({"text": answer_text}, ensure_ascii=False),
             }
 
             # 4. 发送引用来源
