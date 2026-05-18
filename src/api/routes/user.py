@@ -309,6 +309,86 @@ async def import_students_excel(
     }
 
 
+@router.get("/mentors/relations/template")
+def download_relations_template(current_user: dict = Depends(require_teacher_or_admin)):
+    """下载师生关系批量导入模板。"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "师生关系"
+    
+    cols = ["学生学号*", "导师工号*"]
+    widths = [20, 20]
+    
+    header_fill = PatternFill("solid", fgColor="1A1A1A")
+    header_font = Font(color="FFFFFF", bold=True, size=10)
+    for ci, (col, width) in enumerate(zip(cols, widths), 1):
+        cell = ws.cell(row=1, column=ci, value=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.column_dimensions[cell.column_letter].width = width
+    
+    # 示例数据
+    ws.append(["202201001", "T001"])
+    
+    return _make_xlsx_response(wb, "师生关系导入模板.xlsx")
+
+
+@router.post("/mentors/relations/import")
+async def import_mentor_relations(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_admin),
+) -> dict:
+    """从 Excel 批量导入师生关系（管理员专用）。"""
+    if not (file.filename or "").lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式")
+
+    content = await file.read()
+    try:
+        wb = load_workbook(io.BytesIO(content), data_only=True)
+        ws = wb.active
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Excel 解析失败：{e}") from e
+
+    success, failed = 0, []
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not row or not any(row):
+            continue
+            
+        student_id = str(row[0]).strip() if row[0] else ""
+        employee_id = str(row[1]).strip() if row[1] else ""
+
+        if not student_id or not employee_id:
+            failed.append({"row": row_idx, "reason": "学号和工号均不能为空"})
+            continue
+
+        # 查找学生
+        student_user = _us.get_user_by_student_id(student_id)
+        if not student_user:
+            failed.append({"row": row_idx, "student_id": student_id, "reason": "学生不存在"})
+            continue
+        
+        # 查找教师
+        mentor_user = _us.get_user_by_employee_id(employee_id)
+        if not mentor_user or mentor_user["role"] != "teacher":
+            failed.append({"row": row_idx, "employee_id": employee_id, "reason": "导师不存在或非教师角色"})
+            continue
+
+        try:
+            _us.add_mentor_relation(mentor_user["id"], student_user["id"])
+            success += 1
+        except Exception as e:
+            logger.warning("[relation import] 第 %d 行导入失败: %s", row_idx, e)
+            failed.append({"row": row_idx, "student_id": student_id, "employee_id": employee_id, "reason": str(e)})
+
+    return {
+        "total": success + len(failed),
+        "success": success,
+        "failed": len(failed),
+        "errors": failed,
+    }
+
+
 # ── 教师账号 Excel 导入/导出 ──────────────────────────────────
 
 _TCH_COLS = ["姓名", "工号*", "院系", "职称", "初始密码（留空自动生成）"]
