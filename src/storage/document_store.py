@@ -62,20 +62,61 @@ class DocumentStore:
         file_size: int = 0,
         chunk_count: int = 0,
         chunk_size: int = 256,
+        chunk_overlap_ratio: float = 0.1,
         doc_type: str = "plain_text",
+        splitter_type: str = "recursive",
+        status: str = "completed",
+        summary: str | None = None,
+        content: str | None = None,
     ) -> dict:
         with get_conn() as conn:
             with conn.cursor() as cur:
                 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 cur.execute(
                     """INSERT INTO documents
-                       (kb_name, file_name, file_size, chunk_count, chunk_size, doc_type, status, created_at)
-                       VALUES (%s, %s, %s, %s, %s, %s, 'completed', %s)""",
-                    (kb_name, file_name, file_size, chunk_count, chunk_size, doc_type, now),
+                       (kb_name, file_name, file_size, chunk_count, chunk_size, chunk_overlap_ratio, 
+                        doc_type, splitter_type, status, summary, content, created_at)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (kb_name, file_name, file_size, chunk_count, chunk_size, chunk_overlap_ratio,
+                     doc_type, splitter_type, status, summary, content, now),
                 )
                 conn.commit()
                 cur.execute("SELECT * FROM documents WHERE id = %s", (cur.lastrowid,))
                 return cur.fetchone()
+
+    def update_document(self, doc_id: int, **kwargs) -> bool:
+        allowed = {
+            "summary", "content", "chunk_count", "status", 
+            "chunk_size", "chunk_overlap_ratio", "splitter_type"
+        }
+        updates = []
+        params = []
+        for k, v in kwargs.items():
+            if k in allowed:
+                updates.append(f"{k} = %s")
+                params.append(v)
+        
+        if not updates:
+            return False
+            
+        params.append(doc_id)
+        sql = f"UPDATE documents SET {', '.join(updates)} WHERE id = %s"
+        
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                conn.commit()
+                return cur.rowcount > 0
+
+    def update_document_summary(self, doc_id: int, summary: str) -> bool:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE documents SET summary = %s WHERE id = %s",
+                    (summary, doc_id),
+                )
+                conn.commit()
+                return cur.rowcount > 0
 
     def list_documents(self, kb_name: str) -> list[dict]:
         with get_conn() as conn:
@@ -213,7 +254,14 @@ class DocumentStore:
                 cur.execute("SELECT * FROM conversations WHERE id = %s", (cur.lastrowid,))
                 return cur.fetchone()
 
-    def list_conversations(self, kb_name: str | None = None, user_id: int | None = None) -> list[dict]:
+    def list_conversations(
+        self,
+        kb_name: str | None = None,
+        user_id: int | None = None,
+        limit: int = 30,
+        cursor_id: int | None = None,
+        cursor_updated_at: str | None = None,
+    ) -> dict:
         sql = "SELECT * FROM conversations WHERE 1=1"
         params: list = []
         if kb_name:
@@ -222,11 +270,27 @@ class DocumentStore:
         if user_id is not None:
             sql += " AND user_id = %s"
             params.append(user_id)
-        sql += " ORDER BY updated_at DESC, id DESC"
+        if cursor_id is not None and cursor_updated_at is not None:
+            sql += " AND (updated_at < %s OR (updated_at = %s AND id < %s))"
+            params.extend([cursor_updated_at, cursor_updated_at, cursor_id])
+        sql += " ORDER BY updated_at DESC, id DESC LIMIT %s"
+        params.append(limit + 1)
+
         with get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, params)
-                return cur.fetchall()
+                rows = cur.fetchall()
+
+        has_more = len(rows) > limit
+        items = rows[:limit]
+        next_cursor: dict | None = None
+        if has_more and items:
+            last = items[-1]
+            updated_at = last["updated_at"]
+            if isinstance(updated_at, datetime):
+                updated_at = updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            next_cursor = {"id": last["id"], "updated_at": str(updated_at)}
+        return {"items": items, "has_more": has_more, "next_cursor": next_cursor}
 
     def get_conversation(self, conv_id: int) -> dict | None:
         with get_conn() as conn:
