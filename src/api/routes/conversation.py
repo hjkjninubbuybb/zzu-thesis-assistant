@@ -4,19 +4,24 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from langchain_community.chat_models import ChatTongyi
 
 from src.api.auth import get_current_user
 from src.api.schemas import (
     ConversationCreate,
+    ConversationCursor,
     ConversationInfo,
     ConversationMessageOut,
     ConversationTitleUpdate,
     FeedbackRequest,
     MessageResponse,
+    PaginatedConversations,
     SaveMessageRequest,
 )
-from src.config import get_config, get_dashscope_api_key
+from src.config import get_config, get_api_key, get_api_base_url
+from src.api.routes.chat import _get_llm # Use the centralized factory if possible, but let's check imports
+
+# Actually, _get_llm is in rag_pipeline.py, let's use that.
+from src.core.rag_pipeline import _get_llm
 from src.storage.document_store import DocumentStore
 
 router = APIRouter(prefix="/api/conversation", tags=["conversation"])
@@ -36,14 +41,23 @@ def create_conversation(body: ConversationCreate, current_user: dict = Depends(g
     return row
 
 
-@router.get("", response_model=list[ConversationInfo])
+@router.get("", response_model=PaginatedConversations)
 def list_conversations(
     kb_name: str | None = Query(default=None),
+    cursor_id: int | None = Query(default=None),
+    cursor_updated_at: str | None = Query(default=None),
+    limit: int = Query(default=30, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
 ):
-    """列出对话。学生只看自己的，管理员/教师看所有。"""
+    """列出对话（游标分页）。学生只看自己的，管理员/教师看所有。"""
     user_id = None if current_user["role"] in ("admin", "teacher") else current_user["id"]
-    return _ds.list_conversations(kb_name=kb_name, user_id=user_id)
+    return _ds.list_conversations(
+        kb_name=kb_name,
+        user_id=user_id,
+        limit=limit,
+        cursor_id=cursor_id,
+        cursor_updated_at=cursor_updated_at,
+    )
 
 
 @router.get("/{conv_id}")
@@ -108,14 +122,8 @@ def summarize_title(conv_id: int, current_user: dict = Depends(get_current_user)
     user_text = (first_user["content"] or "").strip()[:500]
     assistant_text = ((first_assistant["content"] if first_assistant else "") or "").strip()[:500]
 
-    fast_model = get_config()["llm"].get("fast_model", "qwen-turbo")
-    api_key = get_dashscope_api_key()
-    if not api_key:
-        logger.warning("[summarize_title] DASHSCOPE_API_KEY 未配置，跳过 LLM 调用")
-        return _ds.update_conversation_title(conv_id, user_text[:20] or "新对话")
-
     try:
-        llm = ChatTongyi(model=fast_model, api_key=api_key, streaming=False)
+        llm = _get_llm(fast=True, streaming=False)
         prompt = (
             f"{_TITLE_SYSTEM_PROMPT}\n\n"
             f"【用户提问】\n{user_text}\n\n"
