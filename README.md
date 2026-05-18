@@ -24,6 +24,10 @@
 
 ## 本地部署指南
 
+> **关于配置**：本项目所有运行时配置（API Key、模型选择、检索参数等）均通过管理后台界面完成，**不需要手动编辑配置文件或创建 `.env` 文件**。
+
+---
+
 ### 第一步：安装前置工具
 
 根据你的操作系统选择对应命令：
@@ -34,84 +38,47 @@
 # 安装 Homebrew（如果还没有）
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# 安装 Python、Node、Docker（Colima 是轻量级 Docker 运行时，推荐）
+# 安装 Python、Node、Docker 运行时（Colima 轻量推荐）
 brew install python@3.11 node colima docker docker-compose
 
-# 安装 Poetry（Python 包管理工具）
+# 安装 Poetry（Python 包管理）
 pip3 install poetry
 ```
 
 #### Windows
 
 ```powershell
-# 以管理员身份打开 PowerShell，安装 Python 和 Node
+# 以管理员身份打开 PowerShell
 winget install Python.Python.3.11
 winget install OpenJS.NodeJS.LTS
-
-# 安装 Poetry
 pip install poetry
-
-# Docker Desktop（图形界面，安装后启动即可）
-# 下载：https://www.docker.com/products/docker-desktop/
+# Docker Desktop 下载并安装后启动即可
+# https://www.docker.com/products/docker-desktop/
 ```
 
-> **Windows 用户提示**：推荐使用 WSL2（Windows Subsystem for Linux）+ Ubuntu 环境，体验更接近 Linux，避免路径和换行符问题。
+> **Windows 建议**：推荐在 WSL2 + Ubuntu 下运行，避免路径和换行符问题。
 
 #### Ubuntu / Debian Linux
 
 ```bash
-sudo apt update
-sudo apt install python3.11 python3-pip nodejs npm docker.io docker-compose -y
+sudo apt update && sudo apt install python3.11 python3-pip nodejs npm docker.io docker-compose -y
 sudo systemctl enable --now docker
-sudo usermod -aG docker $USER   # 免 sudo 使用 docker（需重新登录生效）
+sudo usermod -aG docker $USER   # 免 sudo，需重新登录生效
 pip3 install poetry
 ```
 
 ---
 
-### 第二步：获取 DashScope API Key
-
-本项目 LLM / Embedding / VLM 全部依赖阿里云 DashScope：
-
-1. 访问 [https://dashscope.aliyun.com/](https://dashscope.aliyun.com/) 注册登录
-2. 进入「API-KEY 管理」，创建一个 Key（格式：`sk-xxxx...`）
-3. 记录这个 Key，后续配置中需要用到
-
----
-
-### 第三步：克隆项目
+### 第二步：克隆项目
 
 ```bash
-git clone https://github.com/hjkjninubbuybb/zzu-thesis-rag.git
-cd zzu-thesis-rag
+git clone https://github.com/hjkjninubbuybb/zzu-thesis-assistant.git
+cd zzu-thesis-assistant
 ```
 
 ---
 
-### 第四步：启动数据库容器
-
-项目依赖 Qdrant（向量数据库）和 MySQL 8.0，通过 Docker Compose 一键启动：
-
-```bash
-# macOS（Colima）需先启动 Docker 运行时
-colima start
-
-# 启动容器（首次会自动拉取镜像，MySQL 初始化约需 30 秒）
-docker-compose up -d
-
-# 验证两个容器是否正常运行
-docker ps
-# 应看到 qdrant 和 mysql 两个容器状态为 Up
-```
-
-> **macOS Colima 用户**：如果遇到 `Cannot connect to the Docker daemon` 报错，需要设置环境变量：
-> ```bash
-> export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
-> ```
-
----
-
-### 第五步：安装后端依赖
+### 第三步：安装后端依赖
 
 ```bash
 poetry install
@@ -121,37 +88,68 @@ Poetry 会自动创建虚拟环境并安装所有依赖（约 2-3 分钟）。
 
 ---
 
-### 第六步：构建前端
+### 第四步：构建前端
+
+> 仅生产模式（`poetry run start`）需要此步骤；开发模式（`poetry run dev`）会自动启动 Vite，跳过此步骤。
 
 ```bash
 cd frontend
-npm install        # 安装前端依赖
-npm run build      # 构建产物到 dist/
+npm install
+npm run build
 cd ..
 ```
 
 ---
 
-### 第七步：启动服务
+### 第五步：确保 Docker 运行时已启动
 
-```bash
-# 生产模式（推荐首次体验）：前后端同一端口，访问 http://localhost:8000
-poetry run start
+程序启动时会**自动执行** `docker compose up -d` 并等待 MySQL / Qdrant 就绪，无需手动操作。
+但需要先确保 Docker daemon 本身在运行：
 
-# 开发模式（热重载，适合二次开发）：前端 :5173，后端 :8000
-poetry run dev
-```
+- **macOS（Colima）**：`colima start`
+- **macOS / Windows（Docker Desktop）**：打开 Docker Desktop 应用，等待托盘图标变绿
+- **Linux**：`sudo systemctl start docker`（或上一步已 enable，重登后自动启动）
 
 ---
 
-### 第八步：首次配置
+### 第六步：启动服务
 
-1. 打开浏览器访问 **http://localhost:8000/admin**（生产模式）或 **http://localhost:5173/admin**（开发模式）
-2. 使用默认管理员账号登录：用户名 `admin`，密码 `admin123`
-3. 进入「**系统设置**」页面，填入你的 DashScope API Key
-4. 进入「**知识库**」页面，创建一个知识库
-5. 进入「**文档管理**」页面，上传你的文档（支持 PDF、Word、TXT）
-6. 等待索引完成后，切换到学生端 `/student` 即可开始提问
+```bash
+# 生产模式：前后端统一在 :8000
+poetry run start
+
+# 开发模式：前端 :5173（热重载）+ 后端 :8000（热重载）
+poetry run dev
+```
+
+启动时程序会自动完成：
+- 检测并启动 Colima（macOS）
+- `docker compose up -d` 拉起 MySQL + Qdrant
+- 等待数据库就绪（首次约 30 秒）
+- 启动 FastAPI / Vite
+
+---
+
+### 第七步：在管理后台完成首次配置
+
+打开浏览器，访问管理端：
+
+| 模式 | 地址 |
+|------|------|
+| 生产模式 | http://localhost:8000/admin |
+| 开发模式 | http://localhost:5173/admin |
+
+**首次登录账号**：用户名 `admin`，密码 `admin123`
+
+按以下顺序完成配置：
+
+1. **填入 API Key**：「系统设置」→「API 配置」→ 填入 DashScope API Key（格式 `sk-xxxx`）→ 点击「测试连接」验证
+2. **创建知识库**：「知识库管理」→ 新建知识库（随意命名）
+3. **分配知识库**：知识库列表 → 将刚创建的知识库「设为学生知识库」
+4. **上传文档**：「文档管理」→ 选择知识库 → 上传你的文档（PDF / Word / TXT）
+5. **等待索引**：文档列表中状态变为「已完成」后即可使用
+
+完成后切换到学生端验证：http://localhost:8000/student（或 :5173/student）
 
 ---
 
@@ -163,7 +161,21 @@ poetry run dev
 | 学生端 | http://localhost:8000/student | http://localhost:5173/student |
 | API 文档 | http://localhost:8000/docs | http://localhost:8000/docs |
 
-默认管理员：`admin` / `admin123`
+---
+
+### 生产环境安全建议（可选）
+
+默认配置适合本地开发。用于对外部署时建议修改以下值（在启动前设置 shell 环境变量，或直接编辑 `configs/config.yaml`）：
+
+```bash
+# JWT 签名密钥（默认值不安全）
+export AUTH_SECRET_KEY=你的随机长字符串
+
+# MySQL 密码（需与 docker-compose.yml 中保持一致）
+export MYSQL_PASSWORD=你的数据库密码
+```
+
+> 注意：本项目**不加载** `.env` 文件，以上变量需在启动终端的 shell 中直接 `export`，或写入 `~/.bashrc` / `~/.zshrc`。
 
 ---
 
@@ -172,12 +184,12 @@ poetry run dev
 | 问题 | 解决方法 |
 |------|---------|
 | `Cannot connect to the Docker daemon` | macOS：运行 `colima start`；Windows：启动 Docker Desktop |
-| MySQL 连接失败 / 启动报错 | 等待 30-60 秒让 MySQL 完成初始化，再重启服务 |
+| 启动时卡在"等待 MySQL + Qdrant 就绪" | 首次拉取镜像较慢，耐心等待；若超时请检查 Docker 是否正常运行 |
 | `poetry: command not found` | 重新打开终端，或将 `~/.local/bin` 加入 PATH |
-| 端口 8000 已被占用 | `lsof -i :8000` 查找占用进程，kill 后重试 |
-| API Key 无效 | 确认 Key 以 `sk-` 开头，且 DashScope 账户有足够余额 |
-| 上传文档后没有响应 | 检查 API Key 是否已在设置页面正确填入 |
-| Windows 路径问题 | 推荐使用 WSL2 + Ubuntu 环境运行项目 |
+| 端口 8000 / 5173 被占用 | 程序会自动 kill 占用进程，也可手动 `lsof -i :8000 \| kill` |
+| 提问无响应 / 报 API 错误 | 检查管理后台「系统设置」→「API 配置」中 Key 是否已填入并测试通过 |
+| 上传文档后索引卡住 | 同上，API Key 未配置时索引会失败 |
+| Windows 路径 / 权限问题 | 推荐使用 WSL2 + Ubuntu 环境 |
 
 ---
 
