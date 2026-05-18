@@ -1,5 +1,16 @@
 """FastAPI 应用入口。"""
 
+import warnings
+
+# 第一步：在 langchain_core 加载前先全局屏蔽，防止 Pydantic V1 兼容 warning 打印
+warnings.filterwarnings("ignore")
+
+# 第二步：langchain_core 的 __init__.py 会调用 surface_langchain_deprecation_warnings()，
+# 把 LangChainPendingDeprecationWarning 的 "default" filter 插到 warnings 列表头部，
+# 覆盖上面的 "ignore"。所以在其加载后再压入一次 ignore，恢复我们的优先级。
+import langchain_core  # noqa: F401
+warnings.filterwarnings("ignore", message=".*allowed_objects.*")
+
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -33,7 +44,24 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event() -> None:
+    import os, time
     ensure_default_admin()
+
+    # 计算启动耗时
+    start_ts = os.environ.get("_RAG_DEV_START")
+    elapsed = f"  ready in {(time.monotonic() - float(start_ts)) * 1000:.0f} ms" if start_ts else ""
+
+    print(
+        f"\n"
+        f"  RAG 1.0  dev\n"
+        f"\n"
+        f"  ➜  管理端   http://localhost:5173/admin\n"
+        f"  ➜  学生端   http://localhost:5173/student\n"
+        f"  ➜  API      http://127.0.0.1:8000\n"
+        f"\n"
+        f"  ✓{elapsed}",
+        flush=True,
+    )
 
 
 # API 路由（必须在 SPA fallback 之前注册）
@@ -131,8 +159,8 @@ def health():
         qdrant_ok = False
 
     # DashScope API key 存在即视为可用（避免计费探测）
-    from src.config import get_dashscope_api_key
-    dashscope_ok = bool(get_dashscope_api_key().strip())
+    from src.config import get_api_key
+    dashscope_ok = bool(get_api_key().strip())
 
     return {
         "fastapi": True,
