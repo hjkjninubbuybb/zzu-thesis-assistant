@@ -5,7 +5,7 @@ from llama_index.embeddings.dashscope import (
     DashScopeTextEmbeddingModels,
 )
 
-from src.config import get_config, get_dashscope_api_key
+from src.config import get_config, get_api_key
 
 _MODEL_MAP = {
     "text-embedding-v3": DashScopeTextEmbeddingModels.TEXT_EMBEDDING_V3,
@@ -25,6 +25,6 @@ def get_embed_model(text_type: str = "document") -> DashScopeEmbedding:
     return DashScopeEmbedding(
         model_name=_MODEL_MAP.get(model_name, DashScopeTextEmbeddingModels.TEXT_EMBEDDING_V3),
         text_type=text_type,
-        api_key=get_dashscope_api_key(),
+        api_key=get_api_key(),
         embed_batch_size=embed_batch_size,
     )

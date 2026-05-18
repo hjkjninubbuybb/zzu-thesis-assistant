@@ -2,11 +2,11 @@ import json
 import logging
 import os
 
-from langchain_community.chat_models import ChatTongyi
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, ValidationError
 
-from src.config import get_config, get_dashscope_api_key
+from src.config import get_config, get_api_key, get_api_base_url
 from .state import CleaningState
 from .prompts import (
     OPTIMIZER_SYSTEM_PROMPT,
@@ -49,10 +49,22 @@ class EvaluatorOutput(BaseModel):
     feedback: str
 
 
-def _get_llm(fast: bool = False) -> ChatTongyi:
-    cfg = get_config()["llm"]
-    model = cfg["fast_model"] if fast else cfg["model"]
-    return ChatTongyi(model=model, api_key=get_dashscope_api_key())
+def _get_llm(fast: bool = False) -> ChatOpenAI:
+    cfg = get_config()
+    key = get_api_key()
+    url = get_api_base_url()
+    
+    if fast:
+        model_name = cfg.get("llm", {}).get("fast_model", "qwen-turbo")
+    else:
+        model_name = cfg.get("llm", {}).get("model", "qwen-plus")
+        
+    return ChatOpenAI(
+        model=model_name,
+        openai_api_key=key,
+        openai_api_base=url,
+        streaming=False,
+    )
 
 
 def optimizer_node(state: CleaningState) -> dict:

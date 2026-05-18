@@ -396,20 +396,22 @@ def make_get_document_link_tool(kb_name: str, file_events: list):
 
         if not exact and _score(best["file_name"]) < 0.3:
             # 相关度太低，发送前3个文件供用户选择
+            sent = []
             for d in ranked[:3]:
                 file_events.append({
                     "file_name": d["file_name"],
                     "url": f"/api/document/{kb_name}/download/{d['id']}",
                     "size_kb": max(d["file_size"] // 1024, 1),
                 })
-            names = "、".join(fe["file_name"] for fe in file_events[-3:])
-            return f'未找到与\u201c{file_hint}\u201d完全匹配的文件，已发送相关文件：{names}，供用户参考。'
+                sent.append(d["file_name"])
+            names = "、".join(f"《{n}》" for n in sent)
+            return f"未找到与「{file_hint}」完全匹配的文件，已发送相关文件 {names}，文件已通过界面卡片展示给用户，请用纯文字告知用户供参考即可。"
 
         file_events.append({
             "file_name": best["file_name"],
             "url": f"/api/document/{kb_name}/download/{best['id']}",
             "size_kb": max(best["file_size"] // 1024, 1),
         })
-        return f"已发送文件《{best['file_name']}》，用户可直接下载。"
+        return f"已找到并发送文件《{best['file_name']}》，文件已通过界面卡片展示给用户，请用纯文字告知用户文件已准备好即可。"
 
     return get_document_link

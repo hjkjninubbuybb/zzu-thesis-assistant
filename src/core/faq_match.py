@@ -3,11 +3,12 @@
 import logging
 import os
 
-from langchain_community.chat_models import ChatTongyi
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from src.config import get_config, get_dashscope_api_key
+from src.config import get_config, get_api_key, get_api_base_url
 from src.core.embedding import get_embed_model
+from src.core.rag_pipeline import _get_llm
 from src.storage.document_store import DocumentStore
 from src.storage.vector_store import VectorStore
 
@@ -24,15 +25,11 @@ _REWRITE_SYSTEM = (
 
 
 def rewrite_query(raw: str) -> str:
-    """调用快速 LLM 改写查询词，失败时回退原始输入。"""
+    """调用快速 LLM 改写查询词，失败时回退原始输入处理。"""
     try:
-        cfg = get_config()["llm"]
-        llm = ChatTongyi(
-            model=cfg["fast_model"],
-            api_key=get_dashscope_api_key(),
-        )
+        llm = _get_llm(fast=True, streaming=False)
         resp = llm.invoke([SystemMessage(content=_REWRITE_SYSTEM), HumanMessage(content=raw)])
-        rewritten = resp.content.strip()
+        rewritten = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
         logger.info("[faq_match] 查询改写: %r → %r", raw, rewritten)
         return rewritten if rewritten else raw
     except Exception as e:
@@ -132,14 +129,9 @@ def faq_generate(query: str, faq_results: list[dict]) -> str | None:
     system = _FAQ_ANSWER_SYSTEM.format(faq_context=faq_context)
 
     try:
-        cfg = get_config()["llm"]
-        llm = ChatTongyi(
-            model=cfg["fast_model"],
-            streaming=False,
-            api_key=get_dashscope_api_key(),
-        )
+        llm = _get_llm(fast=True, streaming=False)
         resp = llm.invoke([SystemMessage(content=system), HumanMessage(content=query)])
-        text = resp.content.strip()
+        text = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
     except Exception as e:
         logger.warning("[faq_match] FAQ 快答 LLM 调用失败: %s", e)
         return None

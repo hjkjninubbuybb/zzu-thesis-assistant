@@ -220,17 +220,10 @@ def _extract_semantic(block: dict) -> dict:
     )
 
     try:
-        from langchain_community.chat_models import ChatTongyi
+        from src.core.rag_pipeline import _get_llm
         from langchain_core.messages import SystemMessage, HumanMessage
 
-        from pydantic import SecretStr
-
-        from src.config import get_dashscope_api_key
-        api_key = get_dashscope_api_key()
-        llm = ChatTongyi(
-            model="qwen-plus",
-            api_key=SecretStr(api_key) if api_key else None,
-        )
+        llm = _get_llm(fast=False, streaming=False)
         resp = llm.invoke([
             SystemMessage(content=_EXTRACT_SYSTEM),
             HumanMessage(content=user_content),

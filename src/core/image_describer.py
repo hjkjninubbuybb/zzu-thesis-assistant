@@ -17,7 +17,7 @@ import os
 import re
 from pathlib import Path
 
-from src.config import get_dashscope_api_key
+from src.config import get_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ def _describe_images_batch(
         resp = MultiModalConversation.call(
             model=vlm_model,
             messages=[{"role": "user", "content": content}],
-            api_key=get_dashscope_api_key(),
+            api_key=get_api_key(),
         )
         if resp.status_code != 200:
             logger.warning("[image_describer] VLM 批量描述失败 HTTP %s", resp.status_code)
