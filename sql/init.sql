@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS documents (
     chunk_size  INT UNSIGNED NOT NULL DEFAULT 256       COMMENT '切块大小',
     doc_type    VARCHAR(20)  NOT NULL DEFAULT 'plain_text' COMMENT '文档类型',
     status      VARCHAR(20)  NOT NULL DEFAULT 'processing' COMMENT '处理状态',
+    summary     TEXT         NULL                          COMMENT 'LLM 生成的全局摘要',
     created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_kb (kb_name),
     FOREIGN KEY (kb_name) REFERENCES knowledge_bases(name) ON DELETE CASCADE
@@ -193,12 +194,22 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消息表';
 
 
--- ── 消息反馈 ──────────────────────────────────────────────────
+-- ── 毕设里程碑（权威时间线） ──────────────────────────────
 
-CREATE TABLE IF NOT EXISTS message_feedback (
-    id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    message_id BIGINT UNSIGNED NOT NULL UNIQUE            COMMENT '关联消息',
-    rating     ENUM('up','down') NOT NULL                 COMMENT '评分',
-    created_at DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (message_id) REFERENCES conversation_messages(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消息反馈表';
+CREATE TABLE IF NOT EXISTS graduation_milestones (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL                   COMMENT '阶段名称',
+    deadline    DATE         NOT NULL                   COMMENT '权威截止日期',
+    description TEXT                                    COMMENT '阶段说明',
+    sort_order  INT          NOT NULL DEFAULT 0          COMMENT '排序',
+    updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='毕设里程碑表';
+
+-- 初始内置 5 个核心阶段
+INSERT IGNORE INTO graduation_milestones (name, deadline, sort_order, description) VALUES
+('选题确认', '2025-12-22', 1, '确定毕业设计题目并与导师绑定'),
+('开题报告', '2026-03-06', 2, '提交开题报告并经导师审核通过'),
+('中期检查', '2026-04-10', 3, '汇报阶段性研究成果与进度'),
+('论文定稿', '2026-05-22', 4, '完成最终版论文上传并进入查重环节'),
+('毕业答辩', '2026-06-15', 5, '参加学院组织的公开答辩及成绩评定');
+
