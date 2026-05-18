@@ -47,14 +47,31 @@ def get_config() -> dict:
     return _resolve_dict(raw)
 
 
-def get_dashscope_api_key() -> str:
-    """获取 DashScope API Key（数据库 system_settings 表，回退环境变量）。"""
+def get_api_key() -> str:
+    """获取 LLM API Key（数据库 system_settings 表，回退环境变量）。"""
     try:
         from src.storage.document_store import DocumentStore
         ds = DocumentStore()
-        key = ds.get_setting("dashscope_api_key")
+        # 兼容旧名称 dashscope_api_key
+        key = ds.get_setting("api_key") or ds.get_setting("dashscope_api_key")
         if key:
             return key
     except Exception:
         logger.debug("[config] 无法从数据库读取 API Key，回退环境变量")
-    return os.environ.get("DASHSCOPE_API_KEY", "")
+    return os.environ.get("LLM_API_KEY") or os.environ.get("DASHSCOPE_API_KEY", "")
+
+
+def get_api_base_url() -> str | None:
+    """获取 LLM API Base URL（数据库优先）。"""
+    try:
+        from src.storage.document_store import DocumentStore
+        ds = DocumentStore()
+        url = ds.get_setting("api_base_url")
+        if url:
+            return url
+    except Exception:
+        pass
+    
+    cfg = get_config()
+    return cfg.get("llm", {}).get("api_base_url") or os.environ.get("LLM_API_BASE_URL")
+
