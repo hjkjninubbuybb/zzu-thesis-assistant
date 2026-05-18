@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect, useCallback, memo } from 'react'
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import {
   ArrowUp, Loader2, ChevronDown, ChevronUp, Trash2, AlertCircle,
   Download, Plus, ThumbsUp, ThumbsDown, BookOpen, ShieldAlert,
   Pencil, Check, X as XIcon, HelpCircle,
 } from 'lucide-react'
-import { knowledgeApi, faqApi, conversationApi, ticketApi } from '@/lib/api'
+import { knowledgeApi, faqApi, conversationApi, ticketApi, documentApi } from '@/lib/api'
 
 import { useAuth } from '@/hooks/useAuth'
 import { getAccessToken, getRefreshToken, saveAuth, clearAuth, getCurrentPortal } from '@/lib/auth'
@@ -159,11 +159,28 @@ const EXT_COLORS: Record<string, string> = {
 function FileCard({ file }: { file: FileItem }) {
   const ext = file.file_name.split('.').pop()?.toLowerCase() ?? ''
   const badgeColor = EXT_COLORS[ext] ?? 'bg-gray-500'
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownload = async () => {
+    if (downloading) return
+    setDownloading(true)
+    try {
+      const { token } = await documentApi.getDownloadToken(file.url)
+      const a = document.createElement('a')
+      a.href = `${file.url}?token=${token}`
+      a.download = file.file_name
+      a.click()
+    } catch {
+      // 静默失败，不打断用户
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   return (
-    <a
-      href={file.url}
-      download={file.file_name}
-      className="flex items-center gap-3 bg-[#F7F5F1] border border-[#E8E4DC] rounded-xl px-3 py-2.5 no-underline hover:bg-[#F0EDE8] transition-colors group"
+    <div
+      onClick={handleDownload}
+      className="cursor-pointer flex items-center gap-3 bg-[#F7F5F1] border border-[#E8E4DC] rounded-xl px-3 py-2.5 hover:bg-[#F0EDE8] transition-colors group"
     >
       <div className={`${badgeColor} text-white text-[10px] font-bold uppercase rounded-md px-1.5 py-1 min-w-[2.2rem] text-center leading-none`}>
         {ext || 'FILE'}
@@ -172,8 +189,11 @@ function FileCard({ file }: { file: FileItem }) {
         <p className="text-sm font-medium text-gray-800 truncate">{file.file_name}</p>
         <p className="text-xs text-gray-400">{file.size_kb} KB</p>
       </div>
-      <Download size={14} className="text-gray-400 group-hover:text-gray-600 shrink-0" />
-    </a>
+      {downloading
+        ? <Loader2 size={14} className="text-gray-400 shrink-0 animate-spin" />
+        : <Download size={14} className="text-gray-400 group-hover:text-gray-600 shrink-0" />
+      }
+    </div>
   )
 }
 
@@ -261,11 +281,11 @@ function AcademicMarkdown({ content, sources }: { content: string, sources?: Sou
                 if (href?.startsWith('#sandbox:')) {
                   const filename = decodeURIComponent(href.replace('#sandbox:', ''))
                   return (
-                    <a 
-                      href="#" 
-                      onClick={(e) => { 
+                    <a
+                      href="#"
+                      onClick={(e) => {
                         e.preventDefault()
-                        alert(`【演示文件下载】\n\n文件名: ${filename}\n\n注：此为 AI 生成的演示下载链接，实际物理文件并未在此演示环境中持久化。`) 
+                        alert(`【演示文件下载】\n\n文件名: ${filename}\n\n注：此为 AI 生成的演示下载链接，实际物理文件并未在此演示环境中持久化。`)
                       }}
                       className="text-blue-600 hover:text-blue-700 underline underline-offset-2 font-medium"
                       {...props as any}
@@ -578,6 +598,8 @@ function AdminConversationSidebar({
   onNew,
   onDelete,
   onRename,
+  onLoadMore,
+  isFetchingMore,
 }: {
   conversations: ConversationInfo[]
   activeId: number | null
@@ -586,8 +608,24 @@ function AdminConversationSidebar({
   onNew: () => void
   onDelete: (id: number) => void
   onRename: (id: number, title: string) => void
+  onLoadMore: () => void
+  isFetchingMore: boolean
 }) {
   const groups = groupByDate(conversations)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    const handleScroll = () => {
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+        onLoadMore()
+      }
+    }
+    el.addEventListener('scroll', handleScroll)
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [onLoadMore])
+
   return (
     <div className="w-64 shrink-0 flex flex-col glass-card rounded-2xl overflow-hidden">
       <div className="p-3 border-b border-[#F0EDE8]">
@@ -616,7 +654,7 @@ function AdminConversationSidebar({
           新建对话
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-3">
+      <div ref={listRef} className="flex-1 overflow-y-auto p-2 space-y-3">
         {conversations.length === 0 && (
           <p className="text-xs text-gray-400 text-center py-8">
             {adminKbName ? '暂无对话记录' : '等待知识库配置'}
@@ -651,6 +689,11 @@ function AdminConversationSidebar({
             </div>
           ))
         })()}
+        {isFetchingMore && (
+          <div className="flex justify-center py-2">
+            <Loader2 size={14} className="animate-spin text-gray-300" />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -666,6 +709,8 @@ function StudentConversationSidebar({
   onNew,
   onDelete,
   onRename,
+  onLoadMore,
+  isFetchingMore,
 }: {
   conversations: ConversationInfo[]
   activeId: number | null
@@ -674,8 +719,24 @@ function StudentConversationSidebar({
   onNew: () => void
   onDelete: (id: number) => void
   onRename: (id: number, title: string) => void
+  onLoadMore: () => void
+  isFetchingMore: boolean
 }) {
   const groups = groupByDate(conversations)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    const handleScroll = () => {
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+        onLoadMore()
+      }
+    }
+    el.addEventListener('scroll', handleScroll)
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [onLoadMore])
+
   return (
     <div className="w-64 shrink-0 flex flex-col glass-card rounded-2xl overflow-hidden">
       {/* 知识库信息卡 */}
@@ -707,7 +768,7 @@ function StudentConversationSidebar({
       </div>
 
       {/* 对话列表 */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-3">
+      <div ref={listRef} className="flex-1 overflow-y-auto p-2 space-y-3">
         {conversations.length === 0 && (
           <p className="text-xs text-gray-400 text-center py-8">
             {activeKbName ? '暂无对话记录' : '等待知识库分配'}
@@ -742,6 +803,11 @@ function StudentConversationSidebar({
             </div>
           ))
         })()}
+        {isFetchingMore && (
+          <div className="flex justify-center py-2">
+            <Loader2 size={14} className="animate-spin text-gray-300" />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -866,10 +932,32 @@ export default function ConversationsPage() {
   // 当前生效的 kb_name
   const effectiveKb = isStudent ? (studentKb ?? '') : (adminKb ?? '')
 
-  const { data: conversations = [] } = useQuery({
+  const {
+    data: conversationPages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['conversations', effectiveKb || '__all__'],
-    queryFn: () => conversationApi.list(effectiveKb || undefined),
+    queryFn: ({ pageParam }) =>
+      conversationApi.list({
+        kb_name: effectiveKb || undefined,
+        cursor_id: pageParam?.id,
+        cursor_updated_at: pageParam?.updated_at,
+        limit: 30,
+      }),
+    initialPageParam: undefined as { id: number; updated_at: string } | undefined,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
   })
+
+  const conversations = useMemo(
+    () => conversationPages?.pages.flatMap(p => p.items) ?? [],
+    [conversationPages],
+  )
+
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const { data: faqs } = useQuery({
     queryKey: ['faqs', effectiveKb],
@@ -1116,6 +1204,8 @@ export default function ConversationsPage() {
           onNew={handleNewConversation}
           onDelete={handleDeleteConversation}
           onRename={handleRenameConversation}
+          onLoadMore={handleLoadMore}
+          isFetchingMore={isFetchingNextPage}
         />
       ) : (
         <AdminConversationSidebar
@@ -1126,6 +1216,8 @@ export default function ConversationsPage() {
           onNew={handleNewConversation}
           onDelete={handleDeleteConversation}
           onRename={handleRenameConversation}
+          onLoadMore={handleLoadMore}
+          isFetchingMore={isFetchingNextPage}
         />
       )}
 
