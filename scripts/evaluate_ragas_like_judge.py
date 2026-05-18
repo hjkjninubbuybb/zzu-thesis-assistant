@@ -88,14 +88,14 @@ def _nullable_score(value: Any) -> float | None:
 
 
 def _get_dashscope_llm(model: str | None = None):
-    from langchain_community.chat_models import ChatTongyi
-
-    from src.config import get_config, get_dashscope_api_key
+    from langchain_openai import ChatOpenAI
+    from src.config import get_config, get_api_key, get_api_base_url
 
     cfg = get_config()["llm"]
-    return ChatTongyi(
+    return ChatOpenAI(
         model=model or cfg.get("fast_model") or cfg.get("model", "qwen-plus"),
-        api_key=get_dashscope_api_key(),
+        openai_api_key=get_api_key(),
+        openai_api_base=get_api_base_url(),
         streaming=False,
         temperature=0,
     )

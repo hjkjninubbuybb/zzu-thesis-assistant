@@ -234,7 +234,7 @@ class RuntimeDeps:
 
 
 def build_runtime(kb_name: str | None, reranker_top_n: int | None = None) -> RuntimeDeps:
-    from src.config import get_config, get_dashscope_api_key
+    from src.config import get_config, get_api_key
     from src.core.retrieval import HybridRetriever, fetch_corpus
     from src.core.reranker import Reranker
     from src.storage.document_store import DocumentStore
@@ -245,7 +245,7 @@ def build_runtime(kb_name: str | None, reranker_top_n: int | None = None) -> Run
     if not resolved_kb:
         raise RuntimeError("No kb_name provided and no active_kb/admin_kb is configured.")
 
-    if not get_dashscope_api_key():
+    if not get_api_key():
         print("[warn] DashScope API key is empty; embedding/rerank/LLM calls may fail.")
 
     cfg = get_config()
