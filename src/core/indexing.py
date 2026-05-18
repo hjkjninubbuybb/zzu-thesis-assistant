@@ -4,26 +4,46 @@
 - ``policy``：政策文件，纯文本流程（默认）
 - ``manual``：操作手册，图文混排流程，仅对 PDF 生效
   额外步骤：提取图片 → 清洗（含占位符校验）→ VLM 批量描述注入
-- ``form``：填报模板，逐 chunk 处理，表格 → LLM 提取自然语言，文本 → 正常切分
+- ``form``：填报模板/格式规范，Evaluator-Optimizer 工作流按主题提取 → 直接向量化
 """
 
 import logging
 import re
 from pathlib import Path
 
-from llama_index.core.schema import Document
+from llama_index.core.schema import Document, TextNode
 
 from src.core.splitter import create_splitter
 from src.core.cleaning import clean_text
+from src.core.form_extraction import extract_form_sections
 from src.parsers import get_parser
 from src.parsers.pdf.text_extractor import PdfTextExtractor
 from src.core.image_describer import inject_image_descriptions
 from src.storage.vector_store import VectorStore
 from src.storage.document_store import DocumentStore
 from src.core.embedding import get_embed_model
+from src.core.rag_pipeline import _get_llm
 from src.config import get_config
 
 logger = logging.getLogger(__name__)
+
+
+def _generate_document_summary(file_name: str, full_text: str) -> str:
+    """生成文档的全局摘要（用于 Agent 先验知识）。"""
+    try:
+        llm = _get_llm(streaming=False)
+        prompt = (
+            "请为以下文档生成一段简短的全局摘要（150字以内）。\n"
+            "摘要应包含：文档的主题、核心内容、以及它能解决哪类问题。\n\n"
+            f"文件名：{file_name}\n"
+            f"正文预览（前3000字）：\n{full_text[:3000]}"
+        )
+        resp = llm.invoke(prompt)
+        summary = resp.content if hasattr(resp, "content") else str(resp)
+        return summary.strip()
+    except Exception as e:
+        logger.warning("[summary] 生成摘要失败 (%s): %s", file_name, e)
+        return ""
 
 # 图片临时目录（相对项目根）
 _IMAGE_CACHE_DIR = Path(__file__).parents[2] / "data" / "images"
@@ -65,7 +85,7 @@ def index_document(
         )
     if doc_type == "form":
         return _index_form_document(
-            kb_name, file_path, file_name, file_size,
+            kb_name, file_path, file_name, file_size, splitter_type,
             chunk_size, chunk_overlap_ratio, enable_cleaning, vs, ds,
         )
     # policy（默认）
@@ -101,7 +121,10 @@ def _index_policy_document(
 
     # 3. 切分
     nodes = _split_text(text, file_name, kb_name, splitter_type, chunk_size, chunk_overlap_ratio, doc_type="policy")
-    return _embed_and_store(kb_name, file_name, file_size, chunk_size, "policy", nodes, vs, ds)
+    return _embed_and_store(
+        kb_name, file_name, file_size, chunk_size, "policy", nodes, vs, ds, 
+        full_text=text, splitter_type=splitter_type, chunk_overlap_ratio=chunk_overlap_ratio
+    )
 
 
 # ── 图文混排流水线（manual） ─────────────────────────────────────
@@ -155,7 +178,10 @@ def _index_manual_document(
 
     # 4. 切分
     nodes = _split_text(text, file_name, kb_name, splitter_type, chunk_size, chunk_overlap_ratio, doc_type="manual")
-    return _embed_and_store(kb_name, file_name, file_size, chunk_size, "manual", nodes, vs, ds)
+    return _embed_and_store(
+        kb_name, file_name, file_size, chunk_size, "manual", nodes, vs, ds, 
+        full_text=text, splitter_type=splitter_type, chunk_overlap_ratio=chunk_overlap_ratio
+    )
 
 
 # ── 共享工具函数 ──────────────────────────────────────────────
@@ -210,9 +236,9 @@ def _split_text(
     优先级：API 显式传入 splitter_type > config per-doc-type 默认 > 全局默认 recursive。
     """
     splitter_cfg = _get_splitter_config(doc_type)
-    effective_type = splitter_type or splitter_cfg["type"]
-    effective_chunk_size = chunk_size or splitter_cfg["chunk_size"]
-    effective_overlap = chunk_overlap_ratio or splitter_cfg["chunk_overlap_ratio"]
+    effective_type = splitter_type if splitter_type else splitter_cfg["type"]
+    effective_chunk_size = chunk_size if chunk_size else splitter_cfg["chunk_size"]
+    effective_overlap = chunk_overlap_ratio if chunk_overlap_ratio is not None else splitter_cfg["chunk_overlap_ratio"]
 
     # 收集 splitter 特有参数
     extra: dict = {}
@@ -246,33 +272,65 @@ def _index_form_document(
     file_path: Path,
     file_name: str,
     file_size: int,
+    splitter_type: str,
     chunk_size: int,
     chunk_overlap_ratio: float,
     enable_cleaning: bool,
     vs: VectorStore,
     ds: DocumentStore,
 ) -> dict:
-    """填报模板入库流程：提取全部文字 → LLM 去除无用信息 → 切分。
+    """填报模板/格式规范入库流程：Evaluator-Optimizer 按主题提取 → 直接向量化。
 
-    模板类文档的核心价值是其中的文字说明（字段名称、填写要求、注意事项等），
-    表格结构本身不需要保留。流程简化为：
-    1. 解析出所有文本（表格内容也一并提取为纯文字）
-    2. LLM 清洗：去掉空白填写区域、格式噪声、重复表头等无用信息
-    3. 切分入库
+    1. 解析出全部文本
+    2. 调用 extract_form_sections() 按主题提取信息（强模型提取 + 快速模型评估，最多重试 3 次）
+    3. 提取成功：每个 section → TextNode（带 section_topic 元数据），直接向量化
+    4. 提取失败（空列表）：fallback 到 recursive 切分
     """
-    logger.info("[%s] form 类型：提取文字 → LLM 清洗 → 切分...", kb_name)
+    logger.info("[%s] form 类型：Evaluator-Optimizer 主题提取...", kb_name)
 
-    # 1. 解析��—提取全部文字内容
+    # 1. 解析
     parser = get_parser(file_path.suffix.lower())
     parsed = parser.parse(file_path)
     raw_text = parsed.all_text()
 
-    # 2. LLM 清洗——去除模板中的无用信息
-    text = _clean_or_fallback(raw_text, kb_name, doc_type="form", enable=enable_cleaning)
+    # 2. LLM 按主题提取
+    extraction = extract_form_sections(raw_text, file_name)
+    sections = extraction["sections"]
+    extraction_status = extraction["status"]
 
-    # 3. 切分
-    nodes = _split_text(text, file_name, kb_name, "", chunk_size, chunk_overlap_ratio, doc_type="form")
-    return _embed_and_store(kb_name, file_name, file_size, chunk_size, "form", nodes, vs, ds)
+    if sections:
+        # 有实质内容：每个 section 直接作为一个 TextNode
+        logger.info("[%s] 提取到 %d 个 sections，构建 TextNode...", kb_name, len(sections))
+        nodes = [
+            TextNode(
+                text=s["content"],
+                metadata={
+                    "file_name": file_name,
+                    "kb_name": kb_name,
+                    "section_topic": s["topic"],
+                },
+            )
+            for s in sections
+        ]
+        full_text = "\n\n".join(s["content"] for s in sections)
+    elif extraction_status == "PASS":
+        # 主动判断无实质内容（空白表单等）：不存 chunk，不 fallback
+        logger.info("[%s] form 文档无实质内容，跳过向量化", kb_name)
+        nodes = []
+        full_text = raw_text
+    else:
+        # 提取失败（LLM 异常或重试耗尽）：fallback 到 recursive 切分
+        logger.warning("[%s] form 提取失败，fallback 到 recursive 切分", kb_name)
+        nodes = _split_text(
+            raw_text, file_name, kb_name, splitter_type,
+            chunk_size, chunk_overlap_ratio, doc_type="form",
+        )
+        full_text = raw_text
+
+    return _embed_and_store(
+        kb_name, file_name, file_size, chunk_size, "form", nodes, vs, ds,
+        full_text=full_text, splitter_type=splitter_type, chunk_overlap_ratio=chunk_overlap_ratio,
+    )
 
 
 
@@ -285,9 +343,36 @@ def _embed_and_store(
     nodes: list,
     vs: VectorStore,
     ds: DocumentStore,
+    full_text: str = "",
+    splitter_type: str = "recursive",
+    chunk_overlap_ratio: float = 0.2,
 ) -> dict:
-    """Embedding → Qdrant → MySQL，带回滚保护。"""
-    # Embedding
+    """Embedding → MySQL → Qdrant，带回滚保护。"""
+    # 0. 生成全局摘要（用于 Agent 先验知识）
+    summary = ""
+    if full_text:
+        logger.info("[%s] 正在生成文档全局摘要...", kb_name)
+        summary = _generate_document_summary(file_name, full_text)
+
+    # nodes 为空（如 form 流水线判断无实质内容）：仅记录元数据，跳过 Embedding 和 Qdrant
+    if not nodes:
+        logger.info("[%s] 无可索引内容（0 nodes），仅写入元数据: %s", kb_name, file_name)
+        doc_record = ds.add_document(
+            kb_name=kb_name,
+            file_name=file_name,
+            file_size=file_size,
+            chunk_count=0,
+            chunk_size=chunk_size,
+            chunk_overlap_ratio=chunk_overlap_ratio,
+            doc_type=doc_type,
+            splitter_type=splitter_type,
+            summary=summary,
+            content=full_text,
+            status="completed",
+        )
+        return {"doc_id": doc_record["id"], "file_name": file_name, "chunk_count": 0}
+
+    # 1. Embedding
     logger.info("[%s] 生成 Embedding (%d nodes)...", kb_name, len(nodes))
     embed_model = get_embed_model(text_type="document")
     texts = [n.get_content() for n in nodes]
@@ -297,22 +382,7 @@ def _embed_and_store(
         logger.error("[%s] Embedding 失败 (%d chunks): %s", kb_name, len(texts), e)
         raise RuntimeError(f"向量化失败（{len(texts)} 个 chunk）：{e}") from e
 
-    # 存入 Qdrant
-    logger.info("[%s] 写入 Qdrant collection '%s'...", kb_name, kb_name)
-    vs.create_collection(kb_name)
-    payloads = [
-        {
-            "text": n.get_content(),
-            "file_name": file_name,
-            "kb_name": kb_name,
-            "node_id": n.node_id,
-        }
-        for n in nodes
-    ]
-    ids = [n.node_id for n in nodes]
-    vs.add_vectors(kb_name, vectors, payloads, ids)
-
-    # 记录元数据（失败时回滚）
+    # 2. 记录元数据（先占位，获取 doc_id）
     try:
         doc_record = ds.add_document(
             kb_name=kb_name,
@@ -320,21 +390,46 @@ def _embed_and_store(
             file_size=file_size,
             chunk_count=len(nodes),
             chunk_size=chunk_size,
+            chunk_overlap_ratio=chunk_overlap_ratio,
             doc_type=doc_type,
+            splitter_type=splitter_type,
+            summary=summary,
+            content=full_text,
+            status="completed",
         )
+        doc_id = doc_record["id"]
     except Exception as e:
-        logger.error("[%s] MySQL 写入失败，回滚 Qdrant 向量: %s", kb_name, e)
-        try:
-            vs.delete_by_metadata(kb_name, "file_name", file_name)
-        except Exception as rollback_err:
-            logger.error(
-                "[%s] 向量回滚失败，存在孤儿向量，需手动清理: %s", kb_name, rollback_err
-            )
+        logger.error("[%s] MySQL 写入失败: %s", kb_name, e)
+        raise
+
+    # 3. 存入 Qdrant (包含 doc_id 以支持精准删除)
+    logger.info("[%s] 写入 Qdrant collection '%s'...", kb_name, kb_name)
+    vs.create_collection(kb_name)
+    _COMMON_META_KEYS = {"file_name", "kb_name"}
+    payloads = []
+    for n in nodes:
+        payload = {
+            "text": n.get_content(),
+            "file_name": file_name,
+            "kb_name": kb_name,
+            "node_id": n.node_id,
+            "doc_id": doc_id,
+        }
+        for k, v in n.metadata.items():
+            if k not in _COMMON_META_KEYS:
+                payload[k] = v
+        payloads.append(payload)
+    ids = [n.node_id for n in nodes]
+    try:
+        vs.add_vectors(kb_name, vectors, payloads, ids)
+    except Exception as e:
+        logger.error("[%s] Qdrant 写入失败，回滚 MySQL 记录: %s", kb_name, e)
+        ds.delete_document(doc_id)
         raise
 
     logger.info("[%s] 文档 '%s' 入库完成，共 %d 个 chunks", kb_name, file_name, len(nodes))
     return {
-        "doc_id": doc_record["id"],
+        "doc_id": doc_id,
         "file_name": file_name,
         "chunk_count": len(nodes),
     }
@@ -389,6 +484,74 @@ def delete_document(
     if not doc:
         raise ValueError(f"文档 {doc_id} 不存在")
 
-    vs.delete_by_metadata(kb_name, "file_name", doc["file_name"])
+    # 使用 doc_id 进行精准删除
+    vs.delete_by_metadata(kb_name, "doc_id", doc_id)
     ds.delete_document(doc_id)
-    logger.info("[%s] 文档 '%s' 已删除", kb_name, doc["file_name"])
+    logger.info("[%s] 文档 '%s' (ID: %d) 已删除", kb_name, doc["file_name"], doc_id)
+
+
+def reindex_document(
+    kb_name: str,
+    doc_id: int,
+    vector_store: VectorStore | None = None,
+    doc_store: DocumentStore | None = None,
+) -> dict:
+    """基于数据库中现有的 content 重新索引文档（切分 + Embedding + Qdrant）。"""
+    vs = vector_store or VectorStore()
+    ds = doc_store or DocumentStore()
+
+    doc = ds.get_document(doc_id)
+    if not doc or doc["kb_name"] != kb_name:
+        raise ValueError(f"文档 {doc_id} 不存在或知识库不匹配")
+
+    content = doc.get("content")
+    if not content:
+        raise ValueError(f"文档 {doc_id} 没有可索引的内容")
+
+    file_name = doc["file_name"]
+    doc_type = doc["doc_type"]
+    chunk_size = doc["chunk_size"]
+    chunk_overlap_ratio = doc.get("chunk_overlap_ratio", 0.1)
+    splitter_type = doc.get("splitter_type", "recursive")
+
+    logger.info("[%s] 重新索引文档: %s (doc_id=%d)", kb_name, file_name, doc_id)
+
+    # 1. 删除 Qdrant 中的旧向量 (使用 doc_id)
+    vs.delete_by_metadata(kb_name, "doc_id", doc_id)
+
+    # 2. 切分
+    nodes = _split_text(content, file_name, kb_name, splitter_type, chunk_size, chunk_overlap_ratio, doc_type=doc_type)
+
+    # 3. Embedding
+    logger.info("[%s] 生成 Embedding (%d nodes)...", kb_name, len(nodes))
+    embed_model = get_embed_model(text_type="document")
+    texts = [n.get_content() for n in nodes]
+    vectors = embed_model.get_text_embedding_batch(texts)
+
+    # 4. 写入 Qdrant
+    _COMMON_META_KEYS = {"file_name", "kb_name"}
+    payloads = []
+    for n in nodes:
+        payload = {
+            "text": n.get_content(),
+            "file_name": file_name,
+            "kb_name": kb_name,
+            "node_id": n.node_id,
+            "doc_id": doc_id,
+        }
+        for k, v in n.metadata.items():
+            if k not in _COMMON_META_KEYS:
+                payload[k] = v
+        payloads.append(payload)
+    ids = [n.node_id for n in nodes]
+    vs.add_vectors(kb_name, vectors, payloads, ids)
+
+    # 5. 更新 MySQL 中的 chunk_count
+    ds.update_document(doc_id, chunk_count=len(nodes))
+
+    logger.info("[%s] 文档 '%s' 重新索引完成，共 %d 个 chunks", kb_name, file_name, len(nodes))
+    return {
+        "doc_id": doc_id,
+        "file_name": file_name,
+        "chunk_count": len(nodes),
+    }
