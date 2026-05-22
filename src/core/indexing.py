@@ -13,17 +13,17 @@ from pathlib import Path
 
 from llama_index.core.schema import Document, TextNode
 
-from src.core.splitter import create_splitter
+from src.config import get_config
 from src.core.cleaning import clean_text
 from src.core.form_extraction import extract_form_sections
+from src.core.image_describer import inject_image_descriptions
+from src.core.llm_factory import get_llm
+from src.core.rag.embedding import get_embed_model
+from src.core.splitter import create_splitter
 from src.parsers import get_parser
 from src.parsers.pdf.text_extractor import PdfTextExtractor
-from src.core.image_describer import inject_image_descriptions
-from src.storage.vector_store import VectorStore
 from src.storage.document_store import DocumentStore
-from src.core.embedding import get_embed_model
-from src.core.rag_pipeline import _get_llm
-from src.config import get_config
+from src.storage.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 def _generate_document_summary(file_name: str, full_text: str) -> str:
     """生成文档的全局摘要（用于 Agent 先验知识）。"""
     try:
-        llm = _get_llm(streaming=False)
+        llm = get_llm(streaming=False)
         prompt = (
             "请为以下文档生成一段简短的全局摘要（150字以内）。\n"
             "摘要应包含：文档的主题、核心内容、以及它能解决哪类问题。\n\n"
@@ -44,6 +44,7 @@ def _generate_document_summary(file_name: str, full_text: str) -> str:
     except Exception as e:
         logger.warning("[summary] 生成摘要失败 (%s): %s", file_name, e)
         return ""
+
 
 # 图片临时目录（相对项目根）
 _IMAGE_CACHE_DIR = Path(__file__).parents[2] / "data" / "images"
@@ -80,18 +81,42 @@ def index_document(
 
     if doc_type == "manual":
         return _index_manual_document(
-            kb_name, file_path, file_name, file_size, splitter_type,
-            chunk_size, chunk_overlap_ratio, enable_cleaning, vs, ds,
+            kb_name,
+            file_path,
+            file_name,
+            file_size,
+            splitter_type,
+            chunk_size,
+            chunk_overlap_ratio,
+            enable_cleaning,
+            vs,
+            ds,
         )
     if doc_type == "form":
         return _index_form_document(
-            kb_name, file_path, file_name, file_size, splitter_type,
-            chunk_size, chunk_overlap_ratio, enable_cleaning, vs, ds,
+            kb_name,
+            file_path,
+            file_name,
+            file_size,
+            splitter_type,
+            chunk_size,
+            chunk_overlap_ratio,
+            enable_cleaning,
+            vs,
+            ds,
         )
     # policy（默认）
     return _index_policy_document(
-        kb_name, file_path, file_name, file_size, splitter_type,
-        chunk_size, chunk_overlap_ratio, enable_cleaning, vs, ds,
+        kb_name,
+        file_path,
+        file_name,
+        file_size,
+        splitter_type,
+        chunk_size,
+        chunk_overlap_ratio,
+        enable_cleaning,
+        vs,
+        ds,
     )
 
 
@@ -117,13 +142,32 @@ def _index_policy_document(
     raw_text = parser.parse(file_path).all_text()
 
     # 2. 清洗
-    text = _clean_or_fallback(raw_text, kb_name, doc_type="policy", enable=enable_cleaning)
+    text = _clean_or_fallback(
+        raw_text, kb_name, doc_type="policy", enable=enable_cleaning
+    )
 
     # 3. 切分
-    nodes = _split_text(text, file_name, kb_name, splitter_type, chunk_size, chunk_overlap_ratio, doc_type="policy")
+    nodes = _split_text(
+        text,
+        file_name,
+        kb_name,
+        splitter_type,
+        chunk_size,
+        chunk_overlap_ratio,
+        doc_type="policy",
+    )
     return _embed_and_store(
-        kb_name, file_name, file_size, chunk_size, "policy", nodes, vs, ds, 
-        full_text=text, splitter_type=splitter_type, chunk_overlap_ratio=chunk_overlap_ratio
+        kb_name,
+        file_name,
+        file_size,
+        chunk_size,
+        "policy",
+        nodes,
+        vs,
+        ds,
+        full_text=text,
+        splitter_type=splitter_type,
+        chunk_overlap_ratio=chunk_overlap_ratio,
     )
 
 
@@ -163,7 +207,9 @@ def _index_manual_document(
         raw_text = parser.parse(file_path).all_text()
 
     # 2. 清洗
-    text = _clean_or_fallback(raw_text, kb_name, doc_type="manual", enable=enable_cleaning)
+    text = _clean_or_fallback(
+        raw_text, kb_name, doc_type="manual", enable=enable_cleaning
+    )
 
     # 3. VLM 描述注入（仅 PDF 多模态成功时）
     if is_pdf:
@@ -177,10 +223,27 @@ def _index_manual_document(
             logger.warning("[%s] VLM 描述注入失败，保留占位符原文: %s", kb_name, e)
 
     # 4. 切分
-    nodes = _split_text(text, file_name, kb_name, splitter_type, chunk_size, chunk_overlap_ratio, doc_type="manual")
+    nodes = _split_text(
+        text,
+        file_name,
+        kb_name,
+        splitter_type,
+        chunk_size,
+        chunk_overlap_ratio,
+        doc_type="manual",
+    )
     return _embed_and_store(
-        kb_name, file_name, file_size, chunk_size, "manual", nodes, vs, ds, 
-        full_text=text, splitter_type=splitter_type, chunk_overlap_ratio=chunk_overlap_ratio
+        kb_name,
+        file_name,
+        file_size,
+        chunk_size,
+        "manual",
+        nodes,
+        vs,
+        ds,
+        full_text=text,
+        splitter_type=splitter_type,
+        chunk_overlap_ratio=chunk_overlap_ratio,
     )
 
 
@@ -238,7 +301,11 @@ def _split_text(
     splitter_cfg = _get_splitter_config(doc_type)
     effective_type = splitter_type if splitter_type else splitter_cfg["type"]
     effective_chunk_size = chunk_size if chunk_size else splitter_cfg["chunk_size"]
-    effective_overlap = chunk_overlap_ratio if chunk_overlap_ratio is not None else splitter_cfg["chunk_overlap_ratio"]
+    effective_overlap = (
+        chunk_overlap_ratio
+        if chunk_overlap_ratio is not None
+        else splitter_cfg["chunk_overlap_ratio"]
+    )
 
     # 收集 splitter 特有参数
     extra: dict = {}
@@ -247,21 +314,253 @@ def _split_text(
     elif effective_type == "semantic":
         sem_cfg = get_config().get("splitter", {}).get("semantic", {})
         extra["buffer_size"] = sem_cfg.get("buffer_size", 2)
-        extra["breakpoint_percentile_threshold"] = sem_cfg.get("breakpoint_percentile_threshold", 90)
+        extra["breakpoint_percentile_threshold"] = sem_cfg.get(
+            "breakpoint_percentile_threshold", 90
+        )
 
-    logger.info("[%s] 切分文档 (splitter=%s, chunk_size=%d)...", kb_name, effective_type, effective_chunk_size)
+    logger.info(
+        "[%s] 切分文档 (splitter=%s, chunk_size=%d)...",
+        kb_name,
+        effective_type,
+        effective_chunk_size,
+    )
     doc = Document(text=text, metadata={"file_name": file_name, "kb_name": kb_name})
-    splitter = create_splitter(effective_type, effective_chunk_size, effective_overlap, **extra)
+    splitter = create_splitter(
+        effective_type, effective_chunk_size, effective_overlap, **extra
+    )
     nodes = splitter.split([doc])
 
     # ManualStepSplitter 产出 0 nodes 时回退到 recursive
     if effective_type == "manual_step" and len(nodes) == 0:
-        logger.warning("[%s] ManualStepSplitter 产出 0 nodes，回退到 recursive", kb_name)
+        logger.warning(
+            "[%s] ManualStepSplitter 产出 0 nodes，回退到 recursive", kb_name
+        )
         splitter = create_splitter("recursive", effective_chunk_size, effective_overlap)
         nodes = splitter.split([doc])
 
     logger.info("[%s] 切分为 %d 个 chunks", kb_name, len(nodes))
     return nodes
+
+
+# ── 公开阶段函数（供审核流程独立调用） ────────────────────────────
+
+
+def parse_and_clean(
+    kb_name: str,
+    file_path: Path,
+    original_filename: str,
+    doc_type: str = "policy",
+    enable_cleaning: bool = True,
+) -> str:
+    """解析文件并清洗文本，返回清洗后的文本内容。
+
+    Args:
+        kb_name: 知识库名称。
+        file_path: 文件路径。
+        original_filename: 原始文件名。
+        doc_type: 文档类型（policy/manual/form）。
+        enable_cleaning: 是否启用 LLM 清洗。
+
+    Returns:
+        清洗后的文本。
+    """
+    ext = file_path.suffix.lower()
+    parser = get_parser(ext)
+
+    if doc_type == "manual" and ext == ".pdf":
+        raw_text = _parse_multimodal_pdf_with_kb(kb_name, file_path, original_filename)
+        if not raw_text.strip():
+            raw_text = parser.parse(file_path).all_text()
+    elif doc_type == "form":
+        raw_text = parser.parse(file_path).all_text()
+    else:
+        raw_text = parser.parse(file_path).all_text()
+
+    text = _clean_or_fallback(
+        raw_text, kb_name, doc_type=doc_type, enable=enable_cleaning
+    )
+
+    if doc_type == "manual":
+        cfg = get_config()
+        image_dir = _get_image_dir(kb_name, original_filename)
+        vlm_model = cfg.get("models", {}).get("vlm", "qwen-vl-plus")
+        if image_dir.exists():
+            text = inject_image_descriptions(text, image_dir, vlm_model)
+
+    return text
+
+
+def split_content(
+    text: str,
+    file_name: str,
+    kb_name: str,
+    splitter_type: str = "recursive",
+    chunk_size: int = 256,
+    chunk_overlap_ratio: float = 0.2,
+    doc_type: str = "policy",
+) -> list:
+    """对清洗后的文本执行分块，返回 TextNode 列表。
+
+    Args:
+        text: 清洗后的文本。
+        file_name: 文件名。
+        kb_name: 知识库名称。
+        splitter_type: 分块策略。
+        chunk_size: 分块大小。
+        chunk_overlap_ratio: 分块重叠比例。
+        doc_type: 文档类型。
+
+    Returns:
+        TextNode 列表。
+    """
+    if doc_type == "form":
+        sections_result = extract_form_sections(text, file_name)
+        sections = sections_result.get("sections", [])
+        extraction_status = sections_result.get("status", "")
+        if sections and extraction_status != "PASS":
+            nodes = [
+                TextNode(
+                    text=s["content"],
+                    metadata={
+                        "file_name": file_name,
+                        "kb_name": kb_name,
+                        "doc_type": doc_type,
+                        "section_topic": s.get("topic", ""),
+                    },
+                )
+                for s in sections
+            ]
+            if nodes:
+                return nodes
+        # fallback to regular splitting
+    return _split_text(
+        text,
+        file_name,
+        kb_name,
+        splitter_type,
+        chunk_size,
+        chunk_overlap_ratio,
+        doc_type,
+    )
+
+
+def embed_and_store_nodes(
+    kb_name: str,
+    file_name: str,
+    file_size: int,
+    chunk_size: int,
+    doc_type: str,
+    nodes: list,
+    full_text: str = "",
+    splitter_type: str = "recursive",
+    chunk_overlap_ratio: float = 0.2,
+    vector_store: VectorStore | None = None,
+    doc_store: DocumentStore | None = None,
+    doc_id: int | None = None,
+) -> dict:
+    """对已有的 TextNode 列表执行向量化并入库。
+
+    当 doc_id 不为 None 时，更新已有文档记录而非创建新记录。
+
+    Args:
+        kb_name: 知识库名称。
+        file_name: 文件名。
+        file_size: 文件大小（字节）。
+        chunk_size: 分块大小。
+        doc_type: 文档类型。
+        nodes: TextNode 列表。
+        full_text: 完整清洗文本（用于摘要生成）。
+        splitter_type: 分块策略。
+        chunk_overlap_ratio: 重叠比例。
+        vector_store: 向量库实例。
+        doc_store: 文档库实例。
+        doc_id: 已有文档 ID（审核流程用）。
+
+    Returns:
+        {"doc_id": int, "file_name": str, "chunk_count": int}
+    """
+    vs = vector_store or VectorStore()
+    ds = doc_store or DocumentStore()
+
+    summary = _generate_document_summary(file_name, full_text)
+
+    if not nodes:
+        if doc_id:
+            ds.update_document(
+                doc_id,
+                chunk_count=0,
+                status="active",
+                summary=summary,
+                chunks_preview=None,
+            )
+            return {"doc_id": doc_id, "file_name": file_name, "chunk_count": 0}
+        doc_record = ds.add_document(
+            kb_name=kb_name,
+            file_name=file_name,
+            file_size=file_size,
+            chunk_count=0,
+            chunk_size=chunk_size,
+            doc_type=doc_type,
+            splitter_type=splitter_type,
+            status="active",
+            summary=summary,
+            content=full_text,
+        )
+        return {"doc_id": doc_record["id"], "file_name": file_name, "chunk_count": 0}
+
+    embed_model = get_embed_model(text_type="document")
+    texts = [n.get_content() for n in nodes]
+    vectors = embed_model.get_text_embedding_batch(texts)
+
+    if doc_id:
+        ds.update_document(
+            doc_id,
+            chunk_count=len(nodes),
+            status="active",
+            summary=summary,
+            chunks_preview=None,
+        )
+        doc_record = ds.get_document(doc_id)
+    else:
+        doc_record = ds.add_document(
+            kb_name=kb_name,
+            file_name=file_name,
+            file_size=file_size,
+            chunk_count=len(nodes),
+            chunk_size=chunk_size,
+            doc_type=doc_type,
+            splitter_type=splitter_type,
+            status="active",
+            summary=summary,
+            content=full_text,
+            chunk_overlap_ratio=chunk_overlap_ratio,
+        )
+
+    actual_doc_id = doc_id or doc_record["id"]
+    vs.create_collection(kb_name)
+    payloads = []
+    ids = []
+    for node in nodes:
+        payload = {
+            "text": node.get_content(),
+            "file_name": file_name,
+            "kb_name": kb_name,
+            "node_id": node.node_id,
+            "doc_id": actual_doc_id,
+        }
+        payload.update({k: v for k, v in node.metadata.items() if k not in payload})
+        payloads.append(payload)
+        ids.append(node.node_id)
+
+    try:
+        vs.add_vectors(kb_name, vectors, payloads, ids)
+    except Exception:
+        logger.exception("[embed_and_store_nodes] Qdrant 写入失败，回滚 MySQL")
+        if not doc_id:
+            ds.delete_document(actual_doc_id)
+        raise
+
+    return {"doc_id": actual_doc_id, "file_name": file_name, "chunk_count": len(nodes)}
 
 
 # ── 填报模板流水线（form） ──────────────────────────────────────
@@ -300,7 +599,9 @@ def _index_form_document(
 
     if sections:
         # 有实质内容：每个 section 直接作为一个 TextNode
-        logger.info("[%s] 提取到 %d 个 sections，构建 TextNode...", kb_name, len(sections))
+        logger.info(
+            "[%s] 提取到 %d 个 sections，构建 TextNode...", kb_name, len(sections)
+        )
         nodes = [
             TextNode(
                 text=s["content"],
@@ -322,16 +623,29 @@ def _index_form_document(
         # 提取失败（LLM 异常或重试耗尽）：fallback 到 recursive 切分
         logger.warning("[%s] form 提取失败，fallback 到 recursive 切分", kb_name)
         nodes = _split_text(
-            raw_text, file_name, kb_name, splitter_type,
-            chunk_size, chunk_overlap_ratio, doc_type="form",
+            raw_text,
+            file_name,
+            kb_name,
+            splitter_type,
+            chunk_size,
+            chunk_overlap_ratio,
+            doc_type="form",
         )
         full_text = raw_text
 
     return _embed_and_store(
-        kb_name, file_name, file_size, chunk_size, "form", nodes, vs, ds,
-        full_text=full_text, splitter_type=splitter_type, chunk_overlap_ratio=chunk_overlap_ratio,
+        kb_name,
+        file_name,
+        file_size,
+        chunk_size,
+        "form",
+        nodes,
+        vs,
+        ds,
+        full_text=full_text,
+        splitter_type=splitter_type,
+        chunk_overlap_ratio=chunk_overlap_ratio,
     )
-
 
 
 def _embed_and_store(
@@ -356,7 +670,9 @@ def _embed_and_store(
 
     # nodes 为空（如 form 流水线判断无实质内容）：仅记录元数据，跳过 Embedding 和 Qdrant
     if not nodes:
-        logger.info("[%s] 无可索引内容（0 nodes），仅写入元数据: %s", kb_name, file_name)
+        logger.info(
+            "[%s] 无可索引内容（0 nodes），仅写入元数据: %s", kb_name, file_name
+        )
         doc_record = ds.add_document(
             kb_name=kb_name,
             file_name=file_name,
@@ -427,7 +743,9 @@ def _embed_and_store(
         ds.delete_document(doc_id)
         raise
 
-    logger.info("[%s] 文档 '%s' 入库完成，共 %d 个 chunks", kb_name, file_name, len(nodes))
+    logger.info(
+        "[%s] 文档 '%s' 入库完成，共 %d 个 chunks", kb_name, file_name, len(nodes)
+    )
     return {
         "doc_id": doc_id,
         "file_name": file_name,
@@ -435,9 +753,7 @@ def _embed_and_store(
     }
 
 
-def _parse_multimodal_pdf_with_kb(
-    kb_name: str, file_path: Path, file_name: str
-) -> str:
+def _parse_multimodal_pdf_with_kb(kb_name: str, file_path: Path, file_name: str) -> str:
     """解析多模态 PDF，图片写入按知识库+文件名组织的缓存目录。
 
     将临时文件复制为以原始文件名命名的副本再传给 pymupdf4llm，
@@ -466,6 +782,7 @@ def _get_image_dir(kb_name: str, file_name: str) -> Path:
     使用 MD5 hash 而非原始文件名，避免中文/特殊字符路径在 Windows 上导致 MuPDF 无法写入图片。
     """
     import hashlib
+
     dir_name = hashlib.md5(file_name.encode()).hexdigest()[:16]
     return _IMAGE_CACHE_DIR / kb_name / dir_name
 
@@ -520,7 +837,15 @@ def reindex_document(
     vs.delete_by_metadata(kb_name, "doc_id", doc_id)
 
     # 2. 切分
-    nodes = _split_text(content, file_name, kb_name, splitter_type, chunk_size, chunk_overlap_ratio, doc_type=doc_type)
+    nodes = _split_text(
+        content,
+        file_name,
+        kb_name,
+        splitter_type,
+        chunk_size,
+        chunk_overlap_ratio,
+        doc_type=doc_type,
+    )
 
     # 3. Embedding
     logger.info("[%s] 生成 Embedding (%d nodes)...", kb_name, len(nodes))
@@ -549,7 +874,9 @@ def reindex_document(
     # 5. 更新 MySQL 中的 chunk_count
     ds.update_document(doc_id, chunk_count=len(nodes))
 
-    logger.info("[%s] 文档 '%s' 重新索引完成，共 %d 个 chunks", kb_name, file_name, len(nodes))
+    logger.info(
+        "[%s] 文档 '%s' 重新索引完成，共 %d 个 chunks", kb_name, file_name, len(nodes)
+    )
     return {
         "doc_id": doc_id,
         "file_name": file_name,
