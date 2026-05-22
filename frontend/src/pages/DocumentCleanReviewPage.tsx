@@ -78,10 +78,16 @@ export default function DocumentCleanReviewPage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handleDiscard}
+            onClick={() => navigate("/admin/documents?kb=" + kbName)}
             className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            放弃
+            返回列表
+          </button>
+          <button
+            onClick={handleDiscard}
+            className="px-4 py-2 text-sm text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+          >
+            放弃文档
           </button>
           <button
             onClick={() => confirmMutation.mutate()}

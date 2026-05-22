@@ -44,9 +44,28 @@ export default function DocumentChunkReviewPage() {
   const confirmMutation = useMutation({
     mutationFn: () =>
       documentApi.confirmIndex(kbName!, Number(docId!)).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ["documents", kbName] });
       qc.invalidateQueries({ queryKey: ["knowledge-bases"] });
+
+      // 查找下一个待审核文档，优先 pending_review > pending_chunk_review
+      try {
+        const docs = await documentApi.list(kbName!);
+        const nextReview = docs.find((d) => d.status === "pending_review");
+        if (nextReview) {
+          navigate(`/admin/document/${kbName}/${nextReview.id}/review`);
+          return;
+        }
+        const nextChunk = docs.find(
+          (d) => d.status === "pending_chunk_review" && d.id !== Number(docId),
+        );
+        if (nextChunk) {
+          navigate(`/admin/document/${kbName}/${nextChunk.id}/chunks`);
+          return;
+        }
+      } catch {
+        // 查询失败则回退到列表页
+      }
       navigate("/admin/documents?kb=" + kbName);
     },
   });
