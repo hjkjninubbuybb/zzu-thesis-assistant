@@ -146,22 +146,33 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
                 "data": json.dumps({"step": "running_rag"}, ensure_ascii=False),
             }
 
-            def _run_stream() -> list[dict]:
-                return list(
-                    orchestrator.stream(
+            queue: asyncio.Queue[dict | None] = asyncio.Queue()
+
+            def _run_stream() -> None:
+                try:
+                    for item in orchestrator.stream(
                         query=body.query,
                         kb_name=kb_name,
                         history=body.history,
-                    )
-                )
+                    ):
+                        queue.put_nowait(item)
+                except Exception as e:
+                    logger.exception("orchestrator.stream() error")
+                    queue.put_nowait({"type": "error", "message": str(e)})
+                finally:
+                    queue.put_nowait(None)  # sentinel
 
-            items = await asyncio.to_thread(_run_stream)
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, _run_stream)
 
             token_parts: list[str] = []
             sources_nodes: list[dict] = []
             file_items: list[dict] = []
 
-            for item in items:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
                 item_type = item.get("type")
                 if item_type == "agent_action":
                     yield {
