@@ -313,7 +313,7 @@ function SourcesPanel({ sources }: { sources: SourceItem[] }) {
                 <span className="w-5 h-5 rounded-md bg-white border border-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shadow-sm">
                   {i + 1}
                 </span>
-                <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[180px]">
+                <span className="text-[11px] font-semibold text-gray-700 break-all">
                   {s.source_file}
                 </span>
                 <div className="ml-auto flex items-center gap-1 opacity-40">
@@ -323,7 +323,7 @@ function SourcesPanel({ sources }: { sources: SourceItem[] }) {
                   </span>
                 </div>
               </div>
-              <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-3 italic">
+              <p className="text-[11px] text-gray-500 leading-relaxed italic whitespace-pre-wrap">
                 "{s.text}"
               </p>
             </div>
