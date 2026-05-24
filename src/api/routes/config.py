@@ -2,13 +2,13 @@
 
 import logging
 
+import httpx
 import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-import httpx
 from src.api.auth import require_admin
-from src.config import ROOT_DIR, get_config, get_api_key, get_api_base_url
+from src.config import ROOT_DIR, get_api_base_url, get_api_key, get_config
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 logger = logging.getLogger(__name__)
@@ -16,12 +16,20 @@ logger = logging.getLogger(__name__)
 CONFIG_PATH = ROOT_DIR / "configs" / "config.yaml"
 
 # 默认允许的模型名枚举（仅作为初始化参考，后续通过接口动态获取）
-_ALLOWED_LLM_MODELS = {"qwen-turbo", "qwen-plus", "qwen-max", "qwen-long", "deepseek-chat", "deepseek-reasoner"}
+_ALLOWED_LLM_MODELS = {
+    "qwen-turbo",
+    "qwen-plus",
+    "qwen-max",
+    "qwen-long",
+    "deepseek-chat",
+    "deepseek-reasoner",
+}
 _ALLOWED_EMBED_MODELS = {"text-embedding-v2", "text-embedding-v3"}
 _ALLOWED_RERANKER_MODELS = {"gte-rerank", "gte-rerank-hybrid"}
 
 
 # ── Pydantic 模型 ─────────────────────────────────────────
+
 
 class DocTypeSplitterConfig(BaseModel):
     splitter_type: str | None = Field(
@@ -41,7 +49,7 @@ class SplitterConfig(BaseModel):
     breakpoint_percentile_threshold: int | None = None
     policy: DocTypeSplitterConfig | None = None
     manual: DocTypeSplitterConfig | None = None
-    form:   DocTypeSplitterConfig | None = None
+    form: DocTypeSplitterConfig | None = None
 
 
 class ConfigUpdate(BaseModel):
@@ -70,6 +78,7 @@ class ApiKeyUpdate(BaseModel):
 
 # ── API 密钥与平台接口 ─────────────────────────────────────
 
+
 @router.get("/api-key")
 def get_api_key_info(current_user: dict = Depends(require_admin)) -> dict:
     """获取已配置的 API 信息（脱敏显示）。"""
@@ -85,6 +94,7 @@ def get_api_key_info(current_user: dict = Depends(require_admin)) -> dict:
 def update_api_info(body: ApiKeyUpdate, current_user: dict = Depends(require_admin)) -> dict:
     """更新 API Key 和 Base URL。"""
     from src.storage.document_store import DocumentStore
+
     ds = DocumentStore()
     ds.set_setting("api_key", body.api_key)
     if body.api_base_url:
@@ -100,23 +110,29 @@ async def test_api_info(current_user: dict = Depends(require_admin)) -> dict:
     url = get_api_base_url()
     if not key or not url:
         return {"ok": False, "message": "未配置 API Key 或 Base URL"}
-    
+
     try:
         models = await _fetch_remote_models(url, key)
-        return {"ok": True, "message": f"连接成功，发现 {len(models)} 个模型", "models": models}
+        return {
+            "ok": True,
+            "message": f"连接成功，发现 {len(models)} 个模型",
+            "models": models,
+        }
     except Exception as e:
         logger.warning("[api-key/test] 连接测试失败: %s", e)
         return {"ok": False, "message": f"连接失败: {e}"}
 
 
 @router.get("/models")
-async def list_available_models(current_user: dict = Depends(require_admin)) -> list[str]:
+async def list_available_models(
+    current_user: dict = Depends(require_admin),
+) -> list[str]:
     """动态拉取平台支持的模型列表。"""
     key = get_api_key()
     url = get_api_base_url()
     if not key or not url:
         return sorted(list(_ALLOWED_LLM_MODELS))
-    
+
     try:
         return await _fetch_remote_models(url, key)
     except Exception:
@@ -128,12 +144,9 @@ async def _fetch_remote_models(url: str, key: str) -> list[str]:
     endpoint = url.rstrip("/")
     if not endpoint.endswith("/models"):
         endpoint = f"{endpoint}/models"
-    
+
     async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(
-            endpoint,
-            headers={"Authorization": f"Bearer {key}"}
-        )
+        resp = await client.get(endpoint, headers={"Authorization": f"Bearer {key}"})
         resp.raise_for_status()
         data = resp.json()
         # OpenAI 标准返回 { "data": [ { "id": "..." }, ... ] }
@@ -141,6 +154,7 @@ async def _fetch_remote_models(url: str, key: str) -> list[str]:
 
 
 # ── 配置接口 ─────────────────────────────────────────────
+
 
 @router.get("")
 def read_config(current_user: dict = Depends(require_admin)) -> dict:
@@ -150,9 +164,7 @@ def read_config(current_user: dict = Depends(require_admin)) -> dict:
 
 @router.post("")
 def update_config(body: ConfigUpdate, current_user: dict = Depends(require_admin)) -> dict:
-    """
-    更新 config.yaml 并清除缓存。
-    """
+    """更新 config.yaml 并清除缓存。"""
     # 基础校验（不再死锁模型名，允许通过动态获取）
     if body.embedding_model is not None and body.embedding_model not in _ALLOWED_EMBED_MODELS:
         raise HTTPException(
@@ -161,7 +173,7 @@ def update_config(body: ConfigUpdate, current_user: dict = Depends(require_admin
         )
 
     # 读取原始 yaml
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    with open(CONFIG_PATH, encoding="utf-8") as f:
         raw: dict = yaml.safe_load(f) or {}
 
     # 逐字段 merge
@@ -234,4 +246,3 @@ def update_config(body: ConfigUpdate, current_user: dict = Depends(require_admin
     get_config.cache_clear()
     logger.info("config.yaml 已更新并清除缓存")
     return get_config()
-

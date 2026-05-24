@@ -2,10 +2,10 @@
 
 import logging
 
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 
+from .nodes import evaluator_node, extractor_node
 from .state import FormExtractionState
-from .nodes import extractor_node, evaluator_node
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,10 @@ def extract_form_sections(
 
         logger.info(
             "[extract_form] '%s' 完成: %d sections, status=%s, retries=%d",
-            file_name, len(sections), status, final_state["retry_count"],
+            file_name,
+            len(sections),
+            status,
+            final_state["retry_count"],
         )
         return {"sections": sections, "status": status}
     except Exception as e:

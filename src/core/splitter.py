@@ -12,7 +12,7 @@ import re
 from abc import ABC, abstractmethod
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from llama_index.core.node_parser import TokenTextSplitter, SentenceSplitter
+from llama_index.core.node_parser import SentenceSplitter, TokenTextSplitter
 from llama_index.core.schema import BaseNode, Document, TextNode
 
 # 中文 Markdown 分隔符层级
@@ -20,21 +20,26 @@ CHINESE_MARKDOWN_SEPARATORS = [
     "\n#{1,6} ",
     "\n\n",
     "\n",
-    "。", "！", "？", "；", "，", " ", "",
+    "。",
+    "！",
+    "？",
+    "；",
+    "，",
+    " ",
+    "",
 ]
 
 CHINESE_CHUNKING_REGEX = "[^,.;。？！，；]+[,.;。？！，；]?"
 
 
 def _chinese_sentence_tokenize(text: str) -> list[str]:
-    parts = re.split(r'(?<=[。！？；\!\?\;])', text)
+    parts = re.split(r"(?<=[。！？；\!\?\;])", text)
     return [p for p in parts if p.strip()]
 
 
 class BaseSplitter(ABC):
     @abstractmethod
-    def split(self, documents: list[Document]) -> list[BaseNode]:
-        ...
+    def split(self, documents: list[Document]) -> list[BaseNode]: ...
 
 
 class RecursiveSplitter(BaseSplitter):
@@ -111,7 +116,8 @@ class SemanticSplitter(BaseSplitter):
 
     def split(self, documents: list[Document]) -> list[BaseNode]:
         from llama_index.core.node_parser import SemanticSplitterNodeParser
-        from src.core.embedding import get_embed_model
+
+        from src.core.rag.embedding import get_embed_model
 
         splitter = SemanticSplitterNodeParser(
             embed_model=get_embed_model("document"),
@@ -125,6 +131,7 @@ class SemanticSplitter(BaseSplitter):
 def _get_manual_step_splitter():
     """延迟导入 ManualStepSplitter，避免循环引用。"""
     from src.core.splitter_manual import ManualStepSplitter
+
     return ManualStepSplitter
 
 

@@ -27,6 +27,7 @@ def _auth_cfg() -> dict:
 
 # ── 密码 ─────────────────────────────────────────────────────
 
+
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
@@ -36,6 +37,7 @@ def hash_password(password: str) -> str:
 
 
 # ── Token ────────────────────────────────────────────────────
+
 
 def _make_token(data: dict, expire_delta: timedelta) -> str:
     cfg = _auth_cfg()
@@ -103,6 +105,7 @@ def verify_download_token(token: str, doc_id: int, kb_name: str) -> None:
 
 # ── 用户认证 ─────────────────────────────────────────────────
 
+
 def authenticate_user(username: str, password: str) -> dict | None:
     """验证登录凭据，支持用户名 / 学号 / 工号，成功返回用户 dict，失败返回 None。"""
     user = (
@@ -118,6 +121,7 @@ def authenticate_user(username: str, password: str) -> dict | None:
 
 
 # ── FastAPI Depends ───────────────────────────────────────────
+
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     """解码 JWT，从数据库取用户，校验激活状态。"""
@@ -148,6 +152,7 @@ def require_teacher_or_admin(current_user: dict = Depends(get_current_user)) -> 
 
 
 # ── 启动时初始化 ──────────────────────────────────────────────
+
 
 def ensure_default_admin() -> None:
     """若数据库中没有任何用户，自动创建默认管理员账号。"""

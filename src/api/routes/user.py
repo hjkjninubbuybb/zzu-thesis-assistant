@@ -2,28 +2,42 @@
 
 import io
 import logging
-import secrets
-import string
-import urllib.parse
 from datetime import date
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import StreamingResponse
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Alignment, Font, PatternFill
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
+from openpyxl import load_workbook
 
-from src.api.auth import get_current_user, hash_password, require_admin, require_teacher_or_admin
+from src.api.auth import (
+    get_current_user,
+    hash_password,
+    require_admin,
+    require_teacher_or_admin,
+)
 from src.api.schemas import (
     MentorRelationRequest,
     MessageResponse,
     PaginatedUsers,
     ResetPasswordRequest,
-    StudentProfileCreate,
-    TeacherProfileCreate,
     UpdateProfileRequest,
     UserCreate,
     UserInfo,
     UserUpdate,
+)
+from src.core.user_import import (
+    build_relations_template_workbook,
+    build_student_workbook,
+    build_teacher_workbook,
+    make_xlsx_response,
+    random_password,
 )
 from src.storage.user_store import UserStore
 
@@ -64,7 +78,6 @@ def list_users(
     current_user: dict = Depends(require_teacher_or_admin),
 ):
     """列出用户（分页）。教师只能看学生；管理员看所有。"""
-    # 教师只能查看 student
     effective_role = role
     if current_user["role"] == "teacher":
         if role not in (None, "student"):
@@ -84,7 +97,10 @@ def list_users(
 def create_user(body: UserCreate, current_user: dict = Depends(require_admin)):
     """创建用户（管理员专用）。"""
     if _us.get_user_by_username(body.username):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"用户名 '{body.username}' 已存在")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"用户名 '{body.username}' 已存在",
+        )
     user = _us.create_user(
         username=body.username,
         hashed_pwd=hash_password(body.password),
@@ -152,7 +168,11 @@ def delete_user(user_id: int, current_user: dict = Depends(require_admin)):
 
 
 @router.put("/{user_id}/reset-password", response_model=MessageResponse)
-def reset_password(user_id: int, body: ResetPasswordRequest, current_user: dict = Depends(require_admin)):
+def reset_password(
+    user_id: int,
+    body: ResetPasswordRequest,
+    current_user: dict = Depends(require_admin),
+):
     """重置用户密码（管理员专用）。"""
     user = _us.get_user_by_id(user_id)
     if not user:
@@ -163,66 +183,12 @@ def reset_password(user_id: int, body: ResetPasswordRequest, current_user: dict 
 
 # ── Excel 导入/导出 ───────────────────────────────────────────
 
-_COLS = ["姓名", "学号*", "年级", "专业", "班级", "初始密码（留空自动生成）"]
-_COL_WIDTH = [14, 18, 10, 22, 14, 28]
-
-
-def _build_student_workbook(rows: list[dict] | None) -> Workbook:
-    """构建学生账号 Excel 工作簿（rows=None 时只含表头示例行）。"""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "学生账号"
-
-    # 表头样式
-    header_fill = PatternFill("solid", fgColor="1A1A1A")
-    header_font = Font(color="FFFFFF", bold=True, size=10)
-    for ci, (col, width) in enumerate(_COLS, 1):
-        cell = ws.cell(row=1, column=ci, value=col)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        ws.column_dimensions[cell.column_letter].width = _COL_WIDTH[ci - 1]
-    ws.row_dimensions[1].height = 22
-
-    if rows is None:
-        # 示例行
-        ws.append(["张三", "202201001", "2022", "计算机科学与技术", "计科一班", ""])
-    else:
-        for r in rows:
-            ws.append([
-                r.get("display_name", ""),
-                r.get("student_id", ""),
-                r.get("grade", ""),
-                r.get("major", ""),
-                r.get("class_name", ""),
-                "",  # 密码列导出时留空
-            ])
-
-    return wb
-
-
-def _make_xlsx_response(wb: Workbook, filename: str) -> StreamingResponse:
-    stream = io.BytesIO()
-    wb.save(stream)
-    stream.seek(0)
-    encoded = urllib.parse.quote(filename)
-    return StreamingResponse(
-        stream,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
-    )
-
-
-def _random_password(length: int = 10) -> str:
-    alphabet = string.ascii_letters + string.digits
-    return "".join(secrets.choice(alphabet) for _ in range(length))
-
 
 @router.get("/students/template")
 def download_student_template(current_user: dict = Depends(require_teacher_or_admin)):
     """下载学生批量导入模板。"""
-    wb = _build_student_workbook(rows=None)
-    return _make_xlsx_response(wb, "学生账号导入模板.xlsx")
+    wb = build_student_workbook(rows=None)
+    return make_xlsx_response(wb, "学生账号导入模板.xlsx")
 
 
 @router.get("/students/export")
@@ -232,15 +198,17 @@ def export_students_excel(current_user: dict = Depends(require_teacher_or_admin)
     rows = []
     for u in items:
         profile = _us.get_student_profile(u["id"]) or {}
-        rows.append({
-            "display_name": u["display_name"],
-            "student_id": profile.get("student_id", ""),
-            "grade": profile.get("grade", ""),
-            "major": profile.get("major", ""),
-            "class_name": profile.get("class_name", ""),
-        })
+        rows.append(
+            {
+                "display_name": u["display_name"],
+                "student_id": profile.get("student_id", ""),
+                "grade": profile.get("grade", ""),
+                "major": profile.get("major", ""),
+                "class_name": profile.get("class_name", ""),
+            }
+        )
     filename = f"学生账号_{date.today().strftime('%Y%m%d')}.xlsx"
-    return _make_xlsx_response(_build_student_workbook(rows), filename)
+    return make_xlsx_response(build_student_workbook(rows), filename)
 
 
 @router.post("/students/import")
@@ -276,13 +244,12 @@ async def import_students_excel(
         grade = str(row[2]).strip() if row[2] else ""
         major = str(row[3]).strip() if row[3] else ""
         class_name = str(row[4]).strip() if row[4] else ""
-        password = str(row[5]).strip() if len(row) > 5 and row[5] else (default_password or _random_password())
+        password = str(row[5]).strip() if len(row) > 5 and row[5] else (default_password or random_password())
 
         if not student_id:
             failed.append({"row": row_idx, "student_id": student_id, "reason": "学号不能为空"})
             continue
 
-        # 跳过已存在
         if _us.get_user_by_student_id(student_id):
             skipped += 1
             continue
@@ -312,26 +279,8 @@ async def import_students_excel(
 @router.get("/mentors/relations/template")
 def download_relations_template(current_user: dict = Depends(require_teacher_or_admin)):
     """下载师生关系批量导入模板。"""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "师生关系"
-    
-    cols = ["学生学号*", "导师工号*"]
-    widths = [20, 20]
-    
-    header_fill = PatternFill("solid", fgColor="1A1A1A")
-    header_font = Font(color="FFFFFF", bold=True, size=10)
-    for ci, (col, width) in enumerate(zip(cols, widths), 1):
-        cell = ws.cell(row=1, column=ci, value=col)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        ws.column_dimensions[cell.column_letter].width = width
-    
-    # 示例数据
-    ws.append(["202201001", "T001"])
-    
-    return _make_xlsx_response(wb, "师生关系导入模板.xlsx")
+    wb = build_relations_template_workbook()
+    return make_xlsx_response(wb, "师生关系导入模板.xlsx")
 
 
 @router.post("/mentors/relations/import")
@@ -354,7 +303,7 @@ async def import_mentor_relations(
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or not any(row):
             continue
-            
+
         student_id = str(row[0]).strip() if row[0] else ""
         employee_id = str(row[1]).strip() if row[1] else ""
 
@@ -362,16 +311,20 @@ async def import_mentor_relations(
             failed.append({"row": row_idx, "reason": "学号和工号均不能为空"})
             continue
 
-        # 查找学生
         student_user = _us.get_user_by_student_id(student_id)
         if not student_user:
             failed.append({"row": row_idx, "student_id": student_id, "reason": "学生不存在"})
             continue
-        
-        # 查找教师
+
         mentor_user = _us.get_user_by_employee_id(employee_id)
         if not mentor_user or mentor_user["role"] != "teacher":
-            failed.append({"row": row_idx, "employee_id": employee_id, "reason": "导师不存在或非教师角色"})
+            failed.append(
+                {
+                    "row": row_idx,
+                    "employee_id": employee_id,
+                    "reason": "导师不存在或非教师角色",
+                }
+            )
             continue
 
         try:
@@ -379,7 +332,14 @@ async def import_mentor_relations(
             success += 1
         except Exception as e:
             logger.warning("[relation import] 第 %d 行导入失败: %s", row_idx, e)
-            failed.append({"row": row_idx, "student_id": student_id, "employee_id": employee_id, "reason": str(e)})
+            failed.append(
+                {
+                    "row": row_idx,
+                    "student_id": student_id,
+                    "employee_id": employee_id,
+                    "reason": str(e),
+                }
+            )
 
     return {
         "total": success + len(failed),
@@ -391,43 +351,12 @@ async def import_mentor_relations(
 
 # ── 教师账号 Excel 导入/导出 ──────────────────────────────────
 
-_TCH_COLS = ["姓名", "工号*", "院系", "职称", "初始密码（留空自动生成）"]
-_TCH_COL_WIDTH = [14, 18, 22, 18, 28]
-
-
-def _build_teacher_workbook(rows: list[dict] | None) -> Workbook:
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "教师账号"
-
-    header_fill = PatternFill("solid", fgColor="1A1A1A")
-    header_font = Font(color="FFFFFF", bold=True, size=10)
-    for ci, (col, width) in enumerate(_TCH_COLS, 1):
-        cell = ws.cell(row=1, column=ci, value=col)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        ws.column_dimensions[cell.column_letter].width = _TCH_COL_WIDTH[ci - 1]
-
-    if rows is None:
-        ws.append(["张老师", "T001", "计算机学院", "副教授", ""])
-    else:
-        for r in rows:
-            ws.append([
-                r.get("display_name", ""),
-                r.get("employee_id", ""),
-                r.get("department", ""),
-                r.get("title", ""),
-                "",
-            ])
-    return wb
-
 
 @router.get("/teachers/template")
 def download_teacher_template(current_user: dict = Depends(require_admin)):
     """下载教师批量导入模板。"""
-    wb = _build_teacher_workbook(rows=None)
-    return _make_xlsx_response(wb, "教师账号导入模板.xlsx")
+    wb = build_teacher_workbook(rows=None)
+    return make_xlsx_response(wb, "教师账号导入模板.xlsx")
 
 
 @router.get("/teachers/export")
@@ -437,14 +366,16 @@ def export_teachers_excel(current_user: dict = Depends(require_admin)):
     rows = []
     for u in items:
         profile = _us.get_teacher_profile(u["id"]) or {}
-        rows.append({
-            "display_name": u["display_name"],
-            "employee_id": profile.get("employee_id", ""),
-            "department": profile.get("department", ""),
-            "title": profile.get("title", ""),
-        })
+        rows.append(
+            {
+                "display_name": u["display_name"],
+                "employee_id": profile.get("employee_id", ""),
+                "department": profile.get("department", ""),
+                "title": profile.get("title", ""),
+            }
+        )
     filename = f"教师账号_{date.today().strftime('%Y%m%d')}.xlsx"
-    return _make_xlsx_response(_build_teacher_workbook(rows), filename)
+    return make_xlsx_response(build_teacher_workbook(rows), filename)
 
 
 @router.post("/teachers/import")
@@ -469,7 +400,7 @@ async def import_teachers_excel(
         if not row or not row[0]:
             continue
         display_name, emp_id, dept, title = [str(x).strip() if x else "" for x in row[:4]]
-        password = str(row[4]).strip() if len(row) > 4 and row[4] else (default_password or _random_password())
+        password = str(row[4]).strip() if len(row) > 4 and row[4] else (default_password or random_password())
 
         if not emp_id:
             failed.append({"row": row_idx, "employee_id": emp_id, "reason": "工号不能为空"})
@@ -485,24 +416,37 @@ async def import_teachers_excel(
         except Exception as e:
             failed.append({"row": row_idx, "employee_id": emp_id, "reason": str(e)})
 
-    return {"total": success + skipped + len(failed), "success": success, "skipped": skipped, "failed": len(failed), "errors": failed}
+    return {
+        "total": success + skipped + len(failed),
+        "success": success,
+        "skipped": skipped,
+        "failed": len(failed),
+        "errors": failed,
+    }
 
 
 # ── 师生关系管理 ──────────────────────────────────────────────
+
 
 @router.get("/mentors/{mentor_id}/students", response_model=list[UserInfo])
 def list_mentor_students(mentor_id: int, current_user: dict = Depends(require_teacher_or_admin)):
     """列出指定导师名下的学生。"""
     if current_user["role"] == "teacher" and current_user["id"] != mentor_id:
         raise HTTPException(status_code=403, detail="无权查看其他导师的学生")
-    
+
     students = _us.list_mentor_students(mentor_id)
-    return [_to_user_info(u, {
-        "student_id": u["student_id"],
-        "grade": u["grade"],
-        "major": u["major"],
-        "class_name": u["class_name"]
-    }) for u in students]
+    return [
+        _to_user_info(
+            u,
+            {
+                "student_id": u["student_id"],
+                "grade": u["grade"],
+                "major": u["major"],
+                "class_name": u["class_name"],
+            },
+        )
+        for u in students
+    ]
 
 
 @router.post("/mentors/relations", response_model=MessageResponse)
@@ -511,7 +455,7 @@ def add_mentor_relations(body: MentorRelationRequest, current_user: dict = Depen
     mentor = _us.get_user_by_id(body.mentor_id)
     if not mentor or mentor["role"] != "teacher":
         raise HTTPException(status_code=400, detail="指定的导师 ID 无效或非教师角色")
-    
+
     for sid in body.student_ids:
         _us.add_mentor_relation(body.mentor_id, sid)
     return {"message": f"成功为导师 {mentor['display_name']} 绑定 {len(body.student_ids)} 名学生"}
@@ -529,13 +473,16 @@ def get_my_mentor(current_user: dict = Depends(get_current_user)):
     """获取我的指导教师（学生专用）。"""
     if current_user["role"] != "student":
         raise HTTPException(status_code=400, detail="该接口仅供学生使用")
-    
+
     mentor = _us.get_student_mentor(current_user["id"])
     if not mentor:
         raise HTTPException(status_code=404, detail="您尚未分配指导教师")
-    
-    return _to_user_info(mentor, {
-        "employee_id": mentor["employee_id"],
-        "department": mentor["department"],
-        "title": mentor["title"]
-    })
+
+    return _to_user_info(
+        mentor,
+        {
+            "employee_id": mentor["employee_id"],
+            "department": mentor["department"],
+            "title": mentor["title"],
+        },
+    )

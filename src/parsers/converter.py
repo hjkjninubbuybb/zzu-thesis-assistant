@@ -11,13 +11,15 @@ logger = logging.getLogger(__name__)
 
 # 可被转换为 PDF 的扩展名（需要 LibreOffice）
 # .docx 走自带的 DocxParser，无需转换
-CONVERTIBLE_EXTS: frozenset[str] = frozenset({
-    ".doc",
-})
+CONVERTIBLE_EXTS: frozenset[str] = frozenset(
+    {
+        ".doc",
+    }
+)
 
 # LibreOffice 可执行文件候选路径（Windows）
 _LO_CANDIDATES = [
-    "soffice",                          # PATH 中已配置
+    "soffice",  # PATH 中已配置
     r"C:\Program Files\LibreOffice\program\soffice.exe",
     r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
 ]
@@ -49,8 +51,18 @@ def convert_to_pdf(src: Path) -> Path:
     out_dir = Path(tempfile.mkdtemp())
     try:
         result = subprocess.run(
-            [lo, "--headless", "--convert-to", "pdf", "--outdir", str(out_dir), str(src)],
-            capture_output=True, text=True, timeout=60,
+            [
+                lo,
+                "--headless",
+                "--convert-to",
+                "pdf",
+                "--outdir",
+                str(out_dir),
+                str(src),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode != 0:
             raise RuntimeError(f"LibreOffice 转换失败: {result.stderr.strip()}")

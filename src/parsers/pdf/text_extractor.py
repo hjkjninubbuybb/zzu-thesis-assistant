@@ -17,6 +17,7 @@ def _normalize_image_refs(text: str) -> str:
 
     例如：``![](images/page1-img0.png)`` → ``![IMG_page1-img0](images/page1-img0.png)``
     """
+
     def _replace(m: re.Match) -> str:
         alt = m.group(1)
         path = m.group(2)
@@ -47,8 +48,10 @@ class PdfTextExtractor:
             包含一个 TEXT 类型 Chunk 的列表。
         """
         result = pymupdf4llm.to_markdown(str(file_path))
-        markdown_text = result if isinstance(result, str) else "\n\n".join(
-            p.get("text", "") for p in result
+        markdown_text = (
+            result
+            if isinstance(result, str)
+            else "\n\n".join(p.get("text", "") for p in result)
         )
         return [
             Chunk(
@@ -77,8 +80,10 @@ class PdfTextExtractor:
             write_images=True,
             image_path=str(image_dir),
         )
-        markdown_text = result if isinstance(result, str) else "\n\n".join(
-            p.get("text", "") for p in result
+        markdown_text = (
+            result
+            if isinstance(result, str)
+            else "\n\n".join(p.get("text", "") for p in result)
         )
         markdown_text = _normalize_image_refs(markdown_text)
         return [

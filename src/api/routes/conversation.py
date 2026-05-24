@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.api.auth import get_current_user
 from src.api.schemas import (
     ConversationCreate,
-    ConversationCursor,
     ConversationInfo,
     ConversationMessageOut,
     ConversationTitleUpdate,
@@ -17,11 +16,7 @@ from src.api.schemas import (
     PaginatedConversations,
     SaveMessageRequest,
 )
-from src.config import get_config, get_api_key, get_api_base_url
-from src.api.routes.chat import _get_llm # Use the centralized factory if possible, but let's check imports
-
-# Actually, _get_llm is in rag_pipeline.py, let's use that.
-from src.core.rag_pipeline import _get_llm
+from src.core.llm_factory import get_llm
 from src.storage.document_store import DocumentStore
 
 router = APIRouter(prefix="/api/conversation", tags=["conversation"])
@@ -31,6 +26,7 @@ _ds = DocumentStore()
 
 
 # ── 对话 CRUD ─────────────────────────────────────────────
+
 
 @router.post("", response_model=ConversationInfo)
 def create_conversation(body: ConversationCreate, current_user: dict = Depends(get_current_user)):
@@ -77,7 +73,11 @@ def get_conversation(conv_id: int, current_user: dict = Depends(get_current_user
 
 
 @router.put("/{conv_id}/title", response_model=ConversationInfo)
-def update_title(conv_id: int, body: ConversationTitleUpdate, current_user: dict = Depends(get_current_user)):
+def update_title(
+    conv_id: int,
+    body: ConversationTitleUpdate,
+    current_user: dict = Depends(get_current_user),
+):
     """更新对话标题（用户手动重命名）。"""
     conv = _ds.get_conversation(conv_id)
     if not conv:
@@ -123,7 +123,7 @@ def summarize_title(conv_id: int, current_user: dict = Depends(get_current_user)
     assistant_text = ((first_assistant["content"] if first_assistant else "") or "").strip()[:500]
 
     try:
-        llm = _get_llm(fast=True, streaming=False)
+        llm = get_llm(fast=True, streaming=False)
         prompt = (
             f"{_TITLE_SYSTEM_PROMPT}\n\n"
             f"【用户提问】\n{user_text}\n\n"
@@ -133,7 +133,7 @@ def summarize_title(conv_id: int, current_user: dict = Depends(get_current_user)
         resp = llm.invoke(prompt)
         title = (getattr(resp, "content", "") or "").strip()
         # 清理：去引号、句号、换行
-        title = title.strip('"\'""''。 \n\t')
+        title = title.strip('"\'""。 \n\t')
         if not title:
             title = user_text[:20] or "新对话"
         # 兜底：超过 20 字截断
@@ -162,8 +162,13 @@ def delete_conversation(conv_id: int, current_user: dict = Depends(get_current_u
 
 # ── 消息 ──────────────────────────────────────────────────
 
+
 @router.post("/{conv_id}/messages", response_model=ConversationMessageOut)
-def add_message(conv_id: int, body: SaveMessageRequest, current_user: dict = Depends(get_current_user)):
+def add_message(
+    conv_id: int,
+    body: SaveMessageRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """保存一条消息到对话。"""
     conv = _ds.get_conversation(conv_id)
     if not conv:
@@ -181,8 +186,13 @@ def add_message(conv_id: int, body: SaveMessageRequest, current_user: dict = Dep
 
 # ── 反馈 ──────────────────────────────────────────────────
 
+
 @router.post("/messages/{message_id}/feedback")
-def submit_feedback(message_id: int, body: FeedbackRequest, current_user: dict = Depends(get_current_user)):
+def submit_feedback(
+    message_id: int,
+    body: FeedbackRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """对一条消息提交反馈（👍/👎）。"""
     row = _ds.set_message_feedback(message_id, body.rating)
     return {"message_id": message_id, "rating": row["rating"]}

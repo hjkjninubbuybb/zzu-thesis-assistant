@@ -6,11 +6,11 @@
 支持 LLM few-shot 语义抽取（step_title / goal / precondition / action_type 等），
 失败时回退为规则默认值。
 """
+
 from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 
 from llama_index.core.schema import BaseNode, Document, TextNode
@@ -48,6 +48,7 @@ _STAGE_MAP: dict[str, str] = {
 # 结构解析（规则，确定性）
 # ---------------------------------------------------------------------------
 
+
 def _infer_role(source_doc: str) -> str:
     s = source_doc.lower()
     if "student" in s or "学生" in s:
@@ -80,8 +81,10 @@ def _parse_blocks(text: str, source_doc: str) -> list[dict]:
         nonlocal cur_block
         if cur_block and cur_block["body_lines"]:
             cur_block["image_refs"] = [
-                m.group(1) for line in cur_block["body_lines"]
-                for m in [_IMG.search(line)] if m
+                m.group(1)
+                for line in cur_block["body_lines"]
+                for m in [_IMG.search(line)]
+                if m
             ]
             blocks.append(cur_block)
         cur_block = None
@@ -201,8 +204,7 @@ _EXTRACT_SYSTEM = """你是一个信息抽取专家。根据操作手册的步�
 def _extract_semantic(block: dict) -> dict:
     """用 LLM 抽取语义字段，失败时返回默认值。"""
     body = "\n".join(
-        line for line in block["body_lines"]
-        if not _IMG.search(line)
+        line for line in block["body_lines"] if not _IMG.search(line)
     ).strip()
 
     if not body:
@@ -220,14 +222,17 @@ def _extract_semantic(block: dict) -> dict:
     )
 
     try:
-        from src.core.rag_pipeline import _get_llm
-        from langchain_core.messages import SystemMessage, HumanMessage
+        from langchain_core.messages import HumanMessage, SystemMessage
 
-        llm = _get_llm(fast=False, streaming=False)
-        resp = llm.invoke([
-            SystemMessage(content=_EXTRACT_SYSTEM),
-            HumanMessage(content=user_content),
-        ])
+        from src.core.llm_factory import get_llm
+
+        llm = get_llm(fast=False, streaming=False)
+        resp = llm.invoke(
+            [
+                SystemMessage(content=_EXTRACT_SYSTEM),
+                HumanMessage(content=user_content),
+            ]
+        )
         raw = str(resp.content).strip()
         if raw.startswith("```"):
             raw = re.sub(r"^```[a-z]*\n?", "", raw)
@@ -253,6 +258,7 @@ def _default_semantic(block: dict) -> dict:
 # 组装 step 对象
 # ---------------------------------------------------------------------------
 
+
 def _make_step_id(block: dict, idx: int) -> str:
     role_short = "s" if block["role"] == "student" else "t"
     stage_short = re.sub(r"\s", "", block["stage"])[:4]
@@ -270,8 +276,7 @@ def _blocks_to_steps(blocks: list[dict], use_llm: bool = True) -> list[dict]:
         semantic = _extract_semantic(block) if use_llm else _default_semantic(block)
 
         body_text = "\n".join(
-            line for line in block["body_lines"]
-            if not _IMG.search(line)
+            line for line in block["body_lines"] if not _IMG.search(line)
         ).strip()
 
         step: dict = {
@@ -298,6 +303,7 @@ def _blocks_to_steps(blocks: list[dict], use_llm: bool = True) -> list[dict]:
 # ---------------------------------------------------------------------------
 # BaseSplitter 接口
 # ---------------------------------------------------------------------------
+
 
 class ManualStepSplitter(BaseSplitter):
     """操作手册步骤级分割器。

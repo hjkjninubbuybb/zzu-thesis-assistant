@@ -11,13 +11,13 @@
     doc = parser.parse(file_path)
 """
 
-from src.parsers.registry import get_parser, register_parser, get_supported_extensions
-from src.parsers.base import ParsedDocument, Chunk, ChunkType
+from src.parsers.base import Chunk, ChunkType, ParsedDocument
+from src.parsers.docx_parser import DocxParser
+from src.parsers.pdf import PdfParser
+from src.parsers.registry import get_parser, get_supported_extensions, register_parser
 
 # ── 注册内置解析器（模块加载时执行）──────────────────────────────────
 from src.parsers.txt_parser import TxtParser
-from src.parsers.docx_parser import DocxParser
-from src.parsers.pdf import PdfParser
 
 register_parser(".txt", TxtParser())
 register_parser(".md", TxtParser())
@@ -28,11 +28,11 @@ register_parser(".docx", DocxParser())
 SUPPORTED_EXTS: frozenset[str] = get_supported_extensions()
 
 __all__ = [
-    "get_parser",
-    "register_parser",
-    "get_supported_extensions",
     "SUPPORTED_EXTS",
-    "ParsedDocument",
     "Chunk",
     "ChunkType",
+    "ParsedDocument",
+    "get_parser",
+    "get_supported_extensions",
+    "register_parser",
 ]

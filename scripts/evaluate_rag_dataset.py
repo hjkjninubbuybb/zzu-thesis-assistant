@@ -27,12 +27,13 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.core.retrieval_strategy import enhance_query, protect_raw_candidates
+from src.core.agent.factory import build_orchestrator  # noqa: E402
+from src.core.rag.query_enhancer import RuleQueryEnhancer, protect_raw_candidates  # noqa: E402
 
+enhance_query = RuleQueryEnhancer().enhance
 
 DEFAULT_DATASET = PROJECT_ROOT.parent / "rag_test" / "data" / "queries" / "test_dataset_v2_selected_220.json"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "reports" / "evaluations"
@@ -135,10 +136,7 @@ def build_relevance_vector(
     reference_contexts: list[str],
     fuzzy_threshold: float,
 ) -> list[int]:
-    return [
-        1 if is_relevant(str(r.get("text", "")), reference_contexts, fuzzy_threshold) else 0
-        for r in retrieved
-    ]
+    return [1 if is_relevant(str(r.get("text", "")), reference_contexts, fuzzy_threshold) else 0 for r in retrieved]
 
 
 def count_covered_references(
@@ -217,7 +215,7 @@ def call_with_retries(label: str, attempts: int, fn):
     for attempt in range(1, attempts + 1):
         try:
             return fn()
-        except Exception as exc:  # noqa: BLE001 - evaluator should preserve batch progress.
+        except Exception as exc:
             last_error = exc
             if attempt < attempts:
                 wait_sec = min(2 ** (attempt - 1), 4)
@@ -231,12 +229,14 @@ class RuntimeDeps:
     kb_name: str
     retriever: Any
     reranker: Any
+    vs: Any = None
+    ds: Any = None
 
 
 def build_runtime(kb_name: str | None, reranker_top_n: int | None = None) -> RuntimeDeps:
-    from src.config import get_config, get_api_key
-    from src.core.retrieval import HybridRetriever, fetch_corpus
-    from src.core.reranker import Reranker
+    from src.config import get_api_key, get_config
+    from src.core.rag.reranker import Reranker
+    from src.core.rag.retriever import HybridRetriever, fetch_corpus
     from src.storage.document_store import DocumentStore
     from src.storage.vector_store import VectorStore
 
@@ -263,10 +263,12 @@ def build_runtime(kb_name: str | None, reranker_top_n: int | None = None) -> Run
         vector_store=vs,
     )
     reranker = Reranker(model=rer_cfg["model"], top_n=reranker_top_n or rer_cfg["top_n"])
-    return RuntimeDeps(kb_name=resolved_kb, retriever=retriever, reranker=reranker)
+    return RuntimeDeps(kb_name=resolved_kb, retriever=retriever, reranker=reranker, vs=vs, ds=ds)
 
 
-def load_samples(dataset_path: Path, offset: int, limit: int | None, qids: list[str] | None = None) -> list[dict[str, Any]]:
+def load_samples(
+    dataset_path: Path, offset: int, limit: int | None, qids: list[str] | None = None
+) -> list[dict[str, Any]]:
     with dataset_path.open(encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
@@ -341,12 +343,10 @@ def source_prior_score(question: str, source_file: str) -> float:
         )
     )
     wants_operation = any(
-        term in question
-        for term in ("系统", "入口", "按钮", "状态", "上传", "提交后", "退回", "二级审核", "学院审核")
+        term in question for term in ("系统", "入口", "按钮", "状态", "上传", "提交后", "退回", "二级审核", "学院审核")
     )
     wants_format = any(
-        term in question
-        for term in ("格式", "模板", "摘要", "缩略语", "参考文献", "著录", "图表", "公式")
+        term in question for term in ("格式", "模板", "摘要", "缩略语", "参考文献", "著录", "图表", "公式")
     )
 
     if wants_policy and ("指导手册" in source_file or "通知" in source_file):
@@ -387,8 +387,6 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     reranker_counter = RerankerWarningCounter()
     reranker_logger = logging.getLogger("src.core.reranker")
     reranker_logger.addHandler(reranker_counter)
-
-    from src.core.rag_pipeline import run_rag
 
     answerable_pre_metrics: list[dict[str, float]] = []
     answerable_post_metrics: list[dict[str, float]] = []
@@ -451,9 +449,9 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             raw_nodes = call_with_retries(
                 label=f"{qid} retrieve",
                 attempts=args.api_retries + 1,
-                fn=lambda: runtime.retriever.retrieve(search_query),
+                fn=lambda sq=search_query: runtime.retriever.retrieve(sq),
             )
-        except Exception as exc:  # noqa: BLE001 - keep batch report.
+        except Exception as exc:
             item["error"] = f"retrieve_failed: {type(exc).__name__}: {exc}"
             item["retrieval_latency_sec"] = time.perf_counter() - raw_started
             records.append(item)
@@ -467,9 +465,9 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             reranked_nodes = call_with_retries(
                 label=f"{qid} rerank",
                 attempts=args.api_retries + 1,
-                fn=lambda: runtime.reranker.rerank(search_query, raw_nodes),
+                fn=lambda sq=search_query, rn=raw_nodes: runtime.reranker.rerank(sq, rn),
             )
-        except Exception as exc:  # noqa: BLE001 - Reranker usually falls back internally.
+        except Exception as exc:
             item["rerank_error"] = f"{type(exc).__name__}: {exc}"
             reranked_nodes = raw_nodes[: args.k]
         if args.protect_raw_top_n:
@@ -543,16 +541,16 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
         if args.mode in ("rag", "both"):
             rag_started = time.perf_counter()
-            rag_result = run_rag(
+            orchestrator = build_orchestrator(runtime.kb_name, runtime.vs, runtime.ds)
+            rag_result = orchestrator.run(
                 query=question,
-                retriever_fn=retriever_fn,
                 kb_name=runtime.kb_name,
                 history=None,
             )
             rag_latency = time.perf_counter() - rag_started
             rag_latencies.append(rag_latency)
-            generation = str(rag_result.get("generation", ""))
-            rag_nodes = rag_result.get("graded_nodes", [])
+            generation = rag_result.text
+            rag_nodes = rag_result.nodes
             item["rag_latency_sec"] = rag_latency
             item["generation"] = generation
             item["rag_sources_count"] = len(rag_nodes)
@@ -562,8 +560,8 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
                 args.fuzzy_threshold,
                 args.rag_context_text_limit,
             )
-            item["rag_attempts"] = rag_result.get("attempts", 1)
-            item["safety_guards"] = rag_result.get("safety_guards", [])
+            item["rag_attempts"] = rag_result.attempts
+            item["safety_guards"] = rag_result.safety_guards
 
             if is_unanswerable:
                 refusal_total += 1

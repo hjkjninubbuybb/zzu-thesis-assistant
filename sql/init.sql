@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS documents (
     doc_type    VARCHAR(20)  NOT NULL DEFAULT 'plain_text' COMMENT '文档类型',
     status      VARCHAR(20)  NOT NULL DEFAULT 'processing' COMMENT '处理状态',
     summary     TEXT         NULL                          COMMENT 'LLM 生成的全局摘要',
+    chunks_preview LONGTEXT NULL                          COMMENT '分块预览 JSON（确认入库后清空）',
     created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_kb (kb_name),
     FOREIGN KEY (kb_name) REFERENCES knowledge_bases(name) ON DELETE CASCADE

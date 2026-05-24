@@ -14,10 +14,10 @@ if TYPE_CHECKING:
     from src.parsers.base import BaseParser
 
 # 内部注册表：扩展名（小写，含点）-> 解析器实例
-_REGISTRY: dict[str, "BaseParser"] = {}
+_REGISTRY: dict[str, BaseParser] = {}
 
 
-def register_parser(ext: str, parser: "BaseParser") -> None:
+def register_parser(ext: str, parser: BaseParser) -> None:
     """注册一个解析器。
 
     Args:
@@ -32,7 +32,7 @@ def register_parser(ext: str, parser: "BaseParser") -> None:
     _REGISTRY[ext.lower()] = parser
 
 
-def get_parser(ext: str) -> "BaseParser":
+def get_parser(ext: str) -> BaseParser:
     """根据文件扩展名获取对应解析器。
 
     Args:
@@ -47,9 +47,7 @@ def get_parser(ext: str) -> "BaseParser":
     parser = _REGISTRY.get(ext.lower())
     if parser is None:
         supported = ", ".join(sorted(_REGISTRY.keys()))
-        raise ValueError(
-            f"不支持的文件类型 '{ext}'，当前支持: {supported}"
-        )
+        raise ValueError(f"不支持的文件类型 '{ext}'，当前支持: {supported}")
     return parser
 
 

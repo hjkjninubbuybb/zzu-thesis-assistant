@@ -46,7 +46,11 @@ body {
   margin: 0;
   background-color: var(--color-background);
   color: var(--color-foreground);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -94,37 +98,71 @@ body {
 
 /* 遮罩层渐显 */
 @keyframes appleFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* 模态框 — 平滑落定（去掉过冲回弹，避免"弹一下"的廉价感） */
 @keyframes applePopIn {
-  from { opacity: 0; transform: scale(0.96) translateY(8px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 /* 聊天气泡 — 水平弹入 */
 @keyframes appleSlideRight {
-  from { opacity: 0; transform: translateX(16px) scale(0.97); }
-  to   { opacity: 1; transform: translateX(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateX(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 @keyframes appleSlideLeft {
-  from { opacity: 0; transform: translateX(-16px) scale(0.97); }
-  to   { opacity: 1; transform: translateX(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateX(-16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 /* Toast — 底部平滑滑入（去掉过冲，更"系统感"） */
 @keyframes appleToastIn {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 行/列表项 — 轻盈入场 */
 @keyframes appleFadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes blobFloat {
@@ -235,8 +273,9 @@ body {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
-  transition: grid-template-rows 0.5s var(--apple-ease),
-              opacity 0.45s ease;
+  transition:
+    grid-template-rows 0.5s var(--apple-ease),
+    opacity 0.45s ease;
 }
 
 .accordion-body.open {
@@ -258,13 +297,14 @@ body {
 }
 
 .hover-lift {
-  transition: transform 0.2s var(--apple-ease),
+  transition:
+    transform 0.2s var(--apple-ease),
     box-shadow 0.2s ease;
 }
 
 .hover-lift:hover {
   transform: translateY(-3px);
-  box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.10);
+  box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.1);
 }
 
 /* ───── Glassmorphism utilities ─────
@@ -315,36 +355,86 @@ body {
    使用 vw/vh 单位确保光团在不同屏幕上都能产生明显的“游走”感 */
 
 @keyframes blobIdleA {
-  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
-  33%  { transform: translate(15vw, -10vh) scale(1.1); opacity: 1; }
-  66%  { transform: translate(-5vw, 15vh) scale(0.9); opacity: 0.9; }
-  100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.8;
+  }
+  33% {
+    transform: translate(15vw, -10vh) scale(1.1);
+    opacity: 1;
+  }
+  66% {
+    transform: translate(-5vw, 15vh) scale(0.9);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.8;
+  }
 }
 
 @keyframes blobIdleB {
-  0%   { transform: translate(0, 0) scale(1); opacity: 0.9; }
-  33%  { transform: translate(-12vw, 15vh) scale(0.95); opacity: 1; }
-  66%  { transform: translate(8vw, -8vh) scale(1.05); opacity: 0.85; }
-  100% { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.9;
+  }
+  33% {
+    transform: translate(-12vw, 15vh) scale(0.95);
+    opacity: 1;
+  }
+  66% {
+    transform: translate(8vw, -8vh) scale(1.05);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.9;
+  }
 }
 
 @keyframes blobIdleC {
-  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
-  33%  { transform: translate(10vw, 12vh) scale(1.05); opacity: 0.95; }
-  66%  { transform: translate(-8vw, -10vh) scale(0.9); opacity: 0.85; }
-  100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.8;
+  }
+  33% {
+    transform: translate(10vw, 12vh) scale(1.05);
+    opacity: 0.95;
+  }
+  66% {
+    transform: translate(-8vw, -10vh) scale(0.9);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.8;
+  }
 }
 
 @keyframes blobIdleD {
-  0%   { transform: translate(0, 0) scale(1); opacity: 0.85; }
-  33%  { transform: translate(-15vw, -12vh) scale(1.1); opacity: 1; }
-  66%  { transform: translate(10vw, 5vh) scale(0.95); opacity: 0.8; }
-  100% { transform: translate(0, 0) scale(1); opacity: 0.85; }
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.85;
+  }
+  33% {
+    transform: translate(-15vw, -12vh) scale(1.1);
+    opacity: 1;
+  }
+  66% {
+    transform: translate(10vw, 5vh) scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.85;
+  }
 }
 
 /* 用户系统启用「减少动效」时，光晕完全静止（保留视觉，去掉运动） */
 @media (prefers-reduced-motion: reduce) {
-  .blob-idle { animation: none !important; }
+  .blob-idle {
+    animation: none !important;
+  }
 }
 
 /* ───── 对话页专用动效 ───── */
@@ -356,8 +446,14 @@ body {
 
 /* AI 流式光标 — Claude 风方块闪烁，0.8s 节奏避开 animate-pulse 的 1s 整数 */
 @keyframes cursorBlink {
-  0%, 49%   { opacity: 1; }
-  50%, 100% { opacity: 0; }
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 .cursor-blink {
   display: inline-block;
@@ -387,8 +483,15 @@ body {
 
 /* 空状态中央 logo 缓慢呼吸 */
 @keyframes idleBreath {
-  0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
-  50%      { transform: scale(1.06); box-shadow: 0 8px 30px -8px rgba(0, 0, 0, 0.12); }
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 8px 30px -8px rgba(0, 0, 0, 0.12);
+  }
 }
 .animate-idle-breath {
   animation: idleBreath 3.6s ease-in-out infinite;
@@ -400,7 +503,7 @@ body {
   --tw-prose-body: var(--color-foreground);
   --tw-prose-headings: var(--color-foreground);
   --tw-prose-lead: var(--color-muted-foreground);
-  --tw-prose-links: #2563EB;
+  --tw-prose-links: #2563eb;
   --tw-prose-bold: var(--color-foreground);
   --tw-prose-counters: var(--color-muted-foreground);
   --tw-prose-bullets: var(--color-muted-foreground);
@@ -424,20 +527,24 @@ body {
 .prose-academic strong {
   color: #334155;
   font-weight: 600;
-  background: linear-gradient(120deg, rgba(37, 99, 235, 0.08) 0%, rgba(37, 99, 235, 0.08) 100%);
+  background: linear-gradient(
+    120deg,
+    rgba(37, 99, 235, 0.08) 0%,
+    rgba(37, 99, 235, 0.08) 100%
+  );
   padding: 0 2px;
   border-radius: 2px;
 }
 
 [data-theme="student"] .prose-academic strong {
-  color: #2563EB;
+  color: #2563eb;
 }
 
 .prose-academic blockquote {
   font-style: normal;
   font-weight: 400;
   border-left-width: 3px;
-  border-left-color: #2563EB;
+  border-left-color: #2563eb;
   background-color: rgba(37, 99, 235, 0.04);
   padding: 0.5rem 1rem;
   border-radius: 0 0.5rem 0.5rem 0;
@@ -462,7 +569,7 @@ body {
   align-items: center;
   justify-content: center;
   background-color: rgba(37, 99, 235, 0.1);
-  color: #2563EB;
+  color: #2563eb;
   font-size: 10px;
   font-weight: 700;
   width: 14px;
@@ -475,14 +582,16 @@ body {
 }
 
 .citation-marker:hover {
-  background-color: #2563EB;
+  background-color: #2563eb;
   color: white;
   transform: scale(1.1);
 }
 
 /* prefers-reduced-motion 兼容：呼吸停掉、shimmer 降级为普通深灰文，光标保留闪烁（功能性指示） */
 @media (prefers-reduced-motion: reduce) {
-  .animate-idle-breath { animation: none; }
+  .animate-idle-breath {
+    animation: none;
+  }
   .text-shimmer {
     animation: none;
     background: none;

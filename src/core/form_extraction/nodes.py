@@ -3,22 +3,24 @@
 import json
 import logging
 
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field, ValidationError
 
-from src.config import get_config, get_api_key, get_api_base_url
-from .state import FormExtractionState
+from src.core.eval_base import EvaluatorOutput
+from src.core.llm_factory import get_llm
+
 from .prompts import (
+    FORM_EVALUATOR_PROMPT,
     FORM_EXTRACTOR_PROMPT,
     FORM_EXTRACTOR_RETRY_TEMPLATE,
-    FORM_EVALUATOR_PROMPT,
 )
+from .state import FormExtractionState
 
 logger = logging.getLogger(__name__)
 
 
 # ── Pydantic 输出模型 ──────────────────────────────────────────
+
 
 class FormSection(BaseModel):
     topic: str = Field(description="主题名称，如'中文摘要格式要求'")
@@ -26,41 +28,21 @@ class FormSection(BaseModel):
 
 
 class FormExtraction(BaseModel):
-    sections: list[FormSection] = Field(description="提取的 sections，无实质内容时为空列表")
+    sections: list[FormSection] = Field(
+        description="提取的 sections，无实质内容时为空列表"
+    )
     no_extraction_reason: str = Field(
         default="",
         description="sections 为空时说明理由，非空时留空",
     )
 
 
-class EvaluatorOutput(BaseModel):
-    status: str
-    feedback: str
-
-
-# ── LLM 工厂 ──────────────────────────────────────────────────
-
-def _get_llm(fast: bool = False) -> ChatOpenAI:
-    cfg = get_config()
-    key = get_api_key()
-    url = get_api_base_url()
-    if fast:
-        model_name = cfg.get("llm", {}).get("fast_model", "qwen-turbo")
-    else:
-        model_name = cfg.get("llm", {}).get("model", "qwen-plus")
-    return ChatOpenAI(
-        model=model_name,
-        openai_api_key=key,
-        openai_api_base=url,
-        streaming=False,
-    )
-
-
 # ── extractor_node ─────────────────────────────────────────────
+
 
 def extractor_node(state: FormExtractionState) -> dict:
     """强模型判断是否有实质内容，有则按主题提取，无则输出空 sections + 理由。"""
-    llm = _get_llm(fast=False)
+    llm = get_llm(fast=False, streaming=False)
     structured_llm = llm.with_structured_output(FormExtraction)
 
     if not state["attempts"]:
@@ -107,9 +89,10 @@ def extractor_node(state: FormExtractionState) -> dict:
 
 # ── evaluator_node ─────────────────────────────────────────────
 
+
 def evaluator_node(state: FormExtractionState) -> dict:
     """快速模型评估提取结果：有内容则验证完整性，无内容则审核不提取理由。"""
-    llm = _get_llm(fast=True)
+    llm = get_llm(fast=True, streaming=False)
 
     if state["sections"]:
         sections_text = "\n\n".join(

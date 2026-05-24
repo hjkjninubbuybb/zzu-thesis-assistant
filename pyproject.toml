@@ -56,3 +56,68 @@ dev = "src.main:dev"
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "ruff (>=0.15.14,<0.16.0)",
+    "pre-commit (>=4.6.0,<5.0.0)"
+]
+
+# ── Ruff ─────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort (import sorting)
+    "N",      # pep8-naming
+    "UP",     # pyupgrade (modernize syntax)
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+    "D",      # pydocstyle (Google convention)
+    "RUF",    # Ruff-specific rules
+]
+ignore = [
+    "D100",   # Missing docstring in public module
+    "D104",   # Missing docstring in public package
+    "D105",   # Missing docstring in magic method
+    "D107",   # Missing docstring in __init__
+    "D203",   # Conflicts with D211
+    "D213",   # Conflicts with D212
+    "E501",   # Line too long (handled by formatter)
+    "RUF001", # Ambiguous unicode in string (中文项目)
+    "RUF002", # Ambiguous unicode in docstring (中文项目)
+    "RUF003", # Ambiguous unicode in comment (中文项目)
+    "D101",   # Missing docstring in public class (渐进补充)
+    "D102",   # Missing docstring in public method (渐进补充)
+    "D103",   # Missing docstring in public function (渐进补充)
+    "D415",   # Missing terminal punctuation in docstring (中文句号兼容)
+    "B008",   # Function call in default argument (FastAPI Depends 模式)
+    "D205",   # Blank line between summary and description (tool docstring 需紧凑)
+    "D417",   # Missing argument description in docstring (渐进补充)
+    "N806",   # Variable in function should be lowercase (局部常量允许)
+    "B905",   # zip() without strict= (列表等长已保证)
+    "D200",   # One-line docstring should fit on one line
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/core/rag_pipeline.py" = ["F841", "RUF005"]  # 预留变量 + 列表拼接风格
+"src/storage/*.py" = ["W291", "RUF005", "SIM117"]  # SQL 多行字符串尾部空格 + 列表拼接 + with 合并
+"src/api/app.py" = ["E402"]  # warnings 过滤必须在 import 前
+"src/api/routes/*.py" = ["B904", "B005", "B007", "RUF005"]  # HTTPException 异常链 + strip 多字符 + 循环变量
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true

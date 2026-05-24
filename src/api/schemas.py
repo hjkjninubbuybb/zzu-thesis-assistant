@@ -5,19 +5,26 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 # ── 知识库 ────────────────────────────────────────────────
 
+
 class KBCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_\-\u4e00-\u9fff]+$")
+    name: str = Field(
+        ..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_\-\u4e00-\u9fff]+$"
+    )
     description: str = Field(default="", max_length=256)
-    splitter_type: str = Field(default="recursive", pattern=r"^(recursive|token|sentence|semantic|table_aware)$")
+    splitter_type: str = Field(
+        default="recursive",
+        pattern=r"^(recursive|token|sentence|semantic|table_aware)$",
+    )
     chunk_size: int = Field(default=256, ge=64, le=1024)
     chunk_overlap_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
 
 
 class KBSplitterUpdate(BaseModel):
-    splitter_type: str = Field(..., pattern=r"^(recursive|token|sentence|semantic|table_aware)$")
+    splitter_type: str = Field(
+        ..., pattern=r"^(recursive|token|sentence|semantic|table_aware)$"
+    )
     chunk_size: int = Field(default=256, ge=64, le=1024)
     chunk_overlap_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
 
@@ -27,7 +34,7 @@ class KBInfo(BaseModel):
     name: str
     description: str
     doc_count: int
-    is_active: bool = False        # 是否为学生当前使用的知识库
+    is_active: bool = False  # 是否为学生当前使用的知识库
     is_admin_active: bool = False  # 是否为管理端当前使用的知识库
     splitter_type: str = "recursive"
     chunk_size: int = 256
@@ -36,6 +43,7 @@ class KBInfo(BaseModel):
 
 
 # ── 文档 ─────────────────────────────────────────────────
+
 
 class DocInfo(BaseModel):
     id: int
@@ -60,13 +68,74 @@ class DocUpdate(BaseModel):
 
 
 class IndexRequest(BaseModel):
-    splitter_type: str = Field(default="recursive", pattern=r"^(recursive|token|sentence)$")
+    splitter_type: str = Field(
+        default="recursive", pattern=r"^(recursive|token|sentence)$"
+    )
     chunk_size: int = Field(default=256, ge=64, le=1024)
     chunk_overlap_ratio: float = Field(default=0.2, ge=0.0, le=0.5)
     enable_cleaning: bool = Field(default=False)
 
 
+# ── 文档审核流程 ───────────────────────────────────────────
+
+
+class CleanResult(BaseModel):
+    """upload-and-clean 接口的响应。"""
+
+    doc_id: int
+    file_name: str
+    cleaned_content: str
+    doc_type: str
+    splitter_type: str
+    chunk_size: int
+    chunk_overlap_ratio: float
+
+
+class ConfirmCleanRequest(BaseModel):
+    """confirm-clean 接口的请求体。"""
+
+    content: str = Field(..., min_length=1, description="管理员编辑后的清洗文本")
+
+
+class ChunkPreview(BaseModel):
+    """单个 chunk 预览。"""
+
+    index: int
+    content: str
+
+
+class ChunkPreviewResult(BaseModel):
+    """confirm-clean 接口的响应。"""
+
+    doc_id: int
+    chunks: list[ChunkPreview]
+    chunk_count: int
+
+
+class ConfirmIndexResult(BaseModel):
+    """confirm-index 接口的响应。"""
+
+    doc_id: int
+    status: str
+    chunk_count: int
+
+
+class ReviewDetail(BaseModel):
+    """审核中文档的详情。"""
+
+    doc_id: int
+    file_name: str
+    status: str
+    cleaned_content: str | None = None
+    chunks: list[ChunkPreview] | None = None
+    doc_type: str
+    splitter_type: str
+    chunk_size: int
+    chunk_overlap_ratio: float
+
+
 # ── 对话 ─────────────────────────────────────────────────
+
 
 class HistoryMessage(BaseModel):
     role: str = Field(..., pattern=r"^(user|assistant)$")
@@ -90,6 +159,7 @@ class ActiveKBResponse(BaseModel):
 
 
 # ── FAQ ───────────────────────────────────────────────────
+
 
 class FAQCreate(BaseModel):
     question: str = Field(..., min_length=1, max_length=500)
@@ -128,6 +198,7 @@ class FAQSearchResponse(BaseModel):
 
 # ── FAQ 导入/导出 ──────────────────────────────────────────
 
+
 class FAQImportError(BaseModel):
     row: int
     question: str
@@ -143,6 +214,7 @@ class FAQImportResult(BaseModel):
 
 
 # ── 导师答疑请求 (QA Requests) ────────────────────────────────
+
 
 class QARequestCreate(BaseModel):
     conversation_id: int
@@ -168,6 +240,7 @@ class QARequestInfo(BaseModel):
 
 
 # ── 对话历史 ─────────────────────────────────────────────
+
 
 class ConversationCreate(BaseModel):
     kb_name: str
@@ -221,11 +294,13 @@ class FeedbackRequest(BaseModel):
 
 # ── 通用 ─────────────────────────────────────────────────
 
+
 class MessageResponse(BaseModel):
     message: str
 
 
 # ── 用户认证 ─────────────────────────────────────────────
+
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=2, max_length=32, pattern=r"^[a-zA-Z0-9_]+$")

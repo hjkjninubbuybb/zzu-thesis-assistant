@@ -7,13 +7,13 @@
 - MD5 缓存：重建索引时跳过已描述的图片
 - 失败降级：VLM 调用失败时保留空描述，不中断流程
 """
+
 from __future__ import annotations
 
 import base64
 import hashlib
 import json
 import logging
-import os
 import re
 from pathlib import Path
 
@@ -34,9 +34,7 @@ _MD_IMG_RE = re.compile(r"!\[IMG_([^\]]+)\]\(([^\)]+)\)")
 _VLM_BATCH_SIZE = 8
 
 # VLM 描述缓存（按图片内容 MD5，跨索引复用）
-_VLM_CACHE_FILE = (
-    Path(__file__).parents[2] / "data" / "vlm_desc_cache.json"
-)
+_VLM_CACHE_FILE = Path(__file__).parents[2] / "data" / "vlm_desc_cache.json"
 
 
 def _load_vlm_cache() -> dict[str, str]:
@@ -50,9 +48,7 @@ def _load_vlm_cache() -> dict[str, str]:
 
 def _save_vlm_cache(cache: dict[str, str]) -> None:
     _VLM_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _VLM_CACHE_FILE.write_text(
-        json.dumps(cache, ensure_ascii=False), encoding="utf-8"
-    )
+    _VLM_CACHE_FILE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
 
 
 def _img_md5(img_path: Path) -> str:
@@ -72,8 +68,7 @@ def _describe_images_batch(
     refs: list[tuple[str, Path]],
     vlm_model: str,
 ) -> dict[str, str]:
-    """
-    批量调用 VLM 描述多张图片，返回 {img_ref: description}。
+    """批量调用 VLM 描述多张图片，返回 {img_ref: description}。
     失败时返回空 dict，由调用方降级处理。
     """
     try:
@@ -94,13 +89,15 @@ def _describe_images_batch(
         content.append({"image": f"data:{mime};base64,{img_b64}"})
 
     ref_names = "、".join(f"图{i + 1}" for i in range(len(refs)))
-    content.append({
-        "text": (
-            f"以上 {len(refs)} 张图片，按顺序编号为 {ref_names}。"
-            "请对每张图片用一句中文描述其主要内容（包含页面名称、图表类型、关键数据等），"
-            "严格按 JSON 数组返回，顺序与图片一致，例如：[\"描述1\", \"描述2\"]"
-        )
-    })
+    content.append(
+        {
+            "text": (
+                f"以上 {len(refs)} 张图片，按顺序编号为 {ref_names}。"
+                "请对每张图片用一句中文描述其主要内容（包含页面名称、图表类型、关键数据等），"
+                '严格按 JSON 数组返回，顺序与图片一致，例如：["描述1", "描述2"]'
+            )
+        }
+    )
 
     try:
         resp = MultiModalConversation.call(
@@ -109,7 +106,9 @@ def _describe_images_batch(
             api_key=get_api_key(),
         )
         if resp.status_code != 200:
-            logger.warning("[image_describer] VLM 批量描述失败 HTTP %s", resp.status_code)
+            logger.warning(
+                "[image_describer] VLM 批量描述失败 HTTP %s", resp.status_code
+            )
             return {}
 
         raw = resp.output.choices[0].message.content[0]["text"].strip()
@@ -177,11 +176,12 @@ def inject_image_descriptions(
 
     logger.info(
         "[image_describer] %d 张命中缓存，%d 张需调 VLM",
-        len(desc_map), len(to_fetch),
+        len(desc_map),
+        len(to_fetch),
     )
 
     for i in range(0, len(to_fetch), _VLM_BATCH_SIZE):
-        batch = to_fetch[i:i + _VLM_BATCH_SIZE]
+        batch = to_fetch[i : i + _VLM_BATCH_SIZE]
         batch_descs = _describe_images_batch(batch, vlm_model)
         for img_ref, img_path in batch:
             desc = batch_descs.get(img_ref, "")
