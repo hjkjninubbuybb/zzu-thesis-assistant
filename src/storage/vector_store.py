@@ -124,8 +124,7 @@ class VectorStore:
         if payload_filter:
             qdrant_filter = qmodels.Filter(
                 must=[
-                    qmodels.FieldCondition(key=k, match=qmodels.MatchValue(value=v))
-                    for k, v in payload_filter.items()
+                    qmodels.FieldCondition(key=k, match=qmodels.MatchValue(value=v)) for k, v in payload_filter.items()
                 ]
             )
         try:
@@ -164,9 +163,7 @@ class VectorStore:
         except Exception as e:
             raise VectorStoreError(f"按 id 删除向量失败: {e}") from e
 
-    def delete_by_metadata(
-        self, collection_name: str, key: str, value: str
-    ) -> None:
+    def delete_by_metadata(self, collection_name: str, key: str, value: str) -> None:
         """根据 payload 中的元数据字段删除向量。"""
         try:
             self.client.delete(

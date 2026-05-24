@@ -76,9 +76,7 @@ def list_documents(kb_name: str, _: dict = Depends(require_teacher_or_admin)):
 
 
 @router.get("/{kb_name}/{doc_id}", response_model=DocDetail)
-def get_document_detail(
-    kb_name: str, doc_id: int, _: dict = Depends(require_teacher_or_admin)
-):
+def get_document_detail(kb_name: str, doc_id: int, _: dict = Depends(require_teacher_or_admin)):
     """获取文档详情（含摘要和清洗后的内容）。"""
     doc = _ds.get_document(doc_id)
     if not doc or doc["kb_name"] != kb_name:
@@ -217,9 +215,10 @@ async def confirm_clean(
     if not doc or doc["kb_name"] != kb_name:
         raise HTTPException(404, "文档不存在")
     if doc["status"] != "pending_review":
-        raise HTTPException(
-            400, f"文档状态不正确: {doc['status']}，需要 pending_review"
-        )
+        raise HTTPException(400, f"文档状态不正确: {doc['status']}，需要 pending_review")
+
+    if not body.content or not body.content.strip():
+        raise HTTPException(400, "清洗内容不能为空")
 
     _ds.update_document(doc_id, content=body.content)
 
@@ -233,6 +232,9 @@ async def confirm_clean(
         chunk_overlap_ratio=doc.get("chunk_overlap_ratio", 0.2),
         doc_type=doc.get("doc_type", "policy"),
     )
+
+    if not nodes:
+        raise HTTPException(400, "分块结果为空，请检查文本内容是否过短")
 
     chunks_data = []
     for i, node in enumerate(nodes):
@@ -265,9 +267,7 @@ async def confirm_index(
     if not doc or doc["kb_name"] != kb_name:
         raise HTTPException(404, "文档不存在")
     if doc["status"] != "pending_chunk_review":
-        raise HTTPException(
-            400, f"文档状态不正确: {doc['status']}，需要 pending_chunk_review"
-        )
+        raise HTTPException(400, f"文档状态不正确: {doc['status']}，需要 pending_chunk_review")
 
     chunks_json = doc.get("chunks_preview")
     if not chunks_json:
@@ -325,9 +325,7 @@ async def get_review_detail(
     chunks = None
     if doc["status"] == "pending_chunk_review" and doc.get("chunks_preview"):
         chunks_data = json.loads(doc["chunks_preview"])
-        chunks = [
-            ChunkPreview(index=c["index"], content=c["content"]) for c in chunks_data
-        ]
+        chunks = [ChunkPreview(index=c["index"], content=c["content"]) for c in chunks_data]
 
     return ReviewDetail(
         doc_id=doc_id,
@@ -458,9 +456,7 @@ def download_document(
     elif authorization and authorization.startswith("Bearer "):
         decode_token(authorization[len("Bearer ") :], token_type="access")
     else:
-        raise HTTPException(
-            status_code=401, detail="需要认证：请提供 ?token= 或 Authorization header"
-        )
+        raise HTTPException(status_code=401, detail="需要认证：请提供 ?token= 或 Authorization header")
 
     doc = _ds.get_document(doc_id)
     if not doc or doc["kb_name"] != kb_name:
@@ -482,9 +478,7 @@ def download_document(
 
 
 @router.delete("/{kb_name}/{doc_id}", response_model=MessageResponse)
-def remove_document(
-    kb_name: str, doc_id: int, _: dict = Depends(require_teacher_or_admin)
-):
+def remove_document(kb_name: str, doc_id: int, _: dict = Depends(require_teacher_or_admin)):
     """删除文档。"""
     doc = _ds.get_document(doc_id)
     if not doc or doc["kb_name"] != kb_name:

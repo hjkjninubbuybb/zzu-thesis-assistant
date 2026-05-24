@@ -5,6 +5,7 @@ import subprocess
 import sys
 import threading
 import time
+
 import uvicorn
 
 # 屏蔽第三方库的各类 DeprecationWarning（如 LangChain/LangGraph），子进程继承
@@ -64,7 +65,10 @@ def _ensure_docker():
             capture_output=True,
         )
         if ret.returncode != 0:
-            print("[docker] 容器启动失败，请手动检查是否已执行 'colima start'", file=sys.stderr)
+            print(
+                "[docker] 容器启动失败，请手动检查是否已执行 'colima start'",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
     # 先静默快速检查端口，已就绪则直接返回，无需任何提示
@@ -131,7 +135,10 @@ def _ensure_docker_daemon():
             os.environ["DOCKER_HOST"] = f"unix://{colima_sock}"
             print("[docker] Colima 启动成功")
             return
-        print("[docker] Colima 自动启动失败，请手动执行 'colima start' 并确保其运行正常", file=sys.stderr)
+        print(
+            "[docker] Colima 自动启动失败，请手动执行 'colima start' 并确保其运行正常",
+            file=sys.stderr,
+        )
 
 
 def _detect_compose_cmd() -> list[str] | None:
@@ -155,10 +162,10 @@ def _detect_compose_cmd() -> list[str] | None:
 
 # Vite 启动 banner 中需要过滤掉的行（banner 里已有地址，这些重复或无用）
 _VITE_SKIP_PATTERNS = (
-    "VITE v",                        # "  VITE v8.0.6  ready in xxx ms"
-    "➜  Local:",                     # "  ➜  Local:   http://localhost:5173/"
-    "➜  Network:",                   # "  ➜  Network: use --host to expose"
-    "➜  press h",                    # "  ➜  press h + enter to show help"
+    "VITE v",  # "  VITE v8.0.6  ready in xxx ms"
+    "➜  Local:",  # "  ➜  Local:   http://localhost:5173/"
+    "➜  Network:",  # "  ➜  Network: use --host to expose"
+    "➜  press h",  # "  ➜  press h + enter to show help"
 )
 
 
@@ -195,9 +202,9 @@ def _start_frontend():
     env["NODE_NO_WARNINGS"] = "1"
     try:
         process = subprocess.Popen(
-            ["npm", "run", "--silent", "dev"],   # --silent 去掉 npm 脚本前缀行
+            ["npm", "run", "--silent", "dev"],  # --silent 去掉 npm 脚本前缀行
             cwd=frontend_dir,
-            stdout=subprocess.PIPE,              # 走过滤线程
+            stdout=subprocess.PIPE,  # 走过滤线程
             stderr=sys.stderr,
             env=env,
         )

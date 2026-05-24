@@ -27,6 +27,7 @@ _ADMIN_KB_KEY = "admin_kb"
 
 # ── 工具函数 ────────────────────────────────────────────────
 
+
 def _build_active_response(kb_name: str) -> ActiveKBResponse:
     kb = _ds.get_kb(kb_name)
     if not kb:
@@ -59,6 +60,7 @@ def _get_active_response_or_none(key: str) -> ActiveKBResponse | None:
 
 # ── 学生知识库（所有已登录用户可读，管理员/教师可写）──────────
 
+
 @router.get("/active", response_model=ActiveKBResponse | None)
 def get_student_kb(_: dict = Depends(get_current_user)) -> ActiveKBResponse | None:
     """获取为学生分配的知识库（所有已登录用户可访问）。"""
@@ -87,8 +89,11 @@ def clear_student_kb(_: dict = Depends(require_teacher_or_admin)) -> MessageResp
 
 # ── 管理端知识库（管理员/教师可读写）──────────────────────────
 
+
 @router.get("/admin-active", response_model=ActiveKBResponse | None)
-def get_admin_kb(_: dict = Depends(require_teacher_or_admin)) -> ActiveKBResponse | None:
+def get_admin_kb(
+    _: dict = Depends(require_teacher_or_admin),
+) -> ActiveKBResponse | None:
     """获取管理端（教师/管理员）使用的知识库。"""
     return _get_active_response_or_none(_ADMIN_KB_KEY)
 
@@ -114,6 +119,7 @@ def clear_admin_kb(_: dict = Depends(require_teacher_or_admin)) -> MessageRespon
 
 
 # ── 知识库 CRUD（仅管理员/教师）────────────────────────────────
+
 
 @router.get("", response_model=list[KBInfo])
 def list_kbs(_: dict = Depends(require_teacher_or_admin)) -> list[KBInfo]:
@@ -166,5 +172,9 @@ def delete_kb(kb_name: str, _: dict = Depends(require_teacher_or_admin)) -> Mess
     for key, label in [(_STUDENT_KB_KEY, "学生"), (_ADMIN_KB_KEY, "管理端")]:
         if _ds.get_setting(key) == kb_name:
             _ds.delete_setting(key)
-            logger.info("[knowledge] 已自动清除%s知识库分配（原知识库 '%s' 已删除）", label, kb_name)
+            logger.info(
+                "[knowledge] 已自动清除%s知识库分配（原知识库 '%s' 已删除）",
+                label,
+                kb_name,
+            )
     return MessageResponse(message=f"知识库 '{kb_name}' 已删除")

@@ -3,8 +3,8 @@
 import logging
 import os
 import re
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 import yaml
 
@@ -19,9 +19,11 @@ def _resolve_env_vars(value: str) -> str:
     if not isinstance(value, str) or "${" not in value:
         return value
     pattern = r"\$\{(\w+)(?::-(.*?))?\}"
+
     def replacer(m):
         var_name, default = m.group(1), m.group(2) or ""
         return os.environ.get(var_name, default)
+
     return re.sub(pattern, replacer, value)
 
 
@@ -38,11 +40,11 @@ def _resolve_dict(d: dict) -> dict:
     return result
 
 
-@lru_cache()
+@lru_cache
 def get_config() -> dict:
     """加载并返回全局配置。"""
     config_path = ROOT_DIR / "configs" / "config.yaml"
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
     return _resolve_dict(raw)
 
@@ -51,6 +53,7 @@ def get_api_key() -> str:
     """获取 LLM API Key（数据库 system_settings 表，回退环境变量）。"""
     try:
         from src.storage.document_store import DocumentStore
+
         ds = DocumentStore()
         # 兼容旧名称 dashscope_api_key
         key = ds.get_setting("api_key") or ds.get_setting("dashscope_api_key")
@@ -65,13 +68,13 @@ def get_api_base_url() -> str | None:
     """获取 LLM API Base URL（数据库优先）。"""
     try:
         from src.storage.document_store import DocumentStore
+
         ds = DocumentStore()
         url = ds.get_setting("api_base_url")
         if url:
             return url
     except Exception:
         pass
-    
+
     cfg = get_config()
     return cfg.get("llm", {}).get("api_base_url") or os.environ.get("LLM_API_BASE_URL")
-

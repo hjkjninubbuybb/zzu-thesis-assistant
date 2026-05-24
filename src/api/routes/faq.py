@@ -3,22 +3,33 @@
 import asyncio
 import io
 import logging
-import urllib.parse
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query as QueryParam, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import Query as QueryParam
 from fastapi.responses import StreamingResponse
+from openpyxl import load_workbook
 
 from src.api.auth import get_current_user, require_teacher_or_admin
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
-
-from src.api.schemas import FAQCreate, FAQImportError, FAQImportResult, FAQItem, FAQSearchResponse, FAQUpdate, MessageResponse
-from src.config import get_config
-from src.core.embedding import get_embed_model
+from src.api.schemas import (
+    FAQCreate,
+    FAQImportError,
+    FAQImportResult,
+    FAQItem,
+    FAQSearchResponse,
+    FAQUpdate,
+    MessageResponse,
+)
 from src.core.faq_match import rewrite_query as _rewrite_query
+from src.core.faq_service import (
+    batch_embed_and_upsert,
+    build_faq_workbook,
+    make_xlsx_response,
+    parse_faq_sheet,
+    upsert_faq_vector,
+)
+from src.core.rag.embedding import get_embed_model
 from src.storage.document_store import DocumentStore
 from src.storage.vector_store import VectorStore
 
@@ -28,37 +39,6 @@ router = APIRouter(prefix="/api/faq", tags=["faq"])
 
 _doc_store = DocumentStore()
 _vec_store = VectorStore()
-
-
-def _embed_faq_text(question: str, answer: str) -> tuple[list[float], str]:
-    """将 Q+A 合并后 embed，返回 (vector, vector_id)。"""
-    text = f"Q: {question}\nA: {answer}"
-    embed_model = get_embed_model(text_type="document")
-    vector = embed_model.get_text_embedding(text)
-    return vector, text
-
-
-def _upsert_faq_vector(
-    kb_name: str,
-    question: str,
-    answer: str,
-    faq_id: int,
-    vector_id: str,
-) -> None:
-    """同步：embed 并 upsert 到 Qdrant（供 asyncio.to_thread 调用）。"""
-    vector, text = _embed_faq_text(question, answer)
-    _vec_store.add_vectors(
-        collection_name=kb_name,
-        vectors=[vector],
-        payloads=[{
-            "text": text,
-            "source_type": "faq",
-            "faq_id": faq_id,
-            "source_file": "FAQ",
-            "kb_name": kb_name,
-        }],
-        ids=[vector_id],
-    )
 
 
 @router.get("/{kb_name}", response_model=list[FAQItem])
@@ -79,7 +59,11 @@ async def list_faqs(
 
 
 @router.post("/{kb_name}", response_model=FAQItem)
-async def create_faq(kb_name: str, body: FAQCreate, current_user: dict = Depends(require_teacher_or_admin)) -> dict:
+async def create_faq(
+    kb_name: str,
+    body: FAQCreate,
+    current_user: dict = Depends(require_teacher_or_admin),
+) -> dict:
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
 
@@ -103,8 +87,13 @@ async def create_faq(kb_name: str, body: FAQCreate, current_user: dict = Depends
         vector_id = str(uuid.uuid4())
         try:
             await asyncio.to_thread(
-                _upsert_faq_vector,
-                kb_name, body.question, body.answer, faq_id, vector_id,
+                upsert_faq_vector,
+                kb_name,
+                body.question,
+                body.answer,
+                faq_id,
+                vector_id,
+                _vec_store,
             )
             row = _doc_store.update_faq(faq_id, vector_id=vector_id)
         except Exception as e:
@@ -114,7 +103,12 @@ async def create_faq(kb_name: str, body: FAQCreate, current_user: dict = Depends
 
 
 @router.put("/{kb_name}/{faq_id}", response_model=FAQItem)
-async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate, current_user: dict = Depends(require_teacher_or_admin)) -> dict:
+async def update_faq(
+    kb_name: str,
+    faq_id: int,
+    body: FAQUpdate,
+    current_user: dict = Depends(require_teacher_or_admin),
+) -> dict:
     existing = _doc_store.get_faq(faq_id)
     if not existing or existing["kb_name"] != kb_name:
         raise HTTPException(status_code=404, detail="FAQ 不存在")
@@ -127,7 +121,9 @@ async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate, current_user: d
 
     # 审核状态流转联动向量库
     becoming_approved = updates.get("status") == "approved" and existing.get("status") != "approved"
-    becoming_unapproved = updates.get("status") in ("pending", "rejected", "draft") and existing.get("status") == "approved"
+    becoming_unapproved = (
+        updates.get("status") in ("pending", "rejected", "draft") and existing.get("status") == "approved"
+    )
 
     current_status = updates.get("status") or existing["status"]
 
@@ -138,8 +134,13 @@ async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate, current_user: d
         vector_id = existing.get("vector_id") or str(uuid.uuid4())
         try:
             await asyncio.to_thread(
-                _upsert_faq_vector,
-                kb_name, new_q, new_a, faq_id, vector_id,
+                upsert_faq_vector,
+                kb_name,
+                new_q,
+                new_a,
+                faq_id,
+                vector_id,
+                _vec_store,
             )
             updates["vector_id"] = vector_id
         except Exception as e:
@@ -175,7 +176,7 @@ async def update_faq(kb_name: str, faq_id: int, body: FAQUpdate, current_user: d
             a = updates.get("answer", existing["answer"])
             vid = updates.get("vector_id") or existing.get("vector_id") or str(uuid.uuid4())
             try:
-                await asyncio.to_thread(_upsert_faq_vector, kb_name, q, a, faq_id, vid)
+                await asyncio.to_thread(upsert_faq_vector, kb_name, q, a, faq_id, vid, _vec_store)
                 updates["vector_id"] = vid
                 logger.info("[faq] FAQ %d 已启用，向量已重新写入 Qdrant", faq_id)
             except Exception as e:
@@ -256,191 +257,18 @@ async def delete_faq(kb_name: str, faq_id: int, current_user: dict = Depends(req
     return {"message": f"FAQ {faq_id} 已删除"}
 
 
-# ── Excel 导入/导出辅助函数 ────────────────────────────────
-
-def _build_faq_workbook(faqs: list[dict] | None = None) -> Workbook:
-    """
-    构建 FAQ Excel 工作簿。
-    faqs=None → 模板（含示例行）；faqs=[...] → 导出（含数据）。
-    """
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "FAQ"
-
-    is_export = faqs is not None
-    base_headers = ["问题 (必填)", "答案 (必填)", "分类", "排序号"]
-    extra_headers = ["ID", "是否启用", "创建时间"]
-    headers = base_headers + (extra_headers if is_export else [])
-
-    header_fill = PatternFill(start_color="1A1A1A", end_color="1A1A1A", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True, size=10)
-    center_align = Alignment(horizontal="center", vertical="center")
-    wrap_align = Alignment(wrap_text=True, vertical="top")
-
-    for col_idx, h in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_idx, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = center_align
-    ws.row_dimensions[1].height = 24
-
-    col_widths = [40, 60, 15, 10] + ([8, 8, 20] if is_export else [])
-    for i, w in enumerate(col_widths, 1):
-        ws.column_dimensions[get_column_letter(i)].width = w
-
-    sample_fill = PatternFill(start_color="F8F6F2", end_color="F8F6F2", fill_type="solid")
-
-    if is_export and faqs:
-        for row_idx, faq in enumerate(faqs, 2):
-            values = [
-                faq["question"],
-                faq["answer"],
-                faq.get("category", ""),
-                faq.get("sort_order", 0),
-                faq["id"],
-                "是" if faq.get("enabled") else "否",
-                (faq["created_at"][:10] if faq.get("created_at") else ""),
-            ]
-            for col_idx, val in enumerate(values, 1):
-                cell = ws.cell(row=row_idx, column=col_idx, value=val)
-                if col_idx == 2:
-                    cell.alignment = wrap_align
-                    ws.row_dimensions[row_idx].height = 60
-    elif not is_export:
-        # 示例行
-        sample = [
-            "郑州大学毕业答辩的时间安排是什么？",
-            "郑州大学本科毕业论文答辩通常安排在每年6月初，具体时间由各学院通知，请关注学院官网。",
-            "毕业答辩",
-            0,
-        ]
-        for col_idx, val in enumerate(sample, 1):
-            cell = ws.cell(row=2, column=col_idx, value=val)
-            cell.fill = sample_fill
-            if col_idx == 2:
-                cell.alignment = wrap_align
-
-    return wb
-
-
-def _parse_faq_sheet(ws) -> tuple[list[dict], list[FAQImportError]]:
-    """
-    解析 FAQ 工作表，返回 (valid_rows, errors)。
-    valid_rows: [{"question", "answer", "category", "sort_order"}, ...]
-    """
-    valid_rows: list[dict] = []
-    errors: list[FAQImportError] = []
-
-    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        # 跳过全空行
-        if all(v is None or str(v).strip() == "" for v in (row[:4] if len(row) >= 4 else row)):
-            continue
-
-        question = str(row[0]).strip() if row[0] is not None else ""
-        answer   = str(row[1]).strip() if len(row) > 1 and row[1] is not None else ""
-        category = str(row[2]).strip() if len(row) > 2 and row[2] is not None else ""
-        sort_raw = row[3] if len(row) > 3 else None
-
-        err: str | None = None
-        sort_order = 0
-        if not question:
-            err = "问题不能为空"
-        elif len(question) > 500:
-            err = "问题超过 500 字符限制"
-        elif not answer:
-            err = "答案不能为空"
-        elif len(answer) > 2000:
-            err = "答案超过 2000 字符限制"
-        elif category and len(category) > 64:
-            err = "分类超过 64 字符限制"
-        else:
-            if sort_raw is not None and str(sort_raw).strip() != "":
-                try:
-                    sort_order = int(sort_raw)
-                    if sort_order < 0:
-                        err = "排序号不能为负数"
-                except (ValueError, TypeError):
-                    err = f"排序号 '{sort_raw}' 不是有效整数"
-
-        if err:
-            errors.append(FAQImportError(row=row_idx, question=question[:50], reason=err))
-        else:
-            valid_rows.append({
-                "question": question,
-                "answer": answer,
-                "category": category,
-                "sort_order": sort_order,
-            })
-
-    return valid_rows, errors
-
-
-def _batch_embed_and_upsert(
-    kb_name: str,
-    rows: list[dict],
-) -> dict[int, str | Exception]:
-    """
-    批量 embed 并 upsert 到 Qdrant。
-    rows 每项包含: question, answer, faq_id, vector_id。
-    返回 {faq_id: vector_id} 或 {faq_id: Exception}。
-    """
-    cfg = get_config()
-    batch_size: int = cfg.get("embedding", {}).get("embed_batch_size", 10)
-    embed_model = get_embed_model(text_type="document")
-    results: dict[int, str | Exception] = {}
-
-    for i in range(0, len(rows), batch_size):
-        batch = rows[i : i + batch_size]
-        texts = [f"Q: {r['question']}\nA: {r['answer']}" for r in batch]
-        try:
-            vectors = embed_model.get_text_embedding_batch(texts)
-            payloads = [
-                {
-                    "text": texts[j],
-                    "source_type": "faq",
-                    "faq_id": batch[j]["faq_id"],
-                    "source_file": "FAQ",
-                    "kb_name": kb_name,
-                }
-                for j in range(len(batch))
-            ]
-            _vec_store.add_vectors(
-                collection_name=kb_name,
-                vectors=vectors,
-                payloads=payloads,
-                ids=[r["vector_id"] for r in batch],
-            )
-            for r in batch:
-                results[r["faq_id"]] = r["vector_id"]
-        except Exception as e:
-            logger.warning("[faq import] batch %d embed/upsert 失败: %s", i // batch_size, e)
-            for r in batch:
-                results[r["faq_id"]] = e
-
-    return results
-
-
-def _make_xlsx_response(wb: Workbook, filename: str) -> StreamingResponse:
-    stream = io.BytesIO()
-    wb.save(stream)
-    stream.seek(0)
-    encoded = urllib.parse.quote(filename)
-    return StreamingResponse(
-        stream,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
-    )
-
-
 # ── Excel 导入/导出端点 ────────────────────────────────────
 
+
 @router.get("/{kb_name}/template")
-async def download_faq_template(kb_name: str, current_user: dict = Depends(require_teacher_or_admin)) -> StreamingResponse:
+async def download_faq_template(
+    kb_name: str, current_user: dict = Depends(require_teacher_or_admin)
+) -> StreamingResponse:
     """下载 FAQ Excel 导入模板（含表头和示例行）。"""
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
-    wb = _build_faq_workbook(faqs=None)
-    return _make_xlsx_response(wb, "FAQ_导入模板.xlsx")
+    wb = build_faq_workbook(faqs=None)
+    return make_xlsx_response(wb, "FAQ_导入模板.xlsx")
 
 
 @router.get("/{kb_name}/export")
@@ -449,9 +277,9 @@ async def export_faqs_excel(kb_name: str, current_user: dict = Depends(require_t
     if not _doc_store.get_kb(kb_name):
         raise HTTPException(status_code=404, detail=f"知识库 '{kb_name}' 不存在")
     faqs = _doc_store.list_faqs(kb_name)
-    wb = _build_faq_workbook(faqs=faqs)
+    wb = build_faq_workbook(faqs=faqs)
     filename = f"{kb_name}_FAQ_{date.today().strftime('%Y%m%d')}.xlsx"
-    return _make_xlsx_response(wb, filename)
+    return make_xlsx_response(wb, filename)
 
 
 @router.post("/{kb_name}/import", response_model=FAQImportResult)
@@ -480,12 +308,16 @@ async def import_faqs_excel(
         raise HTTPException(status_code=422, detail=f"Excel 文件解析失败：{e}") from e
 
     # 解析数据行
-    valid_rows, parse_errors = _parse_faq_sheet(ws)
+    valid_rows, raw_errors = parse_faq_sheet(ws)
+    parse_errors = [FAQImportError(row=e["row"], question=e["question"], reason=e["reason"]) for e in raw_errors]
     total = len(valid_rows) + len(parse_errors)
 
     if total == 0:
         return {
-            "total": 0, "success": 0, "skipped": 0, "failed": 0,
+            "total": 0,
+            "success": 0,
+            "skipped": 0,
+            "failed": 0,
             "errors": [FAQImportError(row=0, question="", reason="文件中无有效数据行")],
         }
 
@@ -498,9 +330,13 @@ async def import_faqs_excel(
         filtered: list[dict] = []
         for r in valid_rows:
             if r["question"] in existing_questions:
-                all_errors.append(FAQImportError(
-                    row=0, question=r["question"][:50], reason="与现有 FAQ 问题重复，已跳过"
-                ))
+                all_errors.append(
+                    FAQImportError(
+                        row=0,
+                        question=r["question"][:50],
+                        reason="与现有 FAQ 问题重复，已跳过",
+                    )
+                )
                 skipped_count += 1
             else:
                 filtered.append(r)
@@ -518,12 +354,14 @@ async def import_faqs_excel(
                 category=r["category"],
                 sort_order=r["sort_order"],
             )
-            faq_rows.append({
-                "question": r["question"],
-                "answer": r["answer"],
-                "faq_id": row["id"],
-                "vector_id": str(uuid.uuid4()),
-            })
+            faq_rows.append(
+                {
+                    "question": r["question"],
+                    "answer": r["answer"],
+                    "faq_id": row["id"],
+                    "vector_id": str(uuid.uuid4()),
+                }
+            )
         except Exception as e:
             logger.warning("[faq import] MySQL 插入失败: %s", e)
             all_errors.append(FAQImportError(row=0, question=r["question"][:50], reason=f"数据库写入失败：{e}"))
@@ -532,13 +370,17 @@ async def import_faqs_excel(
     # 批量 embed + upsert
     success_count = 0
     if faq_rows:
-        embed_results = await asyncio.to_thread(_batch_embed_and_upsert, kb_name, faq_rows)
+        embed_results = await asyncio.to_thread(batch_embed_and_upsert, kb_name, faq_rows, _vec_store)
         for r in faq_rows:
             result = embed_results.get(r["faq_id"])
             if isinstance(result, Exception):
-                all_errors.append(FAQImportError(
-                    row=0, question=r["question"][:50], reason="向量化失败，FAQ 已保存但未加入检索"
-                ))
+                all_errors.append(
+                    FAQImportError(
+                        row=0,
+                        question=r["question"][:50],
+                        reason="向量化失败，FAQ 已保存但未加入检索",
+                    )
+                )
                 failed_count += 1
             else:
                 try:
@@ -549,7 +391,11 @@ async def import_faqs_excel(
 
     logger.info(
         "[faq import] kb=%s total=%d success=%d skipped=%d failed=%d",
-        kb_name, total, success_count, skipped_count, failed_count,
+        kb_name,
+        total,
+        success_count,
+        skipped_count,
+        failed_count,
     )
     return {
         "total": total,
