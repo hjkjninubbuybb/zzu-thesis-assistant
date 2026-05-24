@@ -3,10 +3,10 @@
 import logging
 import re
 
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 
+from .nodes import evaluator_node, optimizer_node
 from .state import CleaningState
-from .nodes import optimizer_node, evaluator_node
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,9 @@ def placeholder_check_node(state: CleaningState) -> dict:
     )
     logger.warning(
         "[placeholder_check] 丢失占位符 %d 个（原 %d → 清洗后 %d）",
-        lost, orig_count, clean_count,
+        lost,
+        orig_count,
+        clean_count,
     )
     return {
         "placeholder_failed": True,

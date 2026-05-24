@@ -1,28 +1,26 @@
 import json
 import logging
-import os
 
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from pydantic import BaseModel, ValidationError
+from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import ValidationError
 
-from src.config import get_config, get_api_key, get_api_base_url
-from .state import CleaningState
+from src.core.eval_base import EvaluatorOutput
+from src.core.llm_factory import get_llm
+
 from .prompts import (
-    OPTIMIZER_SYSTEM_PROMPT,
-    OPTIMIZER_RETRY_TEMPLATE,
-    TABLE_OPTIMIZER_SYSTEM_PROMPT,
-    FORM_TABLE_EXTRACTOR_PROMPT,
-    FORM_DOCUMENT_OPTIMIZER_PROMPT,
     EVALUATOR_SYSTEM_PROMPT,
+    FORM_DOCUMENT_OPTIMIZER_PROMPT,
+    FORM_TABLE_EXTRACTOR_PROMPT,
+    OPTIMIZER_RETRY_TEMPLATE,
+    OPTIMIZER_SYSTEM_PROMPT,
+    TABLE_OPTIMIZER_SYSTEM_PROMPT,
 )
+from .state import CleaningState
 
 logger = logging.getLogger(__name__)
 
 _COMMON_SPECIAL = set(
-    "，。！？；：""''（）【】《》、·…—～"
-    "≤≥±×÷√∞∑∏∂∫≈≠°%℃℉→←↑↓"
-    "①②③④⑤⑥⑦⑧⑨⑩"
+    "，。！？；：''（）【】《》、·…—～≤≥±×÷√∞∑∏∂∫≈≠°%℃℉→←↑↓①②③④⑤⑥⑦⑧⑨⑩"
 )
 
 
@@ -44,31 +42,8 @@ def _detect_unusual_chars(text: str) -> list[str]:
     return result
 
 
-class EvaluatorOutput(BaseModel):
-    status: str
-    feedback: str
-
-
-def _get_llm(fast: bool = False) -> ChatOpenAI:
-    cfg = get_config()
-    key = get_api_key()
-    url = get_api_base_url()
-    
-    if fast:
-        model_name = cfg.get("llm", {}).get("fast_model", "qwen-turbo")
-    else:
-        model_name = cfg.get("llm", {}).get("model", "qwen-plus")
-        
-    return ChatOpenAI(
-        model=model_name,
-        openai_api_key=key,
-        openai_api_base=url,
-        streaming=False,
-    )
-
-
 def optimizer_node(state: CleaningState) -> dict:
-    llm = _get_llm()
+    llm = get_llm(streaming=False)
     content_type = state.get("content_type", "text")
 
     if content_type == "table":
@@ -84,7 +59,8 @@ def optimizer_node(state: CleaningState) -> dict:
     unusual_note = (
         f"\n\n⚠️ 检测到以下不常见特殊字符，请结合上下文判断是否为字符识别错误并酌情纠正："
         f"{'、'.join(f'{ch}（U+{ord(ch):04X}）' for ch in unusual)}"
-        if unusual else ""
+        if unusual
+        else ""
     )
 
     if not state["attempts"]:
@@ -94,7 +70,9 @@ def optimizer_node(state: CleaningState) -> dict:
         for i, (attempt, feedback) in enumerate(
             zip(state["attempts"], state["feedback_history"])
         ):
-            history += f"### 第 {i + 1} 次尝试结果\n{attempt}\n\n### 评估反馈\n{feedback}\n\n"
+            history += (
+                f"### 第 {i + 1} 次尝试结果\n{attempt}\n\n### 评估反馈\n{feedback}\n\n"
+            )
         history += f"### 原始文档\n{state['original_content']}"
         user_content = OPTIMIZER_RETRY_TEMPLATE.format(history=history)
 
@@ -117,12 +95,9 @@ def optimizer_node(state: CleaningState) -> dict:
 
 
 def evaluator_node(state: CleaningState) -> dict:
-    llm = _get_llm(fast=True)  # PASS/FAIL 判断，用快速模型
+    llm = get_llm(fast=True, streaming=False)  # PASS/FAIL 判断，用快速模型
 
-    user_content = (
-        f"## 原始文档\n\n{state['original_content']}\n\n"
-        f"## 清洗后文档\n\n{state['current_content']}"
-    )
+    user_content = f"## 原始文档\n\n{state['original_content']}\n\n## 清洗后文档\n\n{state['current_content']}"
     messages = [
         SystemMessage(content=EVALUATOR_SYSTEM_PROMPT),
         HumanMessage(content=user_content),

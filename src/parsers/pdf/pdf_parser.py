@@ -3,9 +3,9 @@
 from pathlib import Path
 
 from src.parsers.base import ParsedDocument
-from src.parsers.pdf.text_extractor import PdfTextExtractor
-from src.parsers.pdf.table_extractor import PdfTableExtractor
 from src.parsers.pdf.image_extractor import PdfImageExtractor
+from src.parsers.pdf.table_extractor import PdfTableExtractor
+from src.parsers.pdf.text_extractor import PdfTextExtractor
 
 
 class PdfParser:

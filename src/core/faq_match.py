@@ -1,14 +1,11 @@
 """FAQ 防线：语义匹配 → 轻量 LLM 快答 → 不足则 fallback 到 RAG Agent。"""
 
 import logging
-import os
 
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from src.config import get_config, get_api_key, get_api_base_url
-from src.core.embedding import get_embed_model
-from src.core.rag_pipeline import _get_llm
+from src.core.llm_factory import get_llm
+from src.core.rag.embedding import get_embed_model
 from src.storage.document_store import DocumentStore
 from src.storage.vector_store import VectorStore
 
@@ -27,9 +24,13 @@ _REWRITE_SYSTEM = (
 def rewrite_query(raw: str) -> str:
     """调用快速 LLM 改写查询词，失败时回退原始输入处理。"""
     try:
-        llm = _get_llm(fast=True, streaming=False)
-        resp = llm.invoke([SystemMessage(content=_REWRITE_SYSTEM), HumanMessage(content=raw)])
-        rewritten = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
+        llm = get_llm(fast=True, streaming=False)
+        resp = llm.invoke(
+            [SystemMessage(content=_REWRITE_SYSTEM), HumanMessage(content=raw)]
+        )
+        rewritten = (
+            resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
+        )
         logger.info("[faq_match] 查询改写: %r → %r", raw, rewritten)
         return rewritten if rewritten else raw
     except Exception as e:
@@ -38,6 +39,7 @@ def rewrite_query(raw: str) -> str:
 
 
 # ── FAQ 语义匹配 ──────────────────────────────────────────────────────────
+
 
 def try_faq_match(
     query: str,
@@ -64,7 +66,8 @@ def try_faq_match(
 
     try:
         hits = vs.search(
-            kb_name, vector,
+            kb_name,
+            vector,
             top_k=top_k,
             score_threshold=score_threshold,
             payload_filter={"source_type": "faq"},
@@ -85,18 +88,22 @@ def try_faq_match(
             continue
         row = ds.get_faq(faq_id)
         if row and row.get("enabled") and row.get("status") == "approved":
-            results.append({
-                "question": row["question"],
-                "answer": row["answer"],
-                "score": hit["score"],
-                "faq_id": row["id"],
-            })
+            results.append(
+                {
+                    "question": row["question"],
+                    "answer": row["answer"],
+                    "score": hit["score"],
+                    "faq_id": row["id"],
+                }
+            )
             seen.add(faq_id)
 
     if not results:
         return None
 
-    logger.info("[faq_match] 命中 %d 条 FAQ，最高分=%.4f", len(results), results[0]["score"])
+    logger.info(
+        "[faq_match] 命中 %d 条 FAQ，最高分=%.4f", len(results), results[0]["score"]
+    )
     return results
 
 
@@ -129,7 +136,7 @@ def faq_generate(query: str, faq_results: list[dict]) -> str | None:
     system = _FAQ_ANSWER_SYSTEM.format(faq_context=faq_context)
 
     try:
-        llm = _get_llm(fast=True, streaming=False)
+        llm = get_llm(fast=True, streaming=False)
         resp = llm.invoke([SystemMessage(content=system), HumanMessage(content=query)])
         text = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
     except Exception as e:

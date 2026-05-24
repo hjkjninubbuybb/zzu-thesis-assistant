@@ -11,7 +11,7 @@ from typing import Protocol, runtime_checkable
 class ChunkType(str, Enum):
     """内容块类型，决定下游 splitter 和 cleaning 的策略。"""
 
-    TEXT = "text"    # 普通正文 / Markdown 文本块
+    TEXT = "text"  # 普通正文 / Markdown 文本块
     TABLE = "table"  # 表格（markdown 格式）
     IMAGE = "image"  # 图片描述（由 vision model 生成）
 

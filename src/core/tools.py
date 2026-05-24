@@ -7,7 +7,7 @@ from datetime import date, datetime
 
 from langchain_core.tools import tool
 
-from src.config import get_config, ROOT_DIR
+from src.config import ROOT_DIR
 from src.storage.document_store import DocumentStore
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,9 @@ def _load_cache() -> dict:
 def _save_cache(cache: dict) -> None:
     try:
         CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+        CACHE_PATH.write_text(
+            json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     except Exception as e:
         logger.warning("[calendar] 写入缓存失败: %s", e)
 
@@ -82,6 +84,7 @@ def _fetch_semester_start(cache_key: str) -> str | None:
     for url in (ZZU_CALENDAR_URL, ZZU_CALENDAR_FALLBACK):
         try:
             import httpx
+
             resp = httpx.get(url, timeout=10, follow_redirects=True)
             resp.raise_for_status()
             text = resp.text
@@ -102,7 +105,9 @@ def _fetch_semester_start(cache_key: str) -> str | None:
         m = re.search(pat, text)
         if m:
             month, day = int(m.group(1)), int(m.group(2))
-            logger.info("[calendar] 正则命中 pattern='%s'，解析到 %d月%d日", pat, month, day)
+            logger.info(
+                "[calendar] 正则命中 pattern='%s'，解析到 %d月%d日", pat, month, day
+            )
             return f"{year}-{month:02d}-{day:02d}"
 
     logger.warning("[calendar] 未匹配到开学日期，页面片段: %.300s", text)
@@ -150,7 +155,7 @@ def _candidate_kb_names() -> list[str]:
 def _fetch_semester_start_from_kb(cache_key: str) -> tuple[str, str] | None:
     """从当前知识库文本片段中提取学期第一周起始日期。"""
     try:
-        from src.core.retrieval import fetch_corpus
+        from src.core.rag.retriever import fetch_corpus
     except Exception as e:
         logger.debug("[calendar] 加载知识库语料接口失败: %s", e)
         return None
@@ -177,6 +182,7 @@ def _fetch_semester_start_from_kb(cache_key: str) -> tuple[str, str] | None:
 
 # ── 1. 知识库文档列表 ──────────────────────────────────────
 
+
 @tool
 def list_kb_documents(kb_name: str) -> str:
     """列出指定知识库中所有已上传的文档名称和片段数量。
@@ -200,6 +206,7 @@ def list_kb_documents(kb_name: str) -> str:
 
 
 # ── 2. 学术日历 ───────────────────────────────────────────
+
 
 @tool
 def get_academic_calendar() -> str:
@@ -225,9 +232,15 @@ def get_academic_calendar() -> str:
     if use_positive_cache:
         data_source = cache_source
         start_str = str(cache_entry["start"])
-        logger.debug("[calendar] 命中新鲜缓存: %s → %s (%s)", cache_key, start_str, data_source)
+        logger.debug(
+            "[calendar] 命中新鲜缓存: %s → %s (%s)", cache_key, start_str, data_source
+        )
     else:
-        if cache_source == "unavailable" and cache_entry and _is_cache_fresh(cache_entry):
+        if (
+            cache_source == "unavailable"
+            and cache_entry
+            and _is_cache_fresh(cache_entry)
+        ):
             logger.debug("[calendar] 命中负缓存，仍先检查知识库: %s", cache_key)
             cache_entry = None
         if cache_entry:
@@ -252,14 +265,23 @@ def get_academic_calendar() -> str:
             cache[cache_key] = {
                 "start": start_str,
                 "fetched_at": datetime.now().isoformat(),
-                "source": data_source if data_source.startswith("knowledge_base:") else "zzu_official",
+                "source": data_source
+                if data_source.startswith("knowledge_base:")
+                else "zzu_official",
             }
             _save_cache(cache)
             logger.info("[calendar] 缓存已写入: %s → %s", cache_key, start_str)
         else:
-            stale_source = str(cache_entry.get("source", "zzu_official")) if cache_entry else ""
-            if cache_entry and cache_entry.get("start") and (
-                stale_source == "zzu_official" or stale_source.startswith("knowledge_base:")
+            stale_source = (
+                str(cache_entry.get("source", "zzu_official")) if cache_entry else ""
+            )
+            if (
+                cache_entry
+                and cache_entry.get("start")
+                and (
+                    stale_source == "zzu_official"
+                    or stale_source.startswith("knowledge_base:")
+                )
             ):
                 start_str = str(cache_entry["start"])
                 data_source = f"stale_{stale_source}"
@@ -299,6 +321,7 @@ def get_academic_calendar() -> str:
 
 
 # ── 3. 知识库检索（工厂函数，运行时绑定 retriever） ───────
+
 
 def make_search_kb_tool(retriever_fn, captured_nodes: list):
     """创建 search_knowledge_base 工具，绑定检索函数和节点捕获列表。
@@ -346,6 +369,7 @@ def make_search_kb_tool(retriever_fn, captured_nodes: list):
 
 
 # ── 4. 文件下载链接（工厂函数，运行时绑定 kb_name）───────────
+
 
 def make_get_document_link_tool(kb_name: str, file_events: list):
     """创建 get_document_link 工具，绑定知识库名称和文件事件列表。
@@ -398,20 +422,24 @@ def make_get_document_link_tool(kb_name: str, file_events: list):
             # 相关度太低，发送前3个文件供用户选择
             sent = []
             for d in ranked[:3]:
-                file_events.append({
-                    "file_name": d["file_name"],
-                    "url": f"/api/document/{kb_name}/download/{d['id']}",
-                    "size_kb": max(d["file_size"] // 1024, 1),
-                })
+                file_events.append(
+                    {
+                        "file_name": d["file_name"],
+                        "url": f"/api/document/{kb_name}/download/{d['id']}",
+                        "size_kb": max(d["file_size"] // 1024, 1),
+                    }
+                )
                 sent.append(d["file_name"])
             names = "、".join(f"《{n}》" for n in sent)
             return f"未找到与「{file_hint}」完全匹配的文件，已发送相关文件 {names}，文件已通过界面卡片展示给用户，请用纯文字告知用户供参考即可。"
 
-        file_events.append({
-            "file_name": best["file_name"],
-            "url": f"/api/document/{kb_name}/download/{best['id']}",
-            "size_kb": max(best["file_size"] // 1024, 1),
-        })
+        file_events.append(
+            {
+                "file_name": best["file_name"],
+                "url": f"/api/document/{kb_name}/download/{best['id']}",
+                "size_kb": max(best["file_size"] // 1024, 1),
+            }
+        )
         return f"已找到并发送文件《{best['file_name']}》，文件已通过界面卡片展示给用户，请用纯文字告知用户文件已准备好即可。"
 
     return get_document_link

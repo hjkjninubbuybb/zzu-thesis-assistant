@@ -1,16 +1,22 @@
-"""混合检索：向量检索 + BM25，RRF 融合。"""
+"""检索器实现：向量检索 / BM25 / 混合 RRF 融合。
+
+所有检索器实现 BaseRetriever 接口。
+"""
 
 import logging
 
-import jieba
 import bm25s
+import jieba
 from bm25s.tokenization import Tokenizer as BM25Tokenizer
 
 from src.config import get_config
-from src.core.embedding import get_embed_model
+from src.core.interfaces import BaseRetriever
+from src.core.rag.embedding import get_embed_model
 from src.storage.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
+
+# ── 语料缓存（BM25 需要全量语料建索引）─────────────────────────────
 
 _corpus_cache: dict[str, list[dict]] = {}
 
@@ -19,15 +25,51 @@ def invalidate_corpus_cache(kb_name: str) -> None:
     """文档上传/删除后调用，清除对应知识库的 BM25 语料缓存。"""
     removed = _corpus_cache.pop(kb_name, None)
     if removed is not None:
-        logger.info("[corpus_cache] 已清除知识库 '%s' 的缓存（%d 节点）", kb_name, len(removed))
+        logger.info(
+            "[corpus_cache] 已清除知识库 '%s' 的缓存（%d 节点）", kb_name, len(removed)
+        )
     else:
         logger.debug("[corpus_cache] 知识库 '%s' 无缓存可清除", kb_name)
 
 
-class VectorRetriever:
+def fetch_corpus(kb_name: str, vector_store: VectorStore | None = None) -> list[dict]:
+    """从 Qdrant 获取全量语料（用于 BM25 索引），按知识库名称缓存。"""
+    if kb_name in _corpus_cache:
+        logger.debug(
+            "[corpus_cache] 命中: kb='%s', %d 节点",
+            kb_name,
+            len(_corpus_cache[kb_name]),
+        )
+        return _corpus_cache[kb_name]
+
+    logger.info("[corpus_cache] 未命中，从 Qdrant 拉取: kb='%s'", kb_name)
+    vs = vector_store or VectorStore()
+    cfg = get_config()
+    dim = cfg["embedding"]["dimension"]
+    zero_vec = [0.0] * dim
+    results = vs.search(kb_name, zero_vec, top_k=10000)
+    corpus = [
+        {
+            "node_id": r.get("node_id", r["id"]),
+            "text": r["text"],
+            "file_name": r.get("file_name", ""),
+        }
+        for r in results
+    ]
+    _corpus_cache[kb_name] = corpus
+    logger.info("[corpus_cache] 已缓存: kb='%s', %d 节点", kb_name, len(corpus))
+    return corpus
+
+
+# ── 向量检索器 ───────────────────────────────────────────────────
+
+
+class VectorRetriever(BaseRetriever):
     """基于 Qdrant 的向量检索。"""
 
-    def __init__(self, kb_name: str, top_k: int = 10, vector_store: VectorStore | None = None):
+    def __init__(
+        self, kb_name: str, top_k: int = 10, vector_store: VectorStore | None = None
+    ):
         self.kb_name = kb_name
         self.top_k = top_k
         self._vs = vector_store or VectorStore()
@@ -47,7 +89,10 @@ class VectorRetriever:
         ]
 
 
-class BM25Retriever:
+# ── BM25 检索器 ──────────────────────────────────────────────────
+
+
+class BM25Retriever(BaseRetriever):
     """基于 bm25s + jieba 的中文 BM25 检索。"""
 
     def __init__(self, nodes: list[dict], top_k: int = 10):
@@ -68,7 +113,9 @@ class BM25Retriever:
     def retrieve(self, query: str) -> list[dict]:
         if not self.nodes:
             return []
-        query_tokens = self._tokenizer.tokenize([query], update_vocab=False, return_as="ids")
+        query_tokens = self._tokenizer.tokenize(
+            [query], update_vocab=False, return_as="ids"
+        )
         k = min(self.top_k, len(self.nodes))
         results, scores = self._bm25.retrieve(query_tokens, k=k)
 
@@ -81,16 +128,21 @@ class BM25Retriever:
             if idx < 0 or idx >= len(self.nodes):
                 continue
             node = self.nodes[idx]
-            out.append({
-                "node_id": node["node_id"],
-                "text": node["text"],
-                "score": float(score),
-                "source_file": node.get("file_name", ""),
-            })
+            out.append(
+                {
+                    "node_id": node["node_id"],
+                    "text": node["text"],
+                    "score": float(score),
+                    "source_file": node.get("file_name", ""),
+                }
+            )
         return out
 
 
-class HybridRetriever:
+# ── 混合检索器（RRF 融合）────────────────────────────────────────
+
+
+class HybridRetriever(BaseRetriever):
     """RRF 融合向量检索 + BM25 检索结果。"""
 
     def __init__(
@@ -103,7 +155,9 @@ class HybridRetriever:
         rrf_k: int = 60,
         vector_store: VectorStore | None = None,
     ):
-        self._vector = VectorRetriever(kb_name, top_k=k_vector, vector_store=vector_store)
+        self._vector = VectorRetriever(
+            kb_name, top_k=k_vector, vector_store=vector_store
+        )
         self._bm25 = BM25Retriever(corpus_nodes, top_k=k_bm25)
         self.k_total = k_total
         self.rrf_k = rrf_k
@@ -136,32 +190,3 @@ class HybridRetriever:
             {"score": s, **{k: v for k, v in r.items() if k != "score"}}
             for s, r in sorted_items
         ]
-
-
-def fetch_corpus(kb_name: str, vector_store: VectorStore | None = None) -> list[dict]:
-    """从 Qdrant 获取全量语料（用于 BM25 索引），结果按知识库名称缓存。
-
-    Note:
-        单进程内存缓存。文档上传/删除后须调用 invalidate_corpus_cache(kb_name) 清除缓存。
-    """
-    if kb_name in _corpus_cache:
-        logger.debug("[corpus_cache] 命中: kb='%s', %d 节点", kb_name, len(_corpus_cache[kb_name]))
-        return _corpus_cache[kb_name]
-
-    logger.info("[corpus_cache] 未命中，从 Qdrant 拉取: kb='%s'", kb_name)
-    vs = vector_store or VectorStore()
-    cfg = get_config()
-    dim = cfg["embedding"]["dimension"]
-    zero_vec = [0.0] * dim
-    results = vs.search(kb_name, zero_vec, top_k=10000)
-    corpus = [
-        {
-            "node_id": r.get("node_id", r["id"]),
-            "text": r["text"],
-            "file_name": r.get("file_name", ""),
-        }
-        for r in results
-    ]
-    _corpus_cache[kb_name] = corpus
-    logger.info("[corpus_cache] 已缓存: kb='%s', %d 节点", kb_name, len(corpus))
-    return corpus
