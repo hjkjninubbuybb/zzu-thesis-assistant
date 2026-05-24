@@ -5,13 +5,11 @@ import AppLayout from "@/components/layout/AppLayout";
 import StudentLayout from "@/components/layout/StudentLayout";
 import LoginPage from "@/pages/LoginPage";
 import OverviewPage from "@/pages/OverviewPage";
-import KnowledgeBasePage from "@/pages/KnowledgeBasePage";
+import KnowledgeManagementPage from "@/pages/KnowledgeManagementPage";
 import DocumentPage from "@/pages/DocumentPage";
 import DocumentCleanReviewPage from "@/pages/DocumentCleanReviewPage";
 import DocumentChunkReviewPage from "@/pages/DocumentChunkReviewPage";
-import FaqPage from "@/pages/FaqPage";
-import StudentsPage from "@/pages/StudentsPage";
-import TeachersPage from "@/pages/TeachersPage";
+import UsersPage from "@/pages/UsersPage";
 import TicketsPage from "@/pages/TicketsPage";
 import ConversationsPage from "@/pages/ConversationsPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
@@ -60,14 +58,20 @@ export default function App() {
               <Route element={<AppLayout />}>
                 <Route index element={<OverviewPage />} />
                 <Route path="conversations" element={<ConversationsPage />} />
-                <Route path="faq" element={<FaqPage />} />
-                <Route path="students" element={<StudentsPage />} />
+                <Route path="users" element={<UsersPage />} />
+                <Route
+                  path="students"
+                  element={<Navigate to="/admin/users" replace />}
+                />
                 <Route path="tickets" element={<TicketsPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
 
                 {/* 仅管理员可见的功能 */}
                 <Route element={<RouteGuard allowedRoles={["admin"]} />}>
-                  <Route path="knowledge" element={<KnowledgeBasePage />} />
+                  <Route
+                    path="knowledge"
+                    element={<KnowledgeManagementPage />}
+                  />
                   <Route path="documents" element={<DocumentPage />} />
                   <Route
                     path="document/:kbName/:docId/review"
@@ -77,7 +81,10 @@ export default function App() {
                     path="document/:kbName/:docId/chunks"
                     element={<DocumentChunkReviewPage />}
                   />
-                  <Route path="teachers" element={<TeachersPage />} />
+                  <Route
+                    path="teachers"
+                    element={<Navigate to="/admin/users" replace />}
+                  />
                   <Route path="settings" element={<SettingsPage />} />
                 </Route>
               </Route>
