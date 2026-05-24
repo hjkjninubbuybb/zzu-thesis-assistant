@@ -14,9 +14,8 @@
 ### 双层问答架构
 
 - **第一层（FAQ 防线）**：`src/core/faq_match.py` — LLM 改写查询 → 语义向量匹配 FAQ 库（阈值 0.75），超过阈值用快速模型生成答案；答案含 `[FALLBACK]` 标记则降级到 RAG
-- **第二层（RAG 核心）**：`src/core/rag_pipeline.py` — **手写 StateGraph**（非 create_react_agent）四条路由：
-  - `hard_rag`：涉及具体政策/时间节点 → 混合检索 → 慢模型 CRAG 评估 → 最多 3 次重写
-  - `easy_rag`：简单概念 → 混合检索 → 有结果即通过
+- **第二层（RAG 核心）**：`src/core/rag_pipeline.py` — **手写 StateGraph**（非 create_react_agent）三条路由：
+  - `hard_rag`：所有毕设相关问题 → 混合检索 → 强能力模型 CRAG 评估 → 最多 3 次重写
   - `download`：下载请求 → 文件匹配 → 卡片下发
   - `direct`：闲聊 → 直接生成
 - **Safety Guards**：`_apply_answer_safety_guards()` 内置 20+ 条硬编码规则，在 LLM 生成后拦截高频错误答案（查重率/开题时间/指导人数等），**修改时必须附带测试用例**

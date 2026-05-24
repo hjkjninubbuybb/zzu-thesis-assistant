@@ -211,9 +211,8 @@ export MYSQL_PASSWORD=你的数据库密码
                    ▼
 ┌─────────────────────────────────────────┐
 │ 第二层：RAG Core（rag_pipeline.py）       │
-│  StateGraph 四条路由：                   │
-│   hard_rag → 严苛 CRAG 评估 + 重写       │
-│   easy_rag → 快速检索，有结果即通过       │
+│  StateGraph 三条路由：                   │
+│   hard_rag → CRAG 深度评估 + 重写         │
 │   download → 文件卡片下发                │
 │   direct   → 闲聊直接生成                │
 │  混合检索（Vector + BM25 + RRF）          │
@@ -221,12 +220,11 @@ export MYSQL_PASSWORD=你的数据库密码
 └─────────────────────────────────────────┘
 ```
 
-### RAG Pipeline 四条路由
+### RAG Pipeline 三条路由
 
 | 路由 | 触发条件 | 检索策略 |
 |------|---------|---------|
-| `hard_rag` | 涉及具体政策、时间节点、多实体对比 | 检索 + 慢模型 CRAG 评估 + 最多 3 次重写 |
-| `easy_rag` | 简单常识、基础概念 | 检索，有结果即通过 |
+| `hard_rag` | 所有毕设相关的实质性问题 | 检索 + 强能力模型 CRAG 评估 + 最多 3 次重写 |
 | `download` | 明确要求下载/获取文件 | 跳过检索，直接匹配文件 |
 | `direct` | 闲聊、非毕设相关 | 跳过检索，直接生成 |
 

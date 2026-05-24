@@ -25,9 +25,7 @@ logger = logging.getLogger(__name__)
 def _append_unique_nodes(target: list[dict], nodes: list[dict]) -> None:
     """将 nodes 去重追加到 target。"""
     existing_ids = {n.get("node_id") for n in target}
-    existing_text = {
-        str(n.get("text", ""))[:120] for n in target if not n.get("node_id")
-    }
+    existing_text = {str(n.get("text", ""))[:120] for n in target if not n.get("node_id")}
     for node in nodes:
         node_id = node.get("node_id")
         text_key = str(node.get("text", ""))[:120]
@@ -78,10 +76,7 @@ class AgentOrchestrator(BaseRAGPipeline):
 
     def _get_doc_summaries(self, kb_name: str) -> list[dict]:
         docs = self._ds.list_documents(kb_name)
-        return [
-            {"file_name": d["file_name"], "summary": d.get("summary") or ""}
-            for d in docs
-        ]
+        return [{"file_name": d["file_name"], "summary": d.get("summary") or ""} for d in docs]
 
     def run(
         self,
@@ -102,7 +97,7 @@ class AgentOrchestrator(BaseRAGPipeline):
         if route.decision == "download":
             file_events = self._linker.link(route.file_hint, kb_name)
 
-        elif route.decision in ("hard_rag", "easy_rag"):
+        elif route.decision == "hard_rag":
             for task in route.tasks:
                 current_task = task
                 task_nodes: list[dict] = []
@@ -111,11 +106,8 @@ class AgentOrchestrator(BaseRAGPipeline):
                 for attempt in range(max_retries):
                     nodes = self._chain.retrieve(current_task)
 
-                    if route.decision == "hard_rag":
-                        grade_result = self._grader.grade(query, nodes)
-                        is_task_relevant = grade_result.is_relevant
-                    else:
-                        is_task_relevant = len(nodes) > 0
+                    grade_result = self._grader.grade(query, nodes)
+                    is_task_relevant = grade_result.is_relevant
 
                     if is_task_relevant:
                         task_nodes = nodes
@@ -176,9 +168,7 @@ class AgentOrchestrator(BaseRAGPipeline):
             }
             file_events = self._linker.link(route.file_hint, kb_name)
 
-        elif route.decision in ("hard_rag", "easy_rag"):
-            action_name = "深度检索" if route.decision == "hard_rag" else "快速检索"
-
+        elif route.decision == "hard_rag":
             for task_idx, task in enumerate(route.tasks):
                 current_task = task
                 task_nodes: list[dict] = []
@@ -193,24 +183,21 @@ class AgentOrchestrator(BaseRAGPipeline):
                 else:
                     yield {
                         "type": "agent_action",
-                        "tool": action_name,
+                        "tool": "深度检索",
                         "input": f"正在搜索关于 '{current_task}' 的资料...",
                     }
 
                 for attempt in range(max_retries):
                     nodes = self._chain.retrieve(current_task)
 
-                    if route.decision == "hard_rag":
-                        if len(route.tasks) == 1 and attempt == 0:
-                            yield {
-                                "type": "agent_action",
-                                "tool": "深度评估",
-                                "input": f"搜到 {len(nodes)} 个片段，正在进行逻辑对齐...",
-                            }
-                        grade_result = self._grader.grade(query, nodes)
-                        is_task_relevant = grade_result.is_relevant
-                    else:
-                        is_task_relevant = len(nodes) > 0
+                    if len(route.tasks) == 1 and attempt == 0:
+                        yield {
+                            "type": "agent_action",
+                            "tool": "深度评估",
+                            "input": f"搜到 {len(nodes)} 个片段，正在进行逻辑对齐...",
+                        }
+                    grade_result = self._grader.grade(query, nodes)
+                    is_task_relevant = grade_result.is_relevant
 
                     if is_task_relevant:
                         task_nodes = nodes
@@ -272,11 +259,7 @@ class AgentOrchestrator(BaseRAGPipeline):
             suggestions_resp = llm.invoke(
                 f"基于以下问题，生成2-3个用户可能想继续追问的简短问题（每行一个，不要编号，不要解释）：\n问：{query}"
             )
-            raw = (
-                suggestions_resp.content
-                if hasattr(suggestions_resp, "content")
-                else str(suggestions_resp)
-            )
+            raw = suggestions_resp.content if hasattr(suggestions_resp, "content") else str(suggestions_resp)
             suggestions = [s.strip() for s in raw.strip().split("\n") if s.strip()][:3]
             if suggestions:
                 yield {"type": "suggestions", "items": suggestions}

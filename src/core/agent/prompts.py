@@ -11,14 +11,13 @@ ROUTER_PROMPT = """\
 {doc_info}
 
 【分类规则】
-1. "hard_rag": 用户问题涉及具体的毕业设计政策、流程、时间节点、论文规范（如：开题、中期、查重、答辩时间），或者包含多个实体对比。
-2. "easy_rag": 用户问题是简单的毕设常识、基础概念，或可通过先验知识直接概括。
-3. "direct": 用户只是在打招呼、闲聊或问非毕设相关的通用问题。
-4. "download": 用户明确表达了想要"下载、获取、发我、发送、链接、原文、模板、表格"某个具体文件的意图（如"发我开题报告模板"），此时在 "file_hint" 中提取文件名关键词。
+1. "hard_rag": 用户问题涉及毕业设计相关的任何实质性内容，包括但不限于：政策、流程、时间节点、论文规范、答辩准备、选题要求、查重、格式要求、材料清单、基础概念和常识等。只要问题和毕业设计有关且需要知识库支撑，一律走此路由。
+2. "direct": 用户只是在打招呼、闲聊或问非毕设相关的通用问题。
+3. "download": 用户明确表达了想要"下载、获取、发我、发送、链接、原文、模板、表格"某个具体文件的意图（如"发我开题报告模板"），此时在 "file_hint" 中提取文件名关键词。
 
 请务必输出以下格式的 JSON 字符串（不要加 markdown 标记）：
 {{
-    "route_decision": "hard_rag" | "easy_rag" | "direct" | "download",
+    "route_decision": "hard_rag" | "direct" | "download",
     "tasks": ["子查询1", "子查询2"],
     "file_hint": "文件名关键词或空"
 }}
@@ -130,9 +129,7 @@ SYSTEM_PROMPT = """\
 # ── 上下文格式化辅助 ─────────────────────────────────────────────
 
 
-def format_preloaded_context(
-    nodes: list[dict], limit: int = 5, text_limit: int = 1200
-) -> str:
+def format_preloaded_context(nodes: list[dict], limit: int = 5, text_limit: int = 1200) -> str:
     """将检索片段格式化为系统 prompt 中的预检索上下文。"""
     if not nodes:
         return (
@@ -149,9 +146,7 @@ def format_preloaded_context(
         groups.setdefault(source, []).append((idx, text))
 
     multi_source = len(groups) > 1
-    parts = [
-        "预检索知识库片段（回答必须优先依据这些片段；不得编造片段中未出现的事实）："
-    ]
+    parts = ["预检索知识库片段（回答必须优先依据这些片段；不得编造片段中未出现的事实）："]
     if multi_source:
         parts.append(
             "⚠️ 以下片段来自多个不同文档，各文档的适用对象可能不同。\n"

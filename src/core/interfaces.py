@@ -40,7 +40,7 @@ class RetrievedNode:
 class RouteResult:
     """Router 节点的输出。"""
 
-    decision: Literal["hard_rag", "easy_rag", "direct", "download"]
+    decision: Literal["hard_rag", "direct", "download"]
     tasks: list[str] = field(default_factory=list)
     file_hint: str = ""
 

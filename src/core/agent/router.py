@@ -23,12 +23,7 @@ class LLMRouter(BaseRouter):
         logger.info("[Agent] 进入 router")
         llm = get_llm(fast=True, streaming=False)
 
-        doc_info = "\n".join(
-            [
-                f"- {d['file_name']}: {d.get('summary') or '暂无摘要'}"
-                for d in doc_summaries
-            ]
-        )
+        doc_info = "\n".join([f"- {d['file_name']}: {d.get('summary') or '暂无摘要'}" for d in doc_summaries])
         prompt = ROUTER_PROMPT.format(doc_info=doc_info, query=query)
 
         resp = llm.invoke([HumanMessage(content=prompt)])
@@ -42,7 +37,7 @@ class LLMRouter(BaseRouter):
             if json_match:
                 data = json.loads(json_match.group(0))
                 decision = data.get("route_decision", "").lower()
-                if decision in ("hard_rag", "easy_rag", "direct", "download"):
+                if decision in ("hard_rag", "direct", "download"):
                     result.decision = decision
 
                 parsed_tasks = data.get("tasks", [])

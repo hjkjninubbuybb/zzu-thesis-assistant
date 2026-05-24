@@ -38,9 +38,7 @@ class LLMGenerator(BaseGenerator):
         today_str = f"{now.strftime('%Y-%m-%d %H:%M:%S')} 星期{weekday_map[int(now.strftime('%w'))]}"
 
         docs = self._ds.list_documents(kb_name)
-        doc_list = "\n".join(
-            [f"- {d['file_name']}: {d.get('summary') or '暂无摘要'}" for d in docs]
-        )
+        doc_list = "\n".join([f"- {d['file_name']}: {d.get('summary') or '暂无摘要'}" for d in docs])
 
         system_prompt = SYSTEM_PROMPT.format(
             kb_name=kb_name or "默认",
@@ -49,7 +47,7 @@ class LLMGenerator(BaseGenerator):
         )
 
         context_prefix = ""
-        if route_decision in ("hard_rag", "easy_rag"):
+        if route_decision == "hard_rag":
             if is_relevant:
                 context_prefix = format_preloaded_context(context_nodes)
             else:
@@ -91,9 +89,7 @@ class LLMGenerator(BaseGenerator):
     ) -> str:
         use_fast = route_decision != "hard_rag"
         llm = get_llm(fast=use_fast, streaming=False)
-        messages = self._build_messages(
-            query, context_nodes, kb_name, history, route_decision, is_relevant
-        )
+        messages = self._build_messages(query, context_nodes, kb_name, history, route_decision, is_relevant)
         resp = llm.invoke(messages)
         return str(resp.content)
 
@@ -108,9 +104,7 @@ class LLMGenerator(BaseGenerator):
     ) -> Generator[str, None, None]:
         use_fast = route_decision != "hard_rag"
         llm = get_llm(fast=use_fast, streaming=True)
-        messages = self._build_messages(
-            query, context_nodes, kb_name, history, route_decision, is_relevant
-        )
+        messages = self._build_messages(query, context_nodes, kb_name, history, route_decision, is_relevant)
         for chunk in llm.stream(messages):
             if chunk.content:
                 yield chunk.content
