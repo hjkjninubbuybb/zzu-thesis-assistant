@@ -1,10 +1,13 @@
-import { Outlet } from 'react-router-dom'
-import StudentSidebar from './StudentSidebar'
-import BlobBackdrop from './BlobBackdrop'
+import { Outlet } from "react-router-dom";
+import StudentSidebar from "./StudentSidebar";
+import BlobBackdrop from "./BlobBackdrop";
 
 export default function StudentLayout() {
   return (
-    <div data-theme="student" className="relative flex h-screen w-full bg-background p-3 gap-3 overflow-hidden">
+    <div
+      data-theme="student"
+      className="relative flex h-screen w-full bg-background p-3 gap-3 overflow-hidden"
+    >
       <BlobBackdrop variant="cool" />
       <div className="relative z-10 flex w-full h-full gap-3">
         <StudentSidebar />
@@ -13,5 +16,5 @@ export default function StudentLayout() {
         </main>
       </div>
     </div>
-  )
+  );
 }

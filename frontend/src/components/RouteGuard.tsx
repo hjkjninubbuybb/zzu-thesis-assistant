@@ -1,9 +1,9 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { useAuth } from '@/hooks/useAuth'
-import type { UserRole } from '@/types/api'
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import type { UserRole } from "@/types/api";
 
 interface RouteGuardProps {
-  allowedRoles?: UserRole[]
+  allowedRoles?: UserRole[];
 }
 
 /**
@@ -13,20 +13,24 @@ interface RouteGuardProps {
  * - 通过 → 渲染子路由
  */
 export default function RouteGuard({ allowedRoles }: RouteGuardProps) {
-  const { user } = useAuth()
-  const { pathname } = useLocation()
+  const { user } = useAuth();
+  const { pathname } = useLocation();
 
   if (!user) {
-    const loginPath = pathname.startsWith('/student') ? '/student/login' : '/admin/login'
-    return <Navigate to={loginPath} replace />
+    const loginPath = pathname.startsWith("/student")
+      ? "/student/login"
+      : "/admin/login";
+    return <Navigate to={loginPath} replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // 角色不匹配时，跳到当前门户的登录页
     // LoginPage 会自动清除不匹配的会话，实现两端真正分离
-    const loginPath = pathname.startsWith('/student') ? '/student/login' : '/admin/login'
-    return <Navigate to={loginPath} replace />
+    const loginPath = pathname.startsWith("/student")
+      ? "/student/login"
+      : "/admin/login";
+    return <Navigate to={loginPath} replace />;
   }
 
-  return <Outlet />
+  return <Outlet />;
 }
