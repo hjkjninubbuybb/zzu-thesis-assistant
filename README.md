@@ -385,12 +385,12 @@ raw_query
 
 | 节点 | 模型 | 职责 |
 |------|------|------|
-| `router_node` | fast_model | 意图分类（4 路由）+ 任务拆解 + 文件 hint 提取 |
+| `router_node` | fast_model | 意图分类（3 路由）+ 任务拆解 + 文件 hint 提取 |
 | `retrieve_node` | — | 占位节点，实际检索由调用方注入 |
-| `grade_documents_node` | 强能力模型 | CRAG 严苛评估（仅 hard_rag 触发） |
+| `grade_documents_node` | 强能力模型 | CRAG 深度评估（hard_rag 触发） |
 | `rewrite_query_node` | fast_model | 检索失败时改写查询词 |
 | `document_link_node` | — | 文件模糊匹配，生成下载卡片 |
-| `generate_node` | 强/快速模型 | 最终回答生成（含 safety guards 拦截） |
+| `generate_node` | 强能力模型 | 最终回答生成（含 safety guards 拦截） |
 
 **Safety Guards**：`_apply_answer_safety_guards()` 内置 20+ 条针对高频错误答案的硬编码规则（如查重率标准、开题时间、指导人数上限等），在 LLM 生成后直接替换，避免模型幻觉。
 
