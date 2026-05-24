@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
-import { documentApi } from "@/lib/api";
+import { documentApi, extractError } from "@/lib/api";
 import type { ChunkPreview } from "@/types/api";
 
 export default function DocumentChunkReviewPage() {
@@ -27,7 +27,7 @@ export default function DocumentChunkReviewPage() {
   }, [location.state, loaded]);
 
   // Fallback: fetch from API if no navigation state (resume scenario)
-  const { data: review } = useQuery({
+  const { data: review, isError: reviewError } = useQuery({
     queryKey: ["review", kbName, docId],
     queryFn: () =>
       documentApi.getReview(kbName!, Number(docId!)).then((r) => r.data),
@@ -35,8 +35,8 @@ export default function DocumentChunkReviewPage() {
   });
 
   useEffect(() => {
-    if (review?.chunks && !loaded) {
-      setChunks(review.chunks);
+    if (review && !loaded) {
+      setChunks(review.chunks ?? []);
       setLoaded(true);
     }
   }, [review, loaded]);
@@ -48,7 +48,6 @@ export default function DocumentChunkReviewPage() {
       qc.invalidateQueries({ queryKey: ["documents", kbName] });
       qc.invalidateQueries({ queryKey: ["knowledge-bases"] });
 
-      // 查找下一个待审核文档，优先 pending_review > pending_chunk_review
       try {
         const docs = await documentApi.list(kbName!);
         const nextReview = docs.find((d) => d.status === "pending_review");
@@ -75,6 +74,19 @@ export default function DocumentChunkReviewPage() {
   };
 
   if (!loaded) {
+    if (reviewError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-3">
+          <div className="text-red-500 text-sm">加载失败，请返回列表重试</div>
+          <button
+            onClick={() => navigate("/admin/documents?kb=" + kbName)}
+            className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            返回列表
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-gray-500">加载中...</div>
@@ -100,8 +112,11 @@ export default function DocumentChunkReviewPage() {
             返回编辑
           </button>
           <button
-            onClick={() => confirmMutation.mutate()}
-            disabled={confirmMutation.isPending}
+            onClick={() => {
+              if (window.confirm(`确认将 ${chunks.length} 个分块向量化入库？`))
+                confirmMutation.mutate();
+            }}
+            disabled={confirmMutation.isPending || chunks.length === 0}
             className="px-4 py-2 text-sm text-white bg-black rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
           >
             {confirmMutation.isPending ? "入库中..." : "确认入库"}
@@ -112,12 +127,17 @@ export default function DocumentChunkReviewPage() {
       {/* Error display */}
       {confirmMutation.isError && (
         <div className="mx-4 mt-2 px-3 py-2 bg-red-50 text-red-600 text-sm rounded-lg">
-          入库失败：{(confirmMutation.error as Error).message}
+          入库失败：{extractError(confirmMutation.error)}
         </div>
       )}
 
       {/* Chunk list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {chunks.length === 0 && (
+          <div className="text-center text-gray-400 py-16">
+            没有分块数据，请返回编辑页重新分块
+          </div>
+        )}
         {chunks.map((chunk) => (
           <div
             key={chunk.index}

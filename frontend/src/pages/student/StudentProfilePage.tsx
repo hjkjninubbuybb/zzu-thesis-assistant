@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from "react";
 import {
   User,
   GraduationCap,
@@ -8,28 +8,32 @@ import {
   Lock,
   CheckCircle2,
   AlertCircle,
-} from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
-import { authApi, extractError } from '@/lib/api'
-import type { StudentProfile } from '@/types/api'
+} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { authApi, extractError } from "@/lib/api";
+import type { StudentProfile } from "@/types/api";
 
 const cardStyle = (delay: number): React.CSSProperties => ({
   animation: `fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms both`,
-})
+});
 
 export default function StudentProfilePage() {
-  const { user } = useAuth()
-  const profile = user?.profile as StudentProfile | null | undefined
-  const displayName = user?.display_name || user?.username || '同学'
-  const avatarChar = displayName.slice(0, 1).toUpperCase()
+  const { user } = useAuth();
+  const profile = user?.profile as StudentProfile | null | undefined;
+  const displayName = user?.display_name || user?.username || "同学";
+  const avatarChar = displayName.slice(0, 1).toUpperCase();
 
   const infoItems = [
-    { icon: User, label: '姓名', value: displayName },
-    { icon: Hash, label: '学号', value: profile?.student_id || user?.username || '-' },
-    { icon: GraduationCap, label: '年级', value: profile?.grade || '-' },
-    { icon: BookOpen, label: '专业', value: profile?.major || '-' },
-    { icon: Users, label: '班级', value: profile?.class_name || '-' },
-  ]
+    { icon: User, label: "姓名", value: displayName },
+    {
+      icon: Hash,
+      label: "学号",
+      value: profile?.student_id || user?.username || "-",
+    },
+    { icon: GraduationCap, label: "年级", value: profile?.grade || "-" },
+    { icon: BookOpen, label: "专业", value: profile?.major || "-" },
+    { icon: Users, label: "班级", value: profile?.class_name || "-" },
+  ];
 
   return (
     <div className="p-7 flex-1 overflow-y-auto glass-card rounded-2xl">
@@ -39,27 +43,36 @@ export default function StudentProfilePage() {
           <div className="w-20 h-20 rounded-full bg-blue-500 flex items-center justify-center text-2xl font-bold text-white select-none mb-3 shadow-lg">
             {avatarChar}
           </div>
-          <h1 className="text-xl font-semibold text-[#202938]">{displayName}</h1>
+          <h1 className="text-xl font-semibold text-[#202938]">
+            {displayName}
+          </h1>
           <p className="text-sm text-[#6E7787] mt-0.5">
-            {profile?.major ? `${profile.grade} · ${profile.major}` : '学生'}
+            {profile?.major ? `${profile.grade} · ${profile.major}` : "学生"}
           </p>
         </div>
 
         {/* 个人信息卡 */}
-        <div
-          className="glass-card rounded-2xl p-5 mb-5"
-          style={cardStyle(100)}
-        >
-          <h2 className="text-sm font-semibold text-[#202938] mb-4">个人信息</h2>
+        <div className="glass-card rounded-2xl p-5 mb-5" style={cardStyle(100)}>
+          <h2 className="text-sm font-semibold text-[#202938] mb-4">
+            个人信息
+          </h2>
           <div className="flex flex-col gap-3">
             {infoItems.map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-[#EEF2FF] flex items-center justify-center shrink-0">
-                  <Icon size={16} className="text-[#2563EB]" strokeWidth={1.8} />
+                  <Icon
+                    size={16}
+                    className="text-[#2563EB]"
+                    strokeWidth={1.8}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">{label}</p>
-                  <p className="text-sm font-medium text-[#202938] truncate">{value}</p>
+                  <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider">
+                    {label}
+                  </p>
+                  <p className="text-sm font-medium text-[#202938] truncate">
+                    {value}
+                  </p>
                 </div>
               </div>
             ))}
@@ -70,43 +83,44 @@ export default function StudentProfilePage() {
         <ChangePasswordCard />
       </div>
     </div>
-  )
+  );
 }
 
 function ChangePasswordCard() {
-  const [oldPwd, setOldPwd] = useState('')
-  const [newPwd, setNewPwd] = useState('')
-  const [confirmPwd, setConfirmPwd] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [oldPwd, setOldPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  const canSubmit = oldPwd.trim() && newPwd.trim() && newPwd === confirmPwd && newPwd.length >= 6
+  const canSubmit =
+    oldPwd.trim() &&
+    newPwd.trim() &&
+    newPwd === confirmPwd &&
+    newPwd.length >= 6;
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!canSubmit) return
-    setLoading(true)
-    setError(null)
-    setSuccess(false)
+    e.preventDefault();
+    if (!canSubmit) return;
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
     try {
-      await authApi.changePassword(oldPwd, newPwd)
-      setSuccess(true)
-      setOldPwd('')
-      setNewPwd('')
-      setConfirmPwd('')
+      await authApi.changePassword(oldPwd, newPwd);
+      setSuccess(true);
+      setOldPwd("");
+      setNewPwd("");
+      setConfirmPwd("");
     } catch (err) {
-      setError(extractError(err))
+      setError(extractError(err));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div
-      className="glass-card rounded-2xl p-5"
-      style={cardStyle(200)}
-    >
+    <div className="glass-card rounded-2xl p-5" style={cardStyle(200)}>
       <div className="flex items-center gap-2 mb-4">
         <Lock size={16} className="text-[#2563EB]" strokeWidth={1.8} />
         <h2 className="text-sm font-semibold text-[#202938]">修改密码</h2>
@@ -116,7 +130,7 @@ function ChangePasswordCard() {
         <input
           type="password"
           value={oldPwd}
-          onChange={e => setOldPwd(e.target.value)}
+          onChange={(e) => setOldPwd(e.target.value)}
           placeholder="当前密码"
           autoComplete="current-password"
           className="px-3 py-2.5 rounded-xl border border-[#D9DEE5] bg-[#F8F9FB] text-sm text-[#202938] placeholder:text-[#9CA3AF] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 focus:bg-white transition"
@@ -125,7 +139,7 @@ function ChangePasswordCard() {
         <input
           type="password"
           value={newPwd}
-          onChange={e => setNewPwd(e.target.value)}
+          onChange={(e) => setNewPwd(e.target.value)}
           placeholder="新密码（至少 6 位）"
           autoComplete="new-password"
           className="px-3 py-2.5 rounded-xl border border-[#D9DEE5] bg-[#F8F9FB] text-sm text-[#202938] placeholder:text-[#9CA3AF] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 focus:bg-white transition"
@@ -134,7 +148,7 @@ function ChangePasswordCard() {
         <input
           type="password"
           value={confirmPwd}
-          onChange={e => setConfirmPwd(e.target.value)}
+          onChange={(e) => setConfirmPwd(e.target.value)}
           placeholder="确认新密码"
           autoComplete="new-password"
           className="px-3 py-2.5 rounded-xl border border-[#D9DEE5] bg-[#F8F9FB] text-sm text-[#202938] placeholder:text-[#9CA3AF] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20 focus:bg-white transition"
@@ -164,9 +178,9 @@ function ChangePasswordCard() {
           disabled={!canSubmit || loading}
           className="mt-1 w-full py-2.5 bg-[#2563EB] text-white text-sm font-medium rounded-xl hover:bg-[#1D4ED8] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? '修改中...' : '确认修改'}
+          {loading ? "修改中..." : "确认修改"}
         </button>
       </form>
     </div>
-  )
+  );
 }
