@@ -233,6 +233,71 @@ FastAPI 路由用 `async def`，LangGraph 同步调用用 `asyncio.to_thread` �
 final_state = await asyncio.to_thread(run_rag, query=..., retriever_fn=...)
 ```
 
+### Docstring（Google Style）
+
+所有**公共函数和类**必须使用 Google 风格 docstring。私有函数（`_` 前缀）按需添加。
+
+```python
+# ✅ Google Style
+def rerank(self, query: str, nodes: list[dict], top_n: int = 5) -> list[dict]:
+    """对候选文档进行语义重排序。
+
+    Args:
+        query: 用户查询文本。
+        nodes: 候选文档列表，每个元素包含 text 和 metadata。
+        top_n: 返回排名前 N 的结果。
+
+    Returns:
+        按相关性降序排列的文档列表。
+
+    Raises:
+        httpx.TimeoutException: DashScope API 请求超时。
+    """
+
+# ❌ 不写 docstring / 写成 Sphinx 或 NumPy 风格
+```
+
+### Import 顺序
+
+由 Ruff（isort 规则）自动排序，三组之间空一行：
+
+```python
+# 1. 标准库
+import json
+import logging
+from datetime import date
+
+# 2. 第三方库
+from fastapi import APIRouter
+from langchain_core.messages import HumanMessage
+
+# 3. 本项目
+from src.config import get_config
+from src.core.retrieval import HybridRetriever
+```
+
+### 代码格式化工具
+
+本项目使用 **Ruff** 统一 lint + 格式化，配置在 `pyproject.toml` 的 `[tool.ruff]` 段。
+
+```bash
+poetry run ruff check --fix .   # lint + 自动修复
+poetry run ruff format .        # 格式化
+```
+
+**规则要点：**
+- 行长度上限 120 字符
+- quote 风格：双引号
+- import 排序遵循 isort 规则，`src` 为 first-party
+- docstring 遵循 Google Python Style Guide
+- pre-commit 会在 `git commit` 前自动运行 Ruff
+
+前端使用 **Prettier** 格式化：
+
+```bash
+cd frontend && npm run format   # 格式化所有前端文件
+```
+
 ---
 
 ## 三、LangGraph / LangChain 规范
@@ -391,3 +456,33 @@ DB `system_settings` > 环境变量 > `config.yaml` 默认值（`src/config.py` 
 - **禁止** 向 git 提交 `.env` 文件
 - **禁止** 新增路由时忘记加认证依赖
 - **禁止** 直接修改 `poetry.lock`（通过 `poetry add` / `poetry lock` 管理）
+
+---
+
+## 八、Office 文档生成（claude-office-skills）
+
+本项目集成了 [claude-office-skills](https://github.com/tfriedel/claude-office-skills)，支持生成 PPTX / DOCX / XLSX / PDF。
+
+### 路径
+
+- Skills 仓库：`/Users/gefeng/projects/claude-office-skills/`
+- Python 环境：`/Users/gefeng/projects/claude-office-skills/venv/bin/python`
+- 输出目录：`/Users/gefeng/projects/claude-office-skills/outputs/<document-name>/`
+
+### 使用流程
+
+创建任何 Office 文档前，**必须先阅读对应的 SKILL.md**：
+
+| 格式 | SKILL.md 路径 |
+|------|--------------|
+| PPTX | `/Users/gefeng/projects/claude-office-skills/public/pptx/SKILL.md` |
+| DOCX | `/Users/gefeng/projects/claude-office-skills/public/docx/SKILL.md` |
+| XLSX | `/Users/gefeng/projects/claude-office-skills/public/xlsx/SKILL.md` |
+| PDF  | `/Users/gefeng/projects/claude-office-skills/public/pdf/SKILL.md` |
+
+### 关键规则
+
+1. **所有命令使用绝对路径**的 venv python：`/Users/gefeng/projects/claude-office-skills/venv/bin/python`
+2. **输出文件统一放到** `outputs/<document-name>/` 目录下
+3. **PPTX 创建流程**：设计 HTML slides → html2pptx 转换 → 缩略图验证 → 迭代修正
+4. **OOXML 编辑后必须验证**：`venv/bin/python public/pptx/ooxml/scripts/validate.py`
