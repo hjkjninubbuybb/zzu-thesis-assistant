@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { knowledgeApi, documentApi, extractError } from "@/lib/api";
 import type { KBInfo, DocType, SplitterType, UploadParams } from "@/types/api";
+import { Toast } from "@/components/ui/Toast";
 
 // ── Constants ─────────────────────────────────────────────
 
@@ -80,29 +81,6 @@ function StatusIcon({ status }: { status: FileStatus }) {
   if (status === "done")
     return <CheckCircle size={13} className="text-emerald-500" />;
   return <AlertCircle size={13} className="text-red-500" />;
-}
-
-// ── Toast ──────────────────────────────────────────────────
-
-function Toast({
-  message,
-  type,
-  onClose,
-}: {
-  message: string;
-  type: "success" | "error";
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white text-sm z-50 animate-apple-toast ${type === "success" ? "bg-emerald-600" : "bg-red-600"}`}
-    >
-      <span>{message}</span>
-      <button onClick={onClose}>
-        <X size={14} />
-      </button>
-    </div>
-  );
 }
 
 // ── ConfirmDialog ──────────────────────────────────────────

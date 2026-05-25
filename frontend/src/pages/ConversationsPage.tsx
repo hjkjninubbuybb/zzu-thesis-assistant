@@ -32,6 +32,7 @@ import {
 } from "@/lib/api";
 
 import { useAuth } from "@/hooks/useAuth";
+import { Toast } from "@/components/ui/Toast";
 import {
   getAccessToken,
   getRefreshToken,
@@ -1764,37 +1765,6 @@ function TutorHelpModal({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── 通用 Toast ───────────────────────────────────────────
-
-function Toast({
-  message,
-  type,
-  onClose,
-}: {
-  message: string;
-  type: "success" | "error";
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  return (
-    <div
-      className={`fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2.5 rounded-2xl shadow-xl text-white text-sm z-[110] animate-apple-toast ${type === "success" ? "bg-slate-800" : "bg-red-600"}`}
-    >
-      <span>{message}</span>
-      <button
-        onClick={onClose}
-        className="opacity-70 hover:opacity-100 transition-opacity"
-      >
-        <XIcon size={14} />
-      </button>
     </div>
   );
 }

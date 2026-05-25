@@ -28,6 +28,7 @@ import type {
   FAQImportResult,
 } from "@/types/api";
 import { useAuth } from "@/hooks/useAuth";
+import { Toast } from "@/components/ui/Toast";
 
 // ── 状态标签 ──────────────────────────────────────────────
 
@@ -45,29 +46,6 @@ function StatusBadge({ status }: { status: FAQItem["status"] }) {
     >
       {config.label}
     </span>
-  );
-}
-
-// ── Toast ──────────────────────────────────────────────────
-
-function Toast({
-  message,
-  type,
-  onClose,
-}: {
-  message: string;
-  type: "success" | "error";
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className={`fixed bottom-6 right-6 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm z-50 animate-apple-toast ${type === "success" ? "bg-slate-700" : "bg-red-600"}`}
-    >
-      <span>{message}</span>
-      <button onClick={onClose}>
-        <X size={14} />
-      </button>
-    </div>
   );
 }
 
