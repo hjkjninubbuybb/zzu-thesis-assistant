@@ -9,11 +9,20 @@ Each test function gets a clean slate: all tables are truncated (children
 first to satisfy foreign-key constraints) before the test body runs.
 """
 
+import os
+
 import pymysql
 import pytest
 from dbutils.pooled_db import PooledDB
 
 import src.storage.database as db_module
+
+_TEST_DB = "rag_db_test"
+_ROOT_PWD = os.environ.get("MYSQL_ROOT_PASSWORD", "rag_root_123")
+_HOST = os.environ.get("MYSQL_HOST", "localhost")
+_PORT = int(os.environ.get("MYSQL_PORT", "3306"))
+_DB_USER = os.environ.get("MYSQL_USER", "rag_user")
+_DB_PWD = os.environ.get("MYSQL_PASSWORD", "rag_pass_123")
 
 # ---------------------------------------------------------------------------
 # Full schema DDL (test-specific: no partitions, includes columns and tables
@@ -214,28 +223,28 @@ def _test_db_setup():
     transparently uses the test database.
     """
     root_conn = pymysql.connect(
-        host="127.0.0.1",
-        port=3306,
+        host=_HOST,
+        port=_PORT,
         user="root",
-        password="rag_root_123",
+        password=_ROOT_PWD,
         charset="utf8mb4",
         autocommit=True,
     )
     try:
         with root_conn.cursor() as cur:
-            cur.execute("CREATE DATABASE IF NOT EXISTS rag_db_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-            cur.execute("GRANT ALL PRIVILEGES ON rag_db_test.* TO 'rag_user'@'%'")
+            cur.execute(f"CREATE DATABASE IF NOT EXISTS {_TEST_DB} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+            cur.execute(f"GRANT ALL PRIVILEGES ON {_TEST_DB}.* TO '{_DB_USER}'@'%'")
             cur.execute("FLUSH PRIVILEGES")
     finally:
         root_conn.close()
 
     # Apply schema ----------------------------------------------------------
     schema_conn = pymysql.connect(
-        host="127.0.0.1",
-        port=3306,
-        user="rag_user",
-        password="rag_pass_123",
-        database="rag_db_test",
+        host=_HOST,
+        port=_PORT,
+        user=_DB_USER,
+        password=_DB_PWD,
+        database=_TEST_DB,
         charset="utf8mb4",
         autocommit=True,
     )
@@ -260,11 +269,11 @@ def _test_db_setup():
         maxshared=0,
         maxconnections=0,
         blocking=True,
-        host="127.0.0.1",
-        port=3306,
-        user="rag_user",
-        password="rag_pass_123",
-        database="rag_db_test",
+        host=_HOST,
+        port=_PORT,
+        user=_DB_USER,
+        password=_DB_PWD,
+        database=_TEST_DB,
         charset="utf8mb4",
         cursorclass=pymysql.cursors.DictCursor,
         autocommit=False,
