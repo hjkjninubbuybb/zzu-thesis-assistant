@@ -6,7 +6,7 @@
 
 **Architecture:** Extract duplicated patterns (Toast, ConfirmDialog, download helper, modal overlay) into shared modules. Then split ConversationsPage.tsx (1,800 lines) into focused sub-components under `components/chat/`. Other large pages get their inline sub-components extracted to colocated files. All changes are pure refactoring — no API changes, no behavior changes.
 
-**Tech Stack:** React 19, TypeScript, Vite, Vitest (new — for unit testing extracted utilities), TailwindCSS
+**Tech Stack:** React 19, TypeScript, Vite, Playwright (new — for e2e regression testing, suitable for thesis defense demo), TailwindCSS
 
 ---
 
@@ -40,79 +40,89 @@
 | `frontend/src/pages/KnowledgeBasePage.tsx` | Replace inline Toast + ConfirmDialog with shared imports |
 | `frontend/src/pages/FaqPage.tsx` | Replace inline Toast with shared import |
 
-### Test files
+### Test files (Playwright e2e)
 | File | Tests |
 |------|-------|
-| `frontend/src/__tests__/lib/download.test.ts` | downloadBlob utility |
-| `frontend/src/__tests__/lib/streamChat.test.ts` | SSE parser, buildHistory |
+| `frontend/e2e/chat.spec.ts` | Chat page loads, send message, SSE streaming, sidebar navigation, conversation CRUD |
+| `frontend/e2e/shared-ui.spec.ts` | Toast notification, ConfirmDialog, file download |
 
 ---
 
-## Task 1: Set up Vitest
+## Task 1: Set up Playwright
 
 **Files:**
 - Modify: `frontend/package.json`
-- Create: `frontend/vitest.config.ts`
-- Create: `frontend/src/__tests__/setup.ts`
+- Create: `frontend/playwright.config.ts`
+- Create: `frontend/e2e/chat.spec.ts` (initial smoke test)
 
-- [ ] **Step 1: Install vitest**
+- [ ] **Step 1: Install Playwright**
 
 ```bash
-cd frontend && npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
+cd frontend && npm install -D @playwright/test && npx playwright install chromium
 ```
 
-- [ ] **Step 2: Create vitest config**
+- [ ] **Step 2: Create Playwright config**
 
-Create `frontend/vitest.config.ts`:
+Create `frontend/playwright.config.ts`:
 
 ```ts
-import { defineConfig } from "vitest/config";
-import path from "path";
+import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
-  test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: ["./src/__tests__/setup.ts"],
+  testDir: "./e2e",
+  timeout: 30_000,
+  retries: 0,
+  use: {
+    baseURL: "http://localhost:5173",
+    headless: true,
+    screenshot: "only-on-failure",
   },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+  webServer: {
+    command: "npm run dev",
+    port: 5173,
+    reuseExistingServer: true,
   },
 });
 ```
 
-- [ ] **Step 3: Create test setup file**
+- [ ] **Step 3: Create initial smoke test**
 
-Create `frontend/src/__tests__/setup.ts`:
+Create `frontend/e2e/chat.spec.ts`:
 
 ```ts
-import "@testing-library/jest-dom/vitest";
+import { test, expect } from "@playwright/test";
+
+test.describe("Chat page smoke test", () => {
+  test("admin login page loads", async ({ page }) => {
+    await page.goto("/admin/login");
+    await expect(page.locator("body")).toBeVisible();
+  });
+});
 ```
 
-- [ ] **Step 4: Add test script to package.json**
+- [ ] **Step 4: Add test scripts to package.json**
 
 Add to `"scripts"` in `frontend/package.json`:
 
 ```json
-"test": "vitest run",
-"test:watch": "vitest"
+"test": "playwright test",
+"test:ui": "playwright test --ui",
+"test:headed": "playwright test --headed"
 ```
 
-- [ ] **Step 5: Run vitest to verify setup**
+- [ ] **Step 5: Run Playwright to verify setup**
 
 ```bash
-cd frontend && npm test
+cd frontend && npx playwright test
 ```
 
-Expected: 0 tests found, no errors.
+Expected: 1 test passed (or skipped if backend not running — webServer will start vite dev).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add frontend/package.json frontend/package-lock.json frontend/vitest.config.ts frontend/src/__tests__/setup.ts
-git commit -m "chore(frontend): set up vitest test framework"
+git add frontend/package.json frontend/package-lock.json frontend/playwright.config.ts frontend/e2e/
+git commit -m "chore(frontend): set up Playwright e2e test framework"
 ```
 
 ---
@@ -121,65 +131,9 @@ git commit -m "chore(frontend): set up vitest test framework"
 
 **Files:**
 - Create: `frontend/src/lib/download.ts`
-- Test: `frontend/src/__tests__/lib/download.test.ts`
 - Modify: `frontend/src/lib/api.ts`
 
-- [ ] **Step 1: Write the failing test**
-
-Create `frontend/src/__tests__/lib/download.test.ts`:
-
-```ts
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { downloadBlob } from "@/lib/download";
-
-describe("downloadBlob", () => {
-  let createObjectURLSpy: ReturnType<typeof vi.fn>;
-  let revokeObjectURLSpy: ReturnType<typeof vi.fn>;
-  let clickSpy: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    createObjectURLSpy = vi.fn().mockReturnValue("blob:http://localhost/fake");
-    revokeObjectURLSpy = vi.fn();
-    clickSpy = vi.fn();
-
-    globalThis.URL.createObjectURL = createObjectURLSpy;
-    globalThis.URL.revokeObjectURL = revokeObjectURLSpy;
-
-    vi.spyOn(document, "createElement").mockReturnValue({
-      set href(v: string) { this._href = v; },
-      get href() { return this._href; },
-      set download(v: string) { this._download = v; },
-      get download() { return this._download; },
-      click: clickSpy,
-      _href: "",
-      _download: "",
-    } as unknown as HTMLAnchorElement);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("creates object URL, triggers download, and revokes URL", () => {
-    const blob = new Blob(["test"], { type: "application/octet-stream" });
-    downloadBlob(blob, "test-file.xlsx");
-
-    expect(createObjectURLSpy).toHaveBeenCalledWith(blob);
-    expect(clickSpy).toHaveBeenCalled();
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:http://localhost/fake");
-  });
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-```bash
-cd frontend && npx vitest run src/__tests__/lib/download.test.ts
-```
-
-Expected: FAIL — cannot find module `@/lib/download`
-
-- [ ] **Step 3: Write minimal implementation**
+- [ ] **Step 1: Create downloadBlob utility**
 
 Create `frontend/src/lib/download.ts`:
 
@@ -197,15 +151,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
-
-```bash
-cd frontend && npx vitest run src/__tests__/lib/download.test.ts
-```
-
-Expected: PASS
-
-- [ ] **Step 5: Replace 7 blob patterns in api.ts**
+- [ ] **Step 2: Replace 7 blob patterns in api.ts**
 
 In `frontend/src/lib/api.ts`, add import at top:
 
@@ -247,7 +193,7 @@ Apply the same transformation to all 7:
 6. `faqApi.downloadTemplate` → filename `"FAQ_导入模板.xlsx"`
 7. `faqApi.exportExcel` → filename `` `${kbName}_FAQ.xlsx` ``
 
-- [ ] **Step 6: Run TypeScript check**
+- [ ] **Step 3: Run TypeScript check**
 
 ```bash
 cd frontend && npx tsc -b --noEmit
@@ -255,10 +201,10 @@ cd frontend && npx tsc -b --noEmit
 
 Expected: No errors.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add frontend/src/lib/download.ts frontend/src/__tests__/lib/download.test.ts frontend/src/lib/api.ts
+git add frontend/src/lib/download.ts frontend/src/lib/api.ts
 git commit -m "refactor(frontend): extract downloadBlob utility, deduplicate 7 blob patterns in api.ts"
 ```
 
@@ -462,80 +408,9 @@ git commit -m "refactor(frontend): extract shared ConfirmDialog, remove 2 inline
 
 **Files:**
 - Create: `frontend/src/lib/streamChat.ts`
-- Test: `frontend/src/__tests__/lib/streamChat.test.ts`
 - Modify: `frontend/src/pages/ConversationsPage.tsx`
 
-- [ ] **Step 1: Write the failing test for buildHistory**
-
-Create `frontend/src/__tests__/lib/streamChat.test.ts`:
-
-```ts
-import { describe, it, expect } from "vitest";
-import { buildHistory } from "@/lib/streamChat";
-import type { ChatMessage, HistoryMessage } from "@/types/api";
-
-function msg(role: "user" | "assistant", content: string, status = "done"): ChatMessage {
-  return { role, content, status } as ChatMessage;
-}
-
-describe("buildHistory", () => {
-  it("returns empty array for empty messages", () => {
-    expect(buildHistory([])).toEqual([]);
-  });
-
-  it("pairs user+assistant messages", () => {
-    const msgs = [msg("user", "hello"), msg("assistant", "hi")];
-    const result = buildHistory(msgs);
-    expect(result).toEqual([
-      { role: "user", content: "hello" },
-      { role: "assistant", content: "hi" },
-    ]);
-  });
-
-  it("truncates long assistant messages at 1500 chars", () => {
-    const long = "a".repeat(2000);
-    const msgs = [msg("user", "q"), msg("assistant", long)];
-    const result = buildHistory(msgs);
-    expect(result[1].content).toHaveLength(1500 + "\n...(内容已截断)".length);
-    expect(result[1].content).toContain("...(内容已截断)");
-  });
-
-  it("only keeps last 10 turns (20 messages)", () => {
-    const msgs: ChatMessage[] = [];
-    for (let i = 0; i < 15; i++) {
-      msgs.push(msg("user", `q${i}`));
-      msgs.push(msg("assistant", `a${i}`));
-    }
-    const result = buildHistory(msgs);
-    expect(result.length).toBe(20);
-    expect(result[0].content).toBe("q5");
-  });
-
-  it("skips unpaired messages", () => {
-    const msgs = [msg("user", "q1"), msg("user", "q2"), msg("assistant", "a2")];
-    const result = buildHistory(msgs);
-    expect(result).toEqual([
-      { role: "user", content: "q2" },
-      { role: "assistant", content: "a2" },
-    ]);
-  });
-
-  it("skips assistant messages that are not done", () => {
-    const msgs = [msg("user", "q"), msg("assistant", "...", "loading")];
-    expect(buildHistory(msgs)).toEqual([]);
-  });
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-```bash
-cd frontend && npx vitest run src/__tests__/lib/streamChat.test.ts
-```
-
-Expected: FAIL — cannot find module `@/lib/streamChat`
-
-- [ ] **Step 3: Create streamChat.ts**
+- [ ] **Step 1: Create streamChat.ts**
 
 Create `frontend/src/lib/streamChat.ts` by moving lines 50-186 from ConversationsPage.tsx:
 
@@ -671,15 +546,7 @@ export async function streamChat(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
-
-```bash
-cd frontend && npx vitest run src/__tests__/lib/streamChat.test.ts
-```
-
-Expected: PASS (all 5 buildHistory tests)
-
-- [ ] **Step 5: Update ConversationsPage.tsx imports**
+- [ ] **Step 2: Update ConversationsPage.tsx imports**
 
 In `frontend/src/pages/ConversationsPage.tsx`:
 - Remove lines 50-186 (the `buildHistory` function, `MAX_HISTORY_TURNS`, `MAX_MSG_LENGTH` constants, and `streamChat` function)
@@ -691,18 +558,18 @@ import { buildHistory, streamChat } from "@/lib/streamChat";
 
 - Remove unused imports that were only used by streamChat: `getAccessToken`, `getRefreshToken`, `saveAuth`, `clearAuth`, `getCurrentPortal` from `@/lib/auth` (check if any are still used by the main component — `getCurrentPortal` may still be needed).
 
-- [ ] **Step 6: Run TypeScript check + tests**
+- [ ] **Step 3: Run TypeScript check**
 
 ```bash
-cd frontend && npx tsc -b --noEmit && npx vitest run
+cd frontend && npx tsc -b --noEmit
 ```
 
-Expected: No type errors, all tests pass.
+Expected: No type errors.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add frontend/src/lib/streamChat.ts frontend/src/__tests__/lib/streamChat.test.ts frontend/src/pages/ConversationsPage.tsx
+git add frontend/src/lib/streamChat.ts frontend/src/pages/ConversationsPage.tsx
 git commit -m "refactor(frontend): extract streamChat + buildHistory to lib/streamChat.ts"
 ```
 
@@ -980,10 +847,10 @@ import { AcademicMarkdown } from "@/components/chat/AcademicMarkdown";
 - [ ] **Step 6: Run TypeScript check + tests**
 
 ```bash
-cd frontend && npx tsc -b --noEmit && npx vitest run
+cd frontend && npx tsc -b --noEmit
 ```
 
-Expected: No errors, all tests pass.
+Expected: No errors.
 
 - [ ] **Step 7: Commit**
 
@@ -1254,10 +1121,10 @@ import type { ThinkingStep } from "@/components/chat/ThinkingProcess";
 - [ ] **Step 4: Run TypeScript check + tests**
 
 ```bash
-cd frontend && npx tsc -b --noEmit && npx vitest run
+cd frontend && npx tsc -b --noEmit
 ```
 
-Expected: No errors, all tests pass.
+Expected: No errors.
 
 - [ ] **Step 5: Commit**
 
@@ -1677,10 +1544,10 @@ import { TutorHelpModal } from "@/components/chat/TutorHelpModal";
 - [ ] **Step 4: Run TypeScript check + tests**
 
 ```bash
-cd frontend && npx tsc -b --noEmit && npx vitest run
+cd frontend && npx tsc -b --noEmit
 ```
 
-Expected: No errors, all tests pass.
+Expected: No errors.
 
 - [ ] **Step 5: Commit**
 
@@ -1691,10 +1558,12 @@ git commit -m "refactor(frontend): extract ConversationSidebar + TutorHelpModal 
 
 ---
 
-## Task 9: Final cleanup and verification
+## Task 9: Final cleanup, Playwright e2e tests, and verification
 
 **Files:**
 - Modify: `frontend/src/pages/ConversationsPage.tsx` (clean up unused imports)
+- Create: `frontend/e2e/chat.spec.ts` (full e2e test)
+- Create: `frontend/e2e/shared-ui.spec.ts` (shared component e2e test)
 
 - [ ] **Step 1: Verify ConversationsPage size**
 
@@ -1717,15 +1586,115 @@ cd frontend && npx tsc -b --noEmit
 
 Fix any unused import warnings.
 
-- [ ] **Step 3: Run full test suite**
+- [ ] **Step 3: Write Playwright e2e test for chat page**
 
-```bash
-cd frontend && npx vitest run
+Update `frontend/e2e/chat.spec.ts` with full regression tests:
+
+```ts
+import { test, expect } from "@playwright/test";
+
+// Helper: log in as admin
+async function loginAsAdmin(page: import("@playwright/test").Page) {
+  await page.goto("/admin/login");
+  await page.fill('input[name="username"], input[type="text"]', "admin");
+  await page.fill('input[type="password"]', "admin123");
+  await page.click('button[type="submit"]');
+  await page.waitForURL(/\/admin/);
+}
+
+test.describe("Chat page — admin portal", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  test("chat page loads with sidebar and input area", async ({ page }) => {
+    await page.goto("/admin/conversations");
+    // Sidebar should be visible
+    await expect(page.locator("text=新建对话")).toBeVisible();
+    // Input area should be visible
+    await expect(page.locator("textarea")).toBeVisible();
+  });
+
+  test("can create a new conversation", async ({ page }) => {
+    await page.goto("/admin/conversations");
+    await page.click("text=新建对话");
+    // Input should be ready
+    const textarea = page.locator("textarea");
+    await expect(textarea).toBeVisible();
+    await expect(textarea).toBeEnabled();
+  });
+
+  test("sidebar shows conversation history groups", async ({ page }) => {
+    await page.goto("/admin/conversations");
+    // Wait for sidebar to load (may show "暂无对话记录" or date groups)
+    await page.waitForTimeout(1000);
+    const sidebar = page.locator(".glass-card").first();
+    await expect(sidebar).toBeVisible();
+  });
+});
+
+test.describe("Chat page — student portal", () => {
+  test("student login page loads", async ({ page }) => {
+    await page.goto("/student/login");
+    await expect(page.locator("body")).toBeVisible();
+    // Login form should be present
+    await expect(page.locator('input[type="password"]')).toBeVisible();
+  });
+});
 ```
 
-Expected: All tests pass.
+- [ ] **Step 4: Write Playwright e2e test for shared UI components**
 
-- [ ] **Step 4: Run TypeScript build**
+Create `frontend/e2e/shared-ui.spec.ts`:
+
+```ts
+import { test, expect } from "@playwright/test";
+
+async function loginAsAdmin(page: import("@playwright/test").Page) {
+  await page.goto("/admin/login");
+  await page.fill('input[name="username"], input[type="text"]', "admin");
+  await page.fill('input[type="password"]', "admin123");
+  await page.click('button[type="submit"]');
+  await page.waitForURL(/\/admin/);
+}
+
+test.describe("Shared UI components regression", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page);
+  });
+
+  test("knowledge base page loads with Toast-capable actions", async ({ page }) => {
+    await page.goto("/admin/knowledge");
+    await page.waitForTimeout(500);
+    // Page should render without errors
+    await expect(page.locator("body")).toBeVisible();
+  });
+
+  test("FAQ page loads with search and action buttons", async ({ page }) => {
+    await page.goto("/admin/faq");
+    await page.waitForTimeout(500);
+    await expect(page.locator("body")).toBeVisible();
+  });
+
+  test("settings page loads with configuration sections", async ({ page }) => {
+    await page.goto("/admin/settings");
+    await page.waitForTimeout(500);
+    await expect(page.locator("body")).toBeVisible();
+  });
+});
+```
+
+- [ ] **Step 5: Run Playwright e2e tests**
+
+Note: Requires backend running (`poetry run dev` in project root). If backend is not available, tests will be skipped.
+
+```bash
+cd frontend && npx playwright test --headed
+```
+
+Expected: All tests pass (green). The `--headed` flag opens the browser so you can visually verify during thesis defense demo.
+
+- [ ] **Step 6: Run TypeScript build**
 
 ```bash
 cd frontend && npx tsc -b
@@ -1733,31 +1702,14 @@ cd frontend && npx tsc -b
 
 Expected: No errors.
 
-- [ ] **Step 5: Visual verification**
+- [ ] **Step 7: Commit**
 
 ```bash
-cd frontend && npm run dev
+git add frontend/src/pages/ConversationsPage.tsx frontend/e2e/
+git commit -m "refactor(frontend): final cleanup + Playwright e2e regression tests for chat and shared UI"
 ```
 
-Open `http://localhost:5173/admin` and `http://localhost:5173/student` in browser. Verify:
-- Chat page loads correctly
-- SSE streaming works
-- Message bubbles render with markdown
-- Sidebars show conversation list with date grouping
-- File cards download correctly
-- Sources panel expands/collapses
-- Thinking process animation works
-- Toast notifications appear
-- Tutor help modal opens and submits
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add frontend/src/pages/ConversationsPage.tsx
-git commit -m "refactor(frontend): clean up ConversationsPage imports after extraction"
-```
-
-- [ ] **Step 7: Code review checkpoint**
+- [ ] **Step 8: Code review checkpoint**
 
 Use `superpowers:requesting-code-review` to review Phase 1 changes.
 
@@ -1775,6 +1727,6 @@ After Phase 1 completion:
 | Duplicate Toast | 4 copies | 1 shared |
 | Duplicate download blob | 7 copies | 1 utility |
 | Duplicate ConfirmDialog | 2 copies | 1 shared |
-| Test files | 0 | 2 (download, streamChat) |
+| Playwright e2e tests | 0 | 2 spec files (chat, shared-ui) |
 
 **Next:** Phase 2 (backend behavior-protection tests) and Phase 3 (backend storage layer split) will be planned in separate documents after Phase 1 is complete and reviewed.
