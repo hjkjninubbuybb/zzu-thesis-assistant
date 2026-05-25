@@ -3,7 +3,6 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { documentApi, extractError } from "@/lib/api";
-import type { ReviewDetail } from "@/types/api";
 
 export default function DocumentCleanReviewPage() {
   const { kbName, docId } = useParams<{ kbName: string; docId: string }>();
