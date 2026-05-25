@@ -60,7 +60,10 @@ build-backend = "poetry.core.masonry.api"
 [dependency-groups]
 dev = [
     "ruff (>=0.15.14,<0.16.0)",
-    "pre-commit (>=4.6.0,<5.0.0)"
+    "pre-commit (>=4.6.0,<5.0.0)",
+    "pytest (>=8.0.0)",
+    "pytest-asyncio (>=0.25.0)",
+    "httpx (>=0.28.0)",
 ]
 
 # ── Ruff ─────────────────────────────────────────────────────────
@@ -110,6 +113,7 @@ ignore = [
 "src/storage/*.py" = ["W291", "RUF005", "SIM117"]  # SQL 多行字符串尾部空格 + 列表拼接 + with 合并
 "src/api/app.py" = ["E402"]  # warnings 过滤必须在 import 前
 "src/api/routes/*.py" = ["B904", "B005", "B007", "RUF005"]  # HTTPException 异常链 + strip 多字符 + 循环变量
+"tests/**/*.py" = ["D", "S101"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -121,3 +125,10 @@ known-first-party = ["src"]
 quote-style = "double"
 indent-style = "space"
 docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: tests that require a running MySQL instance",
+]
