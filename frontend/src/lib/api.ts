@@ -41,6 +41,7 @@ import {
   clearAuth,
   getCurrentPortal,
 } from "@/lib/auth";
+import { downloadBlob } from "@/lib/download";
 
 const client = axios.create({
   baseURL: "/api",
@@ -172,23 +173,14 @@ export const userApi = {
   downloadTeacherTemplate: () => {
     client
       .get("/users/teachers/template", { responseType: "blob" })
-      .then((r) => {
-        const url = URL.createObjectURL(r.data);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "教师账号导入模板.xlsx";
-        a.click();
-        URL.revokeObjectURL(url);
-      });
+      .then((r) => downloadBlob(r.data, "教师账号导入模板.xlsx"));
   },
   exportTeachers: () => {
     client.get("/users/teachers/export", { responseType: "blob" }).then((r) => {
-      const url = URL.createObjectURL(r.data);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `教师账号_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(
+        r.data,
+        `教师账号_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
     });
   },
   importTeachers: (file: File, defaultPassword?: string) => {
@@ -233,14 +225,7 @@ export const userApi = {
   downloadRelationsTemplate: () => {
     client
       .get("/users/mentors/relations/template", { responseType: "blob" })
-      .then((r) => {
-        const url = URL.createObjectURL(r.data);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "师生关系导入模板.xlsx";
-        a.click();
-        URL.revokeObjectURL(url);
-      });
+      .then((r) => downloadBlob(r.data, "师生关系导入模板.xlsx"));
   },
   importMentorRelations: (file: File) => {
     const form = new FormData();
@@ -256,23 +241,14 @@ export const userApi = {
   downloadTemplate: () => {
     client
       .get("/users/students/template", { responseType: "blob" })
-      .then((r) => {
-        const url = URL.createObjectURL(r.data);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "学生账号导入模板.xlsx";
-        a.click();
-        URL.revokeObjectURL(url);
-      });
+      .then((r) => downloadBlob(r.data, "学生账号导入模板.xlsx"));
   },
   exportStudents: () => {
     client.get("/users/students/export", { responseType: "blob" }).then((r) => {
-      const url = URL.createObjectURL(r.data);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `学生账号_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(
+        r.data,
+        `学生账号_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
     });
   },
   importStudents: (file: File, defaultPassword?: string) => {
@@ -471,24 +447,12 @@ export const faqApi = {
   downloadTemplate: (kbName: string) => {
     client
       .get(`/faq/${kbName}/template`, { responseType: "blob" })
-      .then((r) => {
-        const url = URL.createObjectURL(r.data);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "FAQ_导入模板.xlsx";
-        a.click();
-        URL.revokeObjectURL(url);
-      });
+      .then((r) => downloadBlob(r.data, "FAQ_导入模板.xlsx"));
   },
   exportExcel: (kbName: string) => {
-    client.get(`/faq/${kbName}/export`, { responseType: "blob" }).then((r) => {
-      const url = URL.createObjectURL(r.data);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${kbName}_FAQ.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    client
+      .get(`/faq/${kbName}/export`, { responseType: "blob" })
+      .then((r) => downloadBlob(r.data, `${kbName}_FAQ.xlsx`));
   },
   importExcel: (kbName: string, file: File) => {
     const form = new FormData();
