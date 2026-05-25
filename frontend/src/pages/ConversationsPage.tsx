@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
-import ReactMarkdown from "react-markdown";
 import {
   useQuery,
   useQueryClient,
@@ -8,11 +7,8 @@ import {
 import {
   ArrowUp,
   Loader2,
-  ChevronDown,
-  ChevronUp,
   Trash2,
   AlertCircle,
-  Download,
   Plus,
   ThumbsUp,
   ThumbsDown,
@@ -23,267 +19,21 @@ import {
   X as XIcon,
   HelpCircle,
 } from "lucide-react";
-import {
-  knowledgeApi,
-  faqApi,
-  conversationApi,
-  ticketApi,
-  documentApi,
-} from "@/lib/api";
+import { knowledgeApi, faqApi, conversationApi, ticketApi } from "@/lib/api";
 
 import { useAuth } from "@/hooks/useAuth";
 import { Toast } from "@/components/ui/Toast";
 import { buildHistory, streamChat } from "@/lib/streamChat";
+import { AgentAvatar } from "@/components/chat/AgentAvatar";
+import { FileCard } from "@/components/chat/FileCard";
+import { SourcesPanel } from "@/components/chat/SourcesPanel";
+import { AcademicMarkdown } from "@/components/chat/AcademicMarkdown";
 import type {
   ChatMessage,
   FileItem,
   SourceItem,
   ConversationInfo,
 } from "@/types/api";
-
-// ── 专属 Agent 头像组件 ────────────────────────────────────
-
-const AgentAvatar = memo(({ isStudent }: { isStudent: boolean }) => (
-  <div
-    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:rotate-3 border ${
-      isStudent
-        ? "bg-blue-50 text-[#2563EB] border-[#DBEAFE]"
-        : "bg-slate-100 text-[#334155] border-[#E2E8F0]"
-    }`}
-  >
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {/* 博士帽顶部 */}
-      <path d="M12 3L2 8L12 13L22 8L12 3Z" />
-      {/* 博士帽帽筒 */}
-      <path d="M6 10V15.5C6 15.5 8.5 17.5 12 17.5C15.5 17.5 18 15.5 18 15.5V10" />
-      {/* 流苏 */}
-      <path d="M22 8V13" />
-      {/* AI 核心节点 - 位于帽筒中心 */}
-      <circle
-        cx="12"
-        cy="8"
-        r="1.5"
-        fill="currentColor"
-        className="animate-pulse"
-      />
-      <circle cx="12" cy="14" r="1" fill="currentColor" opacity="0.5" />
-    </svg>
-  </div>
-));
-
-// ── 文件卡片 ──────────────────────────────────────────────
-
-const EXT_COLORS: Record<string, string> = {
-  pdf: "bg-red-500",
-  docx: "bg-blue-500",
-  doc: "bg-blue-500",
-  xlsx: "bg-green-600",
-  xls: "bg-green-600",
-  pptx: "bg-orange-500",
-  ppt: "bg-orange-500",
-  txt: "bg-gray-500",
-};
-
-function FileCard({ file }: { file: FileItem }) {
-  const ext = file.file_name.split(".").pop()?.toLowerCase() ?? "";
-  const badgeColor = EXT_COLORS[ext] ?? "bg-gray-500";
-  const [downloading, setDownloading] = useState(false);
-
-  const handleDownload = async () => {
-    if (downloading) return;
-    setDownloading(true);
-    try {
-      const { token } = await documentApi.getDownloadToken(file.url);
-      const a = document.createElement("a");
-      a.href = `${file.url}?token=${token}`;
-      a.download = file.file_name;
-      a.click();
-    } catch {
-      // 静默失败，不打断用户
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  return (
-    <div
-      onClick={handleDownload}
-      className="cursor-pointer flex items-center gap-3 bg-[#F7F5F1] border border-[#E8E4DC] rounded-xl px-3 py-2.5 hover:bg-[#F0EDE8] transition-colors group"
-    >
-      <div
-        className={`${badgeColor} text-white text-[10px] font-bold uppercase rounded-md px-1.5 py-1 min-w-[2.2rem] text-center leading-none`}
-      >
-        {ext || "FILE"}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800 truncate">
-          {file.file_name}
-        </p>
-        <p className="text-xs text-gray-400">{file.size_kb} KB</p>
-      </div>
-      {downloading ? (
-        <Loader2 size={14} className="text-gray-400 shrink-0 animate-spin" />
-      ) : (
-        <Download
-          size={14}
-          className="text-gray-400 group-hover:text-gray-600 shrink-0"
-        />
-      )}
-    </div>
-  );
-}
-
-// ── 引用来源组件 ──────────────────────────────────────────
-
-function SourcesPanel({ sources }: { sources: SourceItem[] }) {
-  const [open, setOpen] = useState(false);
-  if (!sources || sources.length === 0) return null;
-
-  return (
-    <div className="mt-4 pt-3 border-t border-gray-100">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400 hover:text-gray-700 transition-colors uppercase tracking-wider"
-      >
-        <BookOpen size={12} />
-        知识库参考 ({sources.length})
-        {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-      </button>
-      {open && (
-        <div className="mt-3 grid grid-cols-1 gap-2 animate-apple-fade-up">
-          {sources.map((s, i) => (
-            <div
-              key={s.node_id}
-              className="bg-gray-50/50 rounded-xl p-3 border border-gray-100/50"
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="w-5 h-5 rounded-md bg-white border border-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shadow-sm">
-                  {i + 1}
-                </span>
-                <span className="text-[11px] font-semibold text-gray-700 break-all">
-                  {s.source_file}
-                </span>
-                <div className="ml-auto flex items-center gap-1 opacity-40">
-                  <div className="w-1 h-1 rounded-full bg-gray-400" />
-                  <span className="text-[9px] font-medium">
-                    REL {Math.round(s.score * 100)}%
-                  </span>
-                </div>
-              </div>
-              <p className="text-[11px] text-gray-500 leading-relaxed italic whitespace-pre-wrap">
-                "{s.text}"
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── 智能 Markdown 渲染（带内嵌引用支持） ──────────────────
-
-function AcademicMarkdown({
-  content,
-  sources,
-}: {
-  content: string;
-  sources?: SourceItem[];
-}) {
-  // 处理 AI 生成的带有空格的 sandbox 链接，例如 [点击下载：xxx.pdf](sandbox:/mnt/data/xxx.pdf)
-  // 将其转换为 [点击下载：xxx.pdf](#sandbox:xxx.pdf) 以便正常解析和拦截
-  let processedContent = content.replace(
-    /\[(.*?)\]\(sandbox:\/mnt\/data\/(.*?)\)/g,
-    (_, p1, p2) => {
-      return `[${p1}](#sandbox:${encodeURIComponent(p2)})`;
-    },
-  );
-
-  // 匹配形如 [1] [2,3] 的引用标记
-  const parts = processedContent.split(/(\[\d+(?:,\s*\d+)*\])/g);
-
-  return (
-    <div className="prose prose-sm prose-academic max-w-none">
-      {parts.map((part, i) => {
-        const match = part.match(/^\[(\d+(?:,\s*\d+)*)\]$/);
-        if (match && sources && sources.length > 0) {
-          const indices = match[1]
-            .split(",")
-            .map((s) => parseInt(s.trim()) - 1);
-          return (
-            <span key={i} className="inline-flex gap-0.5">
-              {indices.map((idx) => {
-                const source = sources[idx];
-                if (!source) return <span key={idx}>{part}</span>;
-                return (
-                  <span
-                    key={idx}
-                    title={`${source.source_file}: ${source.text.slice(0, 100)}...`}
-                    className="citation-marker"
-                  >
-                    {idx + 1}
-                  </span>
-                );
-              })}
-            </span>
-          );
-        }
-        return (
-          <ReactMarkdown
-            key={i}
-            components={{
-              p: "span",
-              a: ({ node, href, children, ...props }) => {
-                if (href?.startsWith("#sandbox:")) {
-                  const filename = decodeURIComponent(
-                    href.replace("#sandbox:", ""),
-                  );
-                  return (
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        alert(
-                          `【演示文件下载】\n\n文件名: ${filename}\n\n注：此为 AI 生成的演示下载链接，实际物理文件并未在此演示环境中持久化。`,
-                        );
-                      }}
-                      className="text-blue-600 hover:text-blue-700 underline underline-offset-2 font-medium"
-                      {...(props as any)}
-                    >
-                      {children}
-                    </a>
-                  );
-                }
-                return (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 hover:text-blue-700 underline underline-offset-2 font-medium"
-                    {...(props as any)}
-                  >
-                    {children}
-                  </a>
-                );
-              },
-            }}
-          >
-            {part}
-          </ReactMarkdown>
-        );
-      })}
-    </div>
-  );
-}
 
 // ── 反馈按钮 ──────────────────────────────────────────────
 
