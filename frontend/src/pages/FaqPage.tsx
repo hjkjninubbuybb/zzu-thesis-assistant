@@ -29,6 +29,7 @@ import type {
 } from "@/types/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Toast } from "@/components/ui/Toast";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 // ── 状态标签 ──────────────────────────────────────────────
 
@@ -195,56 +196,6 @@ function FaqDialog({
           >
             {loading && <Loader2 size={13} className="animate-spin" />}
             {loading ? "保存中…" : "保存"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── 删除确认 ───────────────────────────────────────────────
-
-function ConfirmDeleteDialog({
-  question,
-  onConfirm,
-  onCancel,
-  loading,
-}: {
-  question: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  loading: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] flex items-center justify-center z-50 animate-apple-fade">
-      <div className="glass-card rounded-2xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
-        <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-4">
-          <Trash2 size={18} className="text-red-500" />
-        </div>
-        <h3 className="text-base font-semibold text-[#334155] mb-1">
-          删除 FAQ
-        </h3>
-        <p className="text-sm leading-relaxed" style={{ color: "#8A8A8A" }}>
-          将删除{" "}
-          <span className="font-medium text-[#334155]">
-            "{question.length > 30 ? question.slice(0, 30) + "…" : question}"
-          </span>
-          ，并从向量库中移除对应向量。此操作不可撤销。
-        </p>
-        <div className="mt-5 flex gap-2.5 justify-end">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm rounded-xl border border-[#E8E4DC] hover:bg-[#F8F6F2] transition-colors"
-          >
-            取消
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading}
-            className="px-4 py-2 text-sm rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-2 transition-colors"
-          >
-            {loading && <Loader2 size={13} className="animate-spin" />}
-            确认删除
           </button>
         </div>
       </div>
@@ -967,8 +918,10 @@ export function FaqKnowledgeTab() {
         />
       )}
       {deleteTarget && (
-        <ConfirmDeleteDialog
-          question={deleteTarget.question}
+        <ConfirmDialog
+          title="删除 FAQ"
+          message={`将删除 "${deleteTarget.question.length > 30 ? deleteTarget.question.slice(0, 30) + "..." : deleteTarget.question}"，并从向量库中移除对应向量。此操作不可撤销。`}
+          confirmLabel="确认删除"
           loading={deleteMutation.isPending}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => deleteMutation.mutate(deleteTarget.id)}

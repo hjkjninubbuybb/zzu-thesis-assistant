@@ -19,6 +19,7 @@ import {
 import { knowledgeApi, documentApi, extractError } from "@/lib/api";
 import type { KBInfo, DocType, SplitterType, UploadParams } from "@/types/api";
 import { Toast } from "@/components/ui/Toast";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 // ── Constants ─────────────────────────────────────────────
 
@@ -81,49 +82,6 @@ function StatusIcon({ status }: { status: FileStatus }) {
   if (status === "done")
     return <CheckCircle size={13} className="text-emerald-500" />;
   return <AlertCircle size={13} className="text-red-500" />;
-}
-
-// ── ConfirmDialog ──────────────────────────────────────────
-
-function ConfirmDialog({
-  name,
-  onConfirm,
-  onCancel,
-  loading,
-}: {
-  name: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  loading: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 animate-apple-fade">
-      <div className="glass-card rounded-xl p-6 w-full max-w-sm mx-4 animate-apple-pop">
-        <h3 className="text-base font-semibold text-gray-900">确认删除</h3>
-        <p className="mt-2 text-sm text-gray-500">
-          将删除知识库{" "}
-          <span className="font-medium text-gray-800">"{name}"</span>{" "}
-          及其所有文档，此操作不可撤销。
-        </p>
-        <div className="mt-4 flex gap-3 justify-end">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
-          >
-            取消
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading}
-            className="px-4 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-2"
-          >
-            {loading && <Loader2 size={14} className="animate-spin" />}
-            删除
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── CreateDialog ───────────────────────────────────────────
@@ -1089,7 +1047,7 @@ export default function KnowledgeBasePage() {
 
       {deleteTarget && (
         <ConfirmDialog
-          name={deleteTarget.name}
+          message={`将删除知识库 "${deleteTarget.name}" 及其所有文档，此操作不可撤销。`}
           onConfirm={() => deleteMutation.mutate(deleteTarget.name)}
           onCancel={() => setDeleteTarget(null)}
           loading={deleteMutation.isPending}
