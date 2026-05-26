@@ -1,6 +1,7 @@
 """Integration tests verifying each specialized store works independently."""
 
 from src.storage.doc_store import DocStore
+from src.storage.faq_store import FAQStore
 from src.storage.kb_store import KBStore
 from src.storage.settings_store import SettingsStore
 
@@ -88,3 +89,40 @@ class TestDocStore:
         assert deleted["id"] == doc["id"]
         assert store.get_document(doc["id"]) is None
         KBStore().delete_kb("_doc_del_kb")
+
+
+class TestFAQStore:
+    def test_add_and_get_faq(self):
+        KBStore().create_kb("_faq_split_kb")
+        store = FAQStore()
+        faq = store.add_faq("_faq_split_kb", "Q?", "A.")
+        assert faq["question"] == "Q?"
+        fetched = store.get_faq(faq["id"])
+        assert fetched["answer"] == "A."
+        KBStore().delete_kb("_faq_split_kb")
+
+    def test_list_faqs(self):
+        KBStore().create_kb("_faq_list_kb")
+        store = FAQStore()
+        store.add_faq("_faq_list_kb", "Q1?", "A1.")
+        store.add_faq("_faq_list_kb", "Q2?", "A2.")
+        faqs = store.list_faqs("_faq_list_kb")
+        assert len(faqs) == 2
+        KBStore().delete_kb("_faq_list_kb")
+
+    def test_update_faq(self):
+        KBStore().create_kb("_faq_upd_kb")
+        store = FAQStore()
+        faq = store.add_faq("_faq_upd_kb", "Q?", "A.")
+        updated = store.update_faq(faq["id"], answer="New A.")
+        assert updated["answer"] == "New A."
+        KBStore().delete_kb("_faq_upd_kb")
+
+    def test_delete_faq(self):
+        KBStore().create_kb("_faq_del_kb")
+        store = FAQStore()
+        faq = store.add_faq("_faq_del_kb", "Q?", "A.")
+        deleted = store.delete_faq(faq["id"])
+        assert deleted["id"] == faq["id"]
+        assert store.get_faq(faq["id"]) is None
+        KBStore().delete_kb("_faq_del_kb")
