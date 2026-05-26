@@ -1,9 +1,11 @@
 """Integration tests verifying each specialized store works independently."""
 
+from src.storage.conversation_store import ConversationStore
 from src.storage.doc_store import DocStore
 from src.storage.faq_store import FAQStore
 from src.storage.kb_store import KBStore
 from src.storage.settings_store import SettingsStore
+from src.storage.user_store import UserStore
 
 
 class TestSettingsStore:
@@ -126,3 +128,47 @@ class TestFAQStore:
         assert deleted["id"] == faq["id"]
         assert store.get_faq(faq["id"]) is None
         KBStore().delete_kb("_faq_del_kb")
+
+
+class TestConversationStore:
+    def test_create_and_get_conversation(self):
+        kb_store = KBStore()
+        user_store = UserStore()
+        kb_store.create_kb("_conv_split_kb")
+        user = user_store.create_user("_conv_split_user", "hash", role="student")
+        store = ConversationStore()
+        conv = store.create_conversation("_conv_split_kb", "Test Conv", user_id=user["id"])
+        assert conv["title"] == "Test Conv"
+        fetched = store.get_conversation(conv["id"])
+        assert fetched["id"] == conv["id"]
+        store.delete_conversation(conv["id"])
+        kb_store.delete_kb("_conv_split_kb")
+
+    def test_add_and_list_messages(self):
+        kb_store = KBStore()
+        user_store = UserStore()
+        kb_store.create_kb("_msg_split_kb")
+        user = user_store.create_user("_msg_split_user", "hash", role="student")
+        store = ConversationStore()
+        conv = store.create_conversation("_msg_split_kb", user_id=user["id"])
+        store.add_message(conv["id"], "user", "hello")
+        store.add_message(conv["id"], "assistant", "hi there")
+        msgs = store.list_messages(conv["id"])
+        assert len(msgs) == 2
+        assert msgs[0]["role"] == "user"
+        store.delete_conversation(conv["id"])
+        kb_store.delete_kb("_msg_split_kb")
+
+    def test_set_and_get_message_feedback(self):
+        kb_store = KBStore()
+        user_store = UserStore()
+        kb_store.create_kb("_fb_split_kb")
+        user = user_store.create_user("_fb_split_user", "hash", role="student")
+        store = ConversationStore()
+        conv = store.create_conversation("_fb_split_kb", user_id=user["id"])
+        msg = store.add_message(conv["id"], "assistant", "answer")
+        store.set_message_feedback(msg["id"], "up")
+        fb = store.get_message_feedback(msg["id"])
+        assert fb["rating"] == "up"
+        store.delete_conversation(conv["id"])
+        kb_store.delete_kb("_fb_split_kb")
