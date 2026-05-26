@@ -172,3 +172,70 @@ class TestConversationStore:
         assert fb["rating"] == "up"
         store.delete_conversation(conv["id"])
         kb_store.delete_kb("_fb_split_kb")
+
+
+class TestTicketStore:
+    def test_create_and_get_qa_request(self):
+        from src.storage.conversation_store import ConversationStore
+        from src.storage.kb_store import KBStore
+        from src.storage.ticket_store import TicketStore
+        from src.storage.user_store import UserStore
+
+        KBStore().create_kb("_ticket_split_kb")
+        user_store = UserStore()
+        student = user_store.create_user("_stu_split", "hash", role="student")
+        mentor = user_store.create_user("_men_split", "hash", role="teacher")
+        conv = ConversationStore().create_conversation("_ticket_split_kb", user_id=student["id"])
+        msg = ConversationStore().add_message(conv["id"], "user", "q?")
+
+        store = TicketStore()
+        ticket = store.create_qa_request(
+            student_id=student["id"],
+            mentor_id=mentor["id"],
+            conversation_id=conv["id"],
+            message_id=msg["id"],
+            question="q?",
+        )
+        assert ticket["question"] == "q?"
+        fetched = store.get_qa_request(ticket["id"])
+        assert fetched["id"] == ticket["id"]
+
+        # cleanup
+        ConversationStore().delete_conversation(conv["id"])
+        user_store.delete_user(student["id"])
+        user_store.delete_user(mentor["id"])
+        KBStore().delete_kb("_ticket_split_kb")
+
+    def test_list_and_update_qa_request(self):
+        from src.storage.conversation_store import ConversationStore
+        from src.storage.kb_store import KBStore
+        from src.storage.ticket_store import TicketStore
+        from src.storage.user_store import UserStore
+
+        KBStore().create_kb("_ticket_list_kb")
+        user_store = UserStore()
+        student = user_store.create_user("_stu2_split", "hash", role="student")
+        mentor = user_store.create_user("_men2_split", "hash", role="teacher")
+        conv = ConversationStore().create_conversation("_ticket_list_kb", user_id=student["id"])
+        msg = ConversationStore().add_message(conv["id"], "user", "q?")
+
+        store = TicketStore()
+        ticket = store.create_qa_request(
+            student_id=student["id"],
+            mentor_id=mentor["id"],
+            conversation_id=conv["id"],
+            message_id=msg["id"],
+            question="q2?",
+        )
+        tickets = store.list_qa_requests(mentor_id=mentor["id"])
+        assert any(t["id"] == ticket["id"] for t in tickets)
+
+        updated = store.update_qa_request(ticket["id"], answer="A!", status="replied")
+        assert updated["status"] == "replied"
+        assert updated["answer"] == "A!"
+
+        # cleanup
+        ConversationStore().delete_conversation(conv["id"])
+        user_store.delete_user(student["id"])
+        user_store.delete_user(mentor["id"])
+        KBStore().delete_kb("_ticket_list_kb")
