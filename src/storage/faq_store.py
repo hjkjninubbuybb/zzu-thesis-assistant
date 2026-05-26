@@ -37,29 +37,28 @@ class FAQStore:
         Returns:
             新插入的 FAQ 行 dict。
         """
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                cur.execute(
-                    """INSERT INTO faqs
-                       (kb_name, question, answer, category, sort_order, enabled, vector_id, author_id, status, created_at, updated_at)
-                       VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s)""",
-                    (
-                        kb_name,
-                        question,
-                        answer,
-                        category,
-                        sort_order,
-                        vector_id,
-                        author_id,
-                        status,
-                        now,
-                        now,
-                    ),
-                )
-                conn.commit()
-                cur.execute("SELECT * FROM faqs WHERE id = %s", (cur.lastrowid,))
-                return cur.fetchone()
+        with get_conn() as conn, conn.cursor() as cur:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cur.execute(
+                """INSERT INTO faqs
+                   (kb_name, question, answer, category, sort_order, enabled, vector_id, author_id, status, created_at, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s)""",
+                (
+                    kb_name,
+                    question,
+                    answer,
+                    category,
+                    sort_order,
+                    vector_id,
+                    author_id,
+                    status,
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+            cur.execute("SELECT * FROM faqs WHERE id = %s", (cur.lastrowid,))
+            return cur.fetchone()
 
     def list_faqs(self, kb_name: str, enabled_only: bool = False, status: str | None = None) -> list[dict]:
         """列出知识库下的 FAQ 列表。
