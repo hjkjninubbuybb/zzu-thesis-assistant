@@ -195,6 +195,16 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消息表';
 
 
+-- ── 消息反馈 ──────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS message_feedback (
+    message_id BIGINT UNSIGNED PRIMARY KEY               COMMENT '关联消息ID',
+    rating     VARCHAR(20)     NOT NULL                  COMMENT '评分（thumbs_up/thumbs_down）',
+    created_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (message_id) REFERENCES conversation_messages(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消息反馈表';
+
+
 -- ── 毕设里程碑（权威时间线） ──────────────────────────────
 
 CREATE TABLE IF NOT EXISTS graduation_milestones (

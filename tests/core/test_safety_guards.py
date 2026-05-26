@@ -1,4 +1,4 @@
-"""Unit tests for RuleSafetyGuard.check() — all 24 rules."""
+"""Unit tests for RuleSafetyGuard.check() — all 23 rules."""
 
 import pytest
 

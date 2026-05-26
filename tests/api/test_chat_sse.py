@@ -58,7 +58,7 @@ def _mock_auth():
 @pytest.fixture()
 def client():
     """Return a TestClient for the FastAPI app."""
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app)
 
 
 @patch("src.api.routes.chat._ds")

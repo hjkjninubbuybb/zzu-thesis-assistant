@@ -20,7 +20,7 @@ class TestUserCRUD:
 
     def test_create_user_duplicate_raises(self, us):
         us.create_user("dup", "hash")
-        with pytest.raises(Exception):  # noqa: B017
+        with pytest.raises(Exception):  # noqa: B017  # pymysql raises IntegrityError on duplicate unique key
             us.create_user("dup", "hash")
 
     def test_get_user_by_username(self, us):

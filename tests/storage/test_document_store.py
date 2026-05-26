@@ -17,7 +17,7 @@ class TestKnowledgeBase:
 
     def test_create_kb_duplicate_raises(self, ds):
         ds.create_kb("dup_kb")
-        with pytest.raises(Exception):  # noqa: B017
+        with pytest.raises(Exception):  # noqa: B017  # pymysql raises IntegrityError on duplicate unique key
             ds.create_kb("dup_kb")
 
     def test_list_kbs_with_doc_count(self, ds):
