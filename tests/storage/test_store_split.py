@@ -1,5 +1,6 @@
 """Integration tests verifying each specialized store works independently."""
 
+from src.storage.doc_store import DocStore
 from src.storage.kb_store import KBStore
 from src.storage.settings_store import SettingsStore
 
@@ -47,3 +48,43 @@ class TestKBStore:
         store.create_kb("_split_del_kb")
         store.delete_kb("_split_del_kb")
         assert store.get_kb("_split_del_kb") is None
+
+
+class TestDocStore:
+    def test_add_and_get_document(self):
+        KBStore().create_kb("_doc_split_kb")
+        store = DocStore()
+        doc = store.add_document("_doc_split_kb", "test.txt", file_size=100)
+        assert doc["file_name"] == "test.txt"
+        fetched = store.get_document(doc["id"])
+        assert fetched["id"] == doc["id"]
+        KBStore().delete_kb("_doc_split_kb")
+
+    def test_list_documents(self):
+        KBStore().create_kb("_doc_list_kb")
+        store = DocStore()
+        store.add_document("_doc_list_kb", "a.txt")
+        store.add_document("_doc_list_kb", "b.txt")
+        docs = store.list_documents("_doc_list_kb")
+        names = [d["file_name"] for d in docs]
+        assert "a.txt" in names and "b.txt" in names
+        KBStore().delete_kb("_doc_list_kb")
+
+    def test_update_document_summary(self):
+        KBStore().create_kb("_doc_upd_kb")
+        store = DocStore()
+        doc = store.add_document("_doc_upd_kb", "upd.txt")
+        ok = store.update_document_summary(doc["id"], "new summary")
+        assert ok is True
+        fetched = store.get_document(doc["id"])
+        assert fetched["summary"] == "new summary"
+        KBStore().delete_kb("_doc_upd_kb")
+
+    def test_delete_document(self):
+        KBStore().create_kb("_doc_del_kb")
+        store = DocStore()
+        doc = store.add_document("_doc_del_kb", "del.txt")
+        deleted = store.delete_document(doc["id"])
+        assert deleted["id"] == doc["id"]
+        assert store.get_document(doc["id"]) is None
+        KBStore().delete_kb("_doc_del_kb")
