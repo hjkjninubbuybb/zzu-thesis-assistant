@@ -250,9 +250,11 @@ def _test_db_setup():
     )
     try:
         with schema_conn.cursor() as cur:
-            # Drop all tables first (reverse order) to ensure clean schema
-            for table in reversed(_TABLES):
+            # Drop all tables first with FK checks disabled to ensure clean schema
+            cur.execute("SET FOREIGN_KEY_CHECKS = 0")
+            for table in _TABLES:
                 cur.execute(f"DROP TABLE IF EXISTS `{table}`")
+            cur.execute("SET FOREIGN_KEY_CHECKS = 1")
             # Execute schema statements one by one
             for statement in _SCHEMA_SQL.split(";"):
                 statement = statement.strip()
