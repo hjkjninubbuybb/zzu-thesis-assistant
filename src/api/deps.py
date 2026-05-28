@@ -8,6 +8,7 @@ from fastapi import Depends
 
 from src.services.analytics_service import AnalyticsService
 from src.services.config_service import ConfigService
+from src.services.document_service import DocumentService
 from src.services.faq_service import FAQService
 from src.services.knowledge_service import KnowledgeService
 from src.services.ticket_service import TicketService
@@ -100,3 +101,11 @@ def get_user_service(
     user_store: UserStore = Depends(get_user_store),
 ) -> UserService:
     return UserService(user_store=user_store)
+
+
+def get_document_service(
+    doc_store: DocStore = Depends(get_doc_store),
+    kb_store: KBStore = Depends(get_kb_store),
+    vector_store: VectorStore = Depends(get_vector_store),
+) -> DocumentService:
+    return DocumentService(doc_store=doc_store, kb_store=kb_store, vector_store=vector_store)
