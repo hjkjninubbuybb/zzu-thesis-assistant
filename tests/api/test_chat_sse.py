@@ -1,13 +1,15 @@
 """Unit tests for the chat SSE endpoint in src/api/routes/chat.py."""
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from starlette.testclient import TestClient
 
 from src.api.app import app
 from src.api.auth import get_current_user
+from src.api.deps import get_chat_service
+from src.exceptions import KnowledgeBaseNotFoundError
 
 
 def _parse_sse(response) -> list[dict]:
@@ -36,11 +38,33 @@ def _parse_sse(response) -> list[dict]:
     return events
 
 
-def _make_valid_kb():
-    """Return a mock KB object that looks like a valid knowledge base."""
-    kb = MagicMock()
-    kb.name = "test_kb"
-    return kb
+def _make_mock_service(kb_name: str | None = "test_kb", stream_events: list | None = None):
+    """Create a mock ChatService with configurable behavior.
+
+    Args:
+        kb_name: Return value of resolve_kb_name (None raises KnowledgeBaseNotFoundError).
+        stream_events: List of event dicts yielded by stream_response.
+
+    Returns:
+        Mock ChatService instance.
+    """
+    svc = MagicMock()
+    if kb_name is None:
+        svc.resolve_kb_name.side_effect = KnowledgeBaseNotFoundError("知识库未配置")
+    else:
+        svc.resolve_kb_name.return_value = kb_name
+
+    async def _fake_stream(**_kwargs):
+        for ev in stream_events or []:
+            # 与真实 _evt() 保持一致：data 序列化为 JSON 字符串
+            data = ev.get("data", {})
+            yield {
+                "event": ev["event"],
+                "data": json.dumps(data, ensure_ascii=False) if isinstance(data, (dict, list)) else data,
+            }
+
+    svc.stream_response = _fake_stream
+    return svc
 
 
 @pytest.fixture(autouse=True)
@@ -61,214 +85,161 @@ def client():
     return TestClient(app)
 
 
-@patch("src.api.routes.chat._ds")
-def test_no_kb_configured_returns_403(mock_ds, client):
-    """When admin_kb setting is not configured, expect 403."""
-    mock_ds.get_setting.return_value = None
-    response = client.post("/api/chat", json={"query": "test", "history": []})
-    assert response.status_code == 403
+def test_no_kb_configured_returns_404(client):
+    """When KB is not configured, resolve_kb_name raises → expect 404."""
+    app.dependency_overrides[get_chat_service] = lambda: _make_mock_service(kb_name=None)
+    try:
+        response = client.post("/api/chat", json={"query": "test", "history": []})
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_chat_service, None)
 
 
-@patch("src.api.routes.chat._ds")
-def test_kb_not_found_returns_404(mock_ds, client):
-    """When the configured KB does not exist in the store, expect 404."""
-    mock_ds.get_setting.return_value = "missing_kb"
-    mock_ds.get_kb.return_value = None
-    response = client.post("/api/chat", json={"query": "test", "history": []})
-    assert response.status_code == 404
+def test_stream_events_passed_through(client):
+    """SSE events yielded by ChatService.stream_response are forwarded to client."""
+    events_to_yield = [
+        {"event": "status", "data": {"step": "faq_matching"}},
+        {"event": "token", "data": {"text": "Hello"}},
+        {"event": "answer", "data": {"text": "Hello"}},
+        {"event": "sources", "data": []},
+        {"event": "done", "data": {}},
+    ]
+    app.dependency_overrides[get_chat_service] = lambda: _make_mock_service(stream_events=events_to_yield)
+    try:
+        response = client.post("/api/chat", json={"query": "test", "history": []})
+        assert response.status_code == 200
+
+        parsed = _parse_sse(response)
+        event_types = [e["event"] for e in parsed]
+        assert "status" in event_types
+        assert "token" in event_types
+        assert "answer" in event_types
+        assert "done" in event_types
+    finally:
+        app.dependency_overrides.pop(get_chat_service, None)
 
 
-@patch("src.api.routes.chat.get_llm")
-@patch("src.api.routes.chat.faq_generate")
-@patch("src.api.routes.chat.try_faq_match")
-@patch("src.api.routes.chat._ds")
-def test_faq_hit_yields_correct_events(mock_ds, mock_try_faq, mock_faq_gen, mock_get_llm, client):
-    """FAQ path: check all expected SSE events appear and answer text is correct."""
-    mock_ds.get_setting.return_value = "test_kb"
-    mock_ds.get_kb.return_value = _make_valid_kb()
+def test_faq_status_events(client):
+    """FAQ path: status steps include faq_matching and faq_answering."""
+    events_to_yield = [
+        {"event": "status", "data": {"step": "faq_matching"}},
+        {"event": "status", "data": {"step": "faq_answering"}},
+        {"event": "token", "data": {"text": "FAQ Answer"}},
+        {"event": "answer", "data": {"text": "FAQ Answer"}},
+        {"event": "sources", "data": []},
+        {"event": "done", "data": {}},
+    ]
+    app.dependency_overrides[get_chat_service] = lambda: _make_mock_service(stream_events=events_to_yield)
+    try:
+        response = client.post("/api/chat", json={"query": "开题什么时候", "history": []})
+        assert response.status_code == 200
 
-    faq_results = [{"faq_id": 1, "question": "开题报告什么时候交？", "answer": "第一周", "score": 0.9}]
-    mock_try_faq.return_value = faq_results
-    mock_faq_gen.return_value = "FAQ Answer"
+        parsed = _parse_sse(response)
+        status_events = [e for e in parsed if e["event"] == "status"]
+        steps = [e["data"].get("step") for e in status_events if isinstance(e["data"], dict)]
+        assert "faq_matching" in steps
+        assert "faq_answering" in steps
 
-    # Mock LLM for suggestion generation
-    mock_llm = MagicMock()
-    mock_resp = MagicMock()
-    mock_resp.content = "追问1\n追问2"
-    mock_llm.invoke.return_value = mock_resp
-    mock_get_llm.return_value = mock_llm
-
-    response = client.post("/api/chat", json={"query": "开题什么时候", "history": []})
-    assert response.status_code == 200
-
-    events = _parse_sse(response)
-    event_types = [e["event"] for e in events]
-
-    assert "status" in event_types
-    assert "token" in event_types
-    assert "answer" in event_types
-    assert "sources" in event_types
-    assert "done" in event_types
-
-    # Check status steps include faq_matching and faq_answering
-    status_events = [e for e in events if e["event"] == "status"]
-    steps = [e["data"].get("step") for e in status_events if isinstance(e["data"], dict)]
-    assert "faq_matching" in steps
-    assert "faq_answering" in steps
-
-    # Check answer event has the correct text
-    answer_events = [e for e in events if e["event"] == "answer"]
-    assert len(answer_events) >= 1
-    assert answer_events[0]["data"]["text"] == "FAQ Answer"
+        answer_events = [e for e in parsed if e["event"] == "answer"]
+        assert len(answer_events) >= 1
+        assert answer_events[0]["data"]["text"] == "FAQ Answer"
+    finally:
+        app.dependency_overrides.pop(get_chat_service, None)
 
 
-@patch("src.api.routes.chat.build_orchestrator")
-@patch("src.api.routes.chat.faq_generate")
-@patch("src.api.routes.chat.try_faq_match")
-@patch("src.api.routes.chat._ds")
-def test_faq_fallback_to_rag(mock_ds, mock_try_faq, mock_faq_gen, mock_build_orch, client):
-    """When faq_generate returns None (FALLBACK), the RAG path should be triggered."""
-    mock_ds.get_setting.return_value = "test_kb"
-    mock_ds.get_kb.return_value = _make_valid_kb()
+def test_rag_token_events(client):
+    """RAG path: token events are streamed and answer is concatenated."""
+    events_to_yield = [
+        {"event": "status", "data": {"step": "building_retriever"}},
+        {"event": "status", "data": {"step": "running_rag"}},
+        {"event": "token", "data": {"text": "Hello"}},
+        {"event": "token", "data": {"text": " World"}},
+        {"event": "sources", "data": []},
+        {"event": "answer", "data": {"text": "Hello World"}},
+        {"event": "done", "data": {}},
+    ]
+    app.dependency_overrides[get_chat_service] = lambda: _make_mock_service(stream_events=events_to_yield)
+    try:
+        response = client.post("/api/chat", json={"query": "what is rag", "history": []})
+        assert response.status_code == 200
 
-    faq_results = [{"faq_id": 1, "question": "Q?", "answer": "A", "score": 0.85}]
-    mock_try_faq.return_value = faq_results
-    mock_faq_gen.return_value = None  # triggers FALLBACK to RAG
+        parsed = _parse_sse(response)
+        status_events = [e for e in parsed if e["event"] == "status"]
+        steps = [e["data"].get("step") for e in status_events if isinstance(e["data"], dict)]
+        assert "building_retriever" in steps
+        assert "running_rag" in steps
 
-    # Build a mock orchestrator that streams agent_action and token
-    mock_orchestrator = MagicMock()
-    mock_orchestrator.stream.return_value = iter(
-        [
-            {"type": "agent_action", "tool": "search_knowledge_base", "input": "query"},
-            {"type": "token", "content": "RAG response"},
-            {
-                "type": "sources",
-                "nodes": [{"node_id": "n1", "text": "some text", "source_file": "doc.pdf", "score": 0.8}],
-            },
-        ]
-    )
-    mock_build_orch.return_value = mock_orchestrator
+        token_events = [e for e in parsed if e["event"] == "token"]
+        assert len(token_events) == 2
+        assert token_events[0]["data"]["text"] == "Hello"
+        assert token_events[1]["data"]["text"] == " World"
 
-    response = client.post("/api/chat", json={"query": "complex question", "history": []})
-    assert response.status_code == 200
-
-    events = _parse_sse(response)
-    event_types = [e["event"] for e in events]
-
-    # Should have gone through RAG path — expect agent_action and token
-    assert "agent_action" in event_types
-    assert "token" in event_types
-    assert "done" in event_types
-
-    # Verify agent_action tool name
-    agent_events = [e for e in events if e["event"] == "agent_action"]
-    assert agent_events[0]["data"]["tool"] == "search_knowledge_base"
+        answer_events = [e for e in parsed if e["event"] == "answer"]
+        assert answer_events[0]["data"]["text"] == "Hello World"
+    finally:
+        app.dependency_overrides.pop(get_chat_service, None)
 
 
-@patch("src.api.routes.chat.build_orchestrator")
-@patch("src.api.routes.chat.try_faq_match")
-@patch("src.api.routes.chat._ds")
-def test_rag_path_no_faq(mock_ds, mock_try_faq, mock_build_orch, client):
-    """When FAQ returns no match, go straight to RAG and check token + answer events."""
-    mock_ds.get_setting.return_value = "test_kb"
-    mock_ds.get_kb.return_value = _make_valid_kb()
-    mock_try_faq.return_value = None  # no FAQ match
+def test_agent_action_event(client):
+    """agent_action events are forwarded from ChatService to SSE stream."""
+    events_to_yield = [
+        {"event": "agent_action", "data": {"tool": "search_knowledge_base", "input": "query"}},
+        {"event": "token", "data": {"text": "RAG response"}},
+        {"event": "sources", "data": []},
+        {"event": "answer", "data": {"text": "RAG response"}},
+        {"event": "done", "data": {}},
+    ]
+    app.dependency_overrides[get_chat_service] = lambda: _make_mock_service(stream_events=events_to_yield)
+    try:
+        response = client.post("/api/chat", json={"query": "complex question", "history": []})
+        assert response.status_code == 200
 
-    mock_orchestrator = MagicMock()
-    mock_orchestrator.stream.return_value = iter(
-        [
-            {"type": "token", "content": "Hello"},
-            {"type": "token", "content": " World"},
-            {"type": "sources", "nodes": []},
-        ]
-    )
-    mock_build_orch.return_value = mock_orchestrator
-
-    response = client.post("/api/chat", json={"query": "what is rag", "history": []})
-    assert response.status_code == 200
-
-    events = _parse_sse(response)
-
-    # Should have building_retriever and running_rag status events
-    status_events = [e for e in events if e["event"] == "status"]
-    steps = [e["data"].get("step") for e in status_events if isinstance(e["data"], dict)]
-    assert "building_retriever" in steps
-    assert "running_rag" in steps
-
-    # Check token events
-    token_events = [e for e in events if e["event"] == "token"]
-    assert len(token_events) == 2
-    assert token_events[0]["data"]["text"] == "Hello"
-    assert token_events[1]["data"]["text"] == " World"
-
-    # Check answer is concatenated tokens
-    answer_events = [e for e in events if e["event"] == "answer"]
-    assert len(answer_events) >= 1
-    assert answer_events[0]["data"]["text"] == "Hello World"
+        parsed = _parse_sse(response)
+        agent_events = [e for e in parsed if e["event"] == "agent_action"]
+        assert len(agent_events) >= 1
+        assert agent_events[0]["data"]["tool"] == "search_knowledge_base"
+    finally:
+        app.dependency_overrides.pop(get_chat_service, None)
 
 
-@patch("src.api.routes.chat.build_orchestrator")
-@patch("src.api.routes.chat.try_faq_match")
-@patch("src.api.routes.chat._ds")
-def test_file_event_cleans_markdown_links(mock_ds, mock_try_faq, mock_build_orch, client):
-    """When file events are present, markdown links in answer text should be stripped."""
-    mock_ds.get_setting.return_value = "test_kb"
-    mock_ds.get_kb.return_value = _make_valid_kb()
-    mock_try_faq.return_value = None
+def test_file_event_forwarded(client):
+    """File events yielded by ChatService are forwarded to the SSE stream."""
+    events_to_yield = [
+        {"event": "token", "data": {"text": "下载开题报告模板使用"}},
+        {
+            "event": "file",
+            "data": {"file_name": "开题报告模板.docx", "url": "http://example.com/file.docx", "size_kb": 50},
+        },
+        {"event": "sources", "data": []},
+        {"event": "answer", "data": {"text": "下载开题报告模板使用"}},
+        {"event": "done", "data": {}},
+    ]
+    app.dependency_overrides[get_chat_service] = lambda: _make_mock_service(stream_events=events_to_yield)
+    try:
+        response = client.post("/api/chat", json={"query": "下载开题报告", "history": []})
+        assert response.status_code == 200
 
-    mock_orchestrator = MagicMock()
-    mock_orchestrator.stream.return_value = iter(
-        [
-            {"type": "token", "content": "下载 [开题报告模板](http://example.com/file.docx) 使用"},
-            {"type": "file", "file_name": "开题报告模板.docx", "url": "http://example.com/file.docx", "size_kb": 50},
-            {"type": "sources", "nodes": []},
-        ]
-    )
-    mock_build_orch.return_value = mock_orchestrator
-
-    response = client.post("/api/chat", json={"query": "下载开题报告", "history": []})
-    assert response.status_code == 200
-
-    events = _parse_sse(response)
-
-    # Check file event was emitted
-    file_events = [e for e in events if e["event"] == "file"]
-    assert len(file_events) == 1
-    assert file_events[0]["data"]["file_name"] == "开题报告模板.docx"
-
-    # Check answer text has markdown link cleaned: [text](url) → text
-    answer_events = [e for e in events if e["event"] == "answer"]
-    assert len(answer_events) >= 1
-    answer_text = answer_events[0]["data"]["text"]
-    # The markdown link should be removed, leaving just the link text
-    assert "[" not in answer_text
-    assert "](http://example.com/file.docx)" not in answer_text
-    assert "开题报告模板" in answer_text
+        parsed = _parse_sse(response)
+        file_events = [e for e in parsed if e["event"] == "file"]
+        assert len(file_events) == 1
+        assert file_events[0]["data"]["file_name"] == "开题报告模板.docx"
+    finally:
+        app.dependency_overrides.pop(get_chat_service, None)
 
 
-@patch("src.api.routes.chat.build_orchestrator")
-@patch("src.api.routes.chat.try_faq_match")
-@patch("src.api.routes.chat._ds")
-def test_orchestrator_error_event(mock_ds, mock_try_faq, mock_build_orch, client):
-    """When orchestrator streams an error item, SSE should emit an error event."""
-    mock_ds.get_setting.return_value = "test_kb"
-    mock_ds.get_kb.return_value = _make_valid_kb()
-    mock_try_faq.return_value = None
+def test_error_event_forwarded(client):
+    """Error events yielded by ChatService are forwarded to the SSE stream."""
+    events_to_yield = [
+        {"event": "error", "data": {"message": "检索失败，请稍后重试"}},
+    ]
+    app.dependency_overrides[get_chat_service] = lambda: _make_mock_service(stream_events=events_to_yield)
+    try:
+        response = client.post("/api/chat", json={"query": "some question", "history": []})
+        assert response.status_code == 200
 
-    mock_orchestrator = MagicMock()
-    mock_orchestrator.stream.return_value = iter(
-        [
-            {"type": "error", "message": "检索失败，请稍后重试"},
-        ]
-    )
-    mock_build_orch.return_value = mock_orchestrator
-
-    response = client.post("/api/chat", json={"query": "some question", "history": []})
-    assert response.status_code == 200
-
-    events = _parse_sse(response)
-    event_types = [e["event"] for e in events]
-
-    assert "error" in event_types
-    error_events = [e for e in events if e["event"] == "error"]
-    assert error_events[0]["data"]["message"] == "检索失败，请稍后重试"
+        parsed = _parse_sse(response)
+        error_events = [e for e in parsed if e["event"] == "error"]
+        assert len(error_events) >= 1
+        assert error_events[0]["data"]["message"] == "检索失败，请稍后重试"
+    finally:
+        app.dependency_overrides.pop(get_chat_service, None)
