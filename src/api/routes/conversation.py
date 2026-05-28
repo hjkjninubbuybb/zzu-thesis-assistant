@@ -1,11 +1,11 @@
 """对话历史管理接口。"""
 
-import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.api.auth import get_current_user
+from src.api.deps import get_conversation_service
 from src.api.schemas import (
     ConversationCreate,
     ConversationInfo,
@@ -16,25 +16,35 @@ from src.api.schemas import (
     PaginatedConversations,
     SaveMessageRequest,
 )
-from src.core.llm_factory import get_llm
-from src.storage.document_store import DocumentStore
+from src.services.conversation_service import (
+    ConversationNotFoundError,
+    ConversationService,
+    KnowledgeBaseNotFoundError,
+)
 
 router = APIRouter(prefix="/api/conversation", tags=["conversation"])
 logger = logging.getLogger(__name__)
 
-_ds = DocumentStore()
+
+def _check_student_access(current_user: dict, conv: dict) -> None:
+    if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="无权访问此对话")
 
 
 # ── 对话 CRUD ─────────────────────────────────────────────
 
 
 @router.post("", response_model=ConversationInfo)
-def create_conversation(body: ConversationCreate, current_user: dict = Depends(get_current_user)):
+def create_conversation(
+    body: ConversationCreate,
+    current_user: dict = Depends(get_current_user),
+    svc: ConversationService = Depends(get_conversation_service),
+):
     """创建新对话。"""
-    if not _ds.get_kb(body.kb_name):
-        raise HTTPException(status_code=404, detail=f"知识库 '{body.kb_name}' 不存在")
-    row = _ds.create_conversation(body.kb_name, body.title, user_id=current_user["id"])
-    return row
+    try:
+        return svc.create_conversation(body.kb_name, body.title, current_user["id"])
+    except KnowledgeBaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.get("", response_model=PaginatedConversations)
@@ -44,10 +54,11 @@ def list_conversations(
     cursor_updated_at: str | None = Query(default=None),
     limit: int = Query(default=30, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
+    svc: ConversationService = Depends(get_conversation_service),
 ):
     """列出对话（游标分页）。学生只看自己的，管理员/教师看所有。"""
     user_id = None if current_user["role"] in ("admin", "teacher") else current_user["id"]
-    return _ds.list_conversations(
+    return svc.list_conversations(
         kb_name=kb_name,
         user_id=user_id,
         limit=limit,
@@ -57,19 +68,18 @@ def list_conversations(
 
 
 @router.get("/{conv_id}")
-def get_conversation(conv_id: int, current_user: dict = Depends(get_current_user)):
+def get_conversation(
+    conv_id: int,
+    current_user: dict = Depends(get_current_user),
+    svc: ConversationService = Depends(get_conversation_service),
+):
     """获取单个对话及其消息列表。"""
-    conv = _ds.get_conversation(conv_id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="对话不存在")
-    # 学生只能查看自己的对话
-    if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权访问此对话")
-    messages = _ds.list_messages(conv_id)
-    for msg in messages:
-        fb = _ds.get_message_feedback(msg["id"])
-        msg["feedback"] = fb["rating"] if fb else None
-    return {"conversation": conv, "messages": messages}
+    try:
+        conv = svc.get_conversation(conv_id)
+    except ConversationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    _check_student_access(current_user, conv)
+    return {"conversation": conv, "messages": svc.list_messages(conv_id)}
 
 
 @router.put("/{conv_id}/title", response_model=ConversationInfo)
@@ -77,80 +87,45 @@ def update_title(
     conv_id: int,
     body: ConversationTitleUpdate,
     current_user: dict = Depends(get_current_user),
+    svc: ConversationService = Depends(get_conversation_service),
 ):
     """更新对话标题（用户手动重命名）。"""
-    conv = _ds.get_conversation(conv_id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="对话不存在")
-    if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权修改此对话")
-    row = _ds.update_conversation_title(conv_id, body.title.strip())
-    return row
-
-
-# ── 标题总结 ─────────────────────────────────────────────
-
-_TITLE_SYSTEM_PROMPT = """你是一个对话标题生成助手。你的任务是根据用户的第一轮提问和助手的回答，生成一个简短、精准、有辨识度的中文标题。
-
-要求：
-1. 标题 6-14 个汉字，概括核心话题，不要出现"关于"、"如何"、"问题"等冗余词
-2. 必须是陈述性名词短语，不能是完整句子，不能带标点符号
-3. 如果用户问题涉及具体文档/表格/流程/截止时间/学院/专业等关键信息，优先保留这些关键词
-4. 如果首轮只是寒暄（如"你好"、"在吗"），返回"闲聊"两个字
-5. 直接输出标题本身，不要加任何解释、引号、前后缀"""
-
-
-def _generate_title(user_text: str, assistant_text: str) -> str:
-    """用快速 LLM 为首轮对话生成语义化标题，失败时回退为前 20 字。"""
     try:
-        llm = get_llm(fast=True, streaming=False)
-        prompt = (
-            f"{_TITLE_SYSTEM_PROMPT}\n\n"
-            f"【用户提问】\n{user_text}\n\n"
-            f"【助手回答】\n{assistant_text or '（尚无回答）'}\n\n"
-            f"请直接输出标题："
-        )
-        resp = llm.invoke(prompt)
-        title = (getattr(resp, "content", "") or "").strip().strip('"\'""。 \n\t')
-        if len(title) > 20:
-            title = title[:20]
-        return title or user_text[:20] or "新对话"
-    except Exception as e:
-        logger.warning("[summarize_title] LLM 调用失败: %s", e)
-        return user_text[:20] or "新对话"
+        conv = svc.get_conversation(conv_id)
+        _check_student_access(current_user, conv)
+        return svc.update_title(conv_id, body.title.strip())
+    except ConversationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.post("/{conv_id}/summarize-title", response_model=ConversationInfo)
-def summarize_title(conv_id: int, current_user: dict = Depends(get_current_user)):
-    """基于首轮对话自动生成语义化标题（fast LLM）。"""
-    conv = _ds.get_conversation(conv_id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="对话不存在")
-    if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权修改此对话")
-    messages = _ds.list_messages(conv_id)
-    if not messages:
-        raise HTTPException(status_code=400, detail="对话尚无消息，无法总结标题")
-    first_user = next((m for m in messages if m["role"] == "user"), None)
-    if not first_user:
-        raise HTTPException(status_code=400, detail="对话缺少用户提问")
-    first_asst = next((m for m in messages if m["role"] == "assistant"), None)
-    user_text = (first_user["content"] or "").strip()[:500]
-    asst_text = ((first_asst["content"] if first_asst else "") or "").strip()[:500]
-    title = _generate_title(user_text, asst_text)
-    logger.info("[summarize_title] conv_id=%d title=%s", conv_id, title)
-    return _ds.update_conversation_title(conv_id, title)
+def summarize_title(
+    conv_id: int,
+    current_user: dict = Depends(get_current_user),
+    svc: ConversationService = Depends(get_conversation_service),
+):
+    """基于首轮对话自动生成语义化标题（快速 LLM）。"""
+    try:
+        conv = svc.get_conversation(conv_id)
+        _check_student_access(current_user, conv)
+        return svc.generate_title(conv_id)
+    except ConversationNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.delete("/{conv_id}", response_model=MessageResponse)
-def delete_conversation(conv_id: int, current_user: dict = Depends(get_current_user)):
+def delete_conversation(
+    conv_id: int,
+    current_user: dict = Depends(get_current_user),
+    svc: ConversationService = Depends(get_conversation_service),
+):
     """删除对话及其所有消息。"""
-    conv = _ds.get_conversation(conv_id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="对话不存在")
-    if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权删除此对话")
-    _ds.delete_conversation(conv_id)
+    try:
+        conv = svc.get_conversation(conv_id)
+        _check_student_access(current_user, conv)
+        svc.delete_conversation(conv_id)
+    except ConversationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     return {"message": "对话已删除"}
 
 
@@ -162,20 +137,15 @@ def add_message(
     conv_id: int,
     body: SaveMessageRequest,
     current_user: dict = Depends(get_current_user),
+    svc: ConversationService = Depends(get_conversation_service),
 ):
     """保存一条消息到对话。"""
-    conv = _ds.get_conversation(conv_id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="对话不存在")
-    if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权访问此对话")
-    sources_json = json.dumps(body.sources, ensure_ascii=False) if body.sources else None
-    files_json = json.dumps(body.files, ensure_ascii=False) if body.files else None
-    row = _ds.add_message(conv_id, body.role, body.content, sources_json, files_json)
-    row["sources"] = body.sources
-    row["files"] = body.files
-    row["feedback"] = None
-    return row
+    try:
+        conv = svc.get_conversation(conv_id)
+    except ConversationNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    _check_student_access(current_user, conv)
+    return svc.add_message(conv_id, body.role, body.content, body.sources, body.files)
 
 
 # ── 反馈 ──────────────────────────────────────────────────
@@ -186,7 +156,8 @@ def submit_feedback(
     message_id: int,
     body: FeedbackRequest,
     current_user: dict = Depends(get_current_user),
+    svc: ConversationService = Depends(get_conversation_service),
 ):
     """对一条消息提交反馈（👍/👎）。"""
-    row = _ds.set_message_feedback(message_id, body.rating)
+    row = svc.set_feedback(message_id, body.rating)
     return {"message_id": message_id, "rating": row["rating"]}

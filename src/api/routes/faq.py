@@ -2,10 +2,11 @@
 
 import asyncio
 import logging
+import urllib.parse
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi import Query as QueryParam
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 
 from src.api.auth import get_current_user, require_teacher_or_admin
 from src.api.deps import get_faq_service
@@ -116,15 +117,28 @@ async def delete_faq(
 # ── Excel 导入/导出端点 ────────────────────────────────────
 
 
+_XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx_response(content: bytes, filename: str) -> Response:
+    encoded = urllib.parse.quote(filename)
+    return Response(
+        content=content,
+        media_type=_XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
+    )
+
+
 @router.get("/{kb_name}/template")
 async def download_faq_template(
     kb_name: str,
     current_user: dict = Depends(require_teacher_or_admin),
     svc: FAQService = Depends(get_faq_service),
-) -> StreamingResponse:
+) -> Response:
     """下载 FAQ Excel 导入模板（含表头和示例行）。"""
     try:
-        return await asyncio.to_thread(svc.get_template, kb_name)
+        content, filename = await asyncio.to_thread(svc.get_template, kb_name)
+        return _xlsx_response(content, filename)
     except KnowledgeBaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -134,10 +148,11 @@ async def export_faqs_excel(
     kb_name: str,
     current_user: dict = Depends(require_teacher_or_admin),
     svc: FAQService = Depends(get_faq_service),
-) -> StreamingResponse:
+) -> Response:
     """导出知识库所有 FAQ 为 Excel 文件。"""
     try:
-        return await asyncio.to_thread(svc.export_to_xlsx, kb_name)
+        content, filename = await asyncio.to_thread(svc.export_to_xlsx, kb_name)
+        return _xlsx_response(content, filename)
     except KnowledgeBaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 

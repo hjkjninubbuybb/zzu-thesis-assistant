@@ -1,9 +1,11 @@
 """用户管理路由（管理员/教师用）：学生账号 CRUD、档案管理。"""
 
 import logging
+import urllib.parse
 from datetime import date
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response
 
 from src.api.auth import get_current_user, hash_password, require_admin, require_teacher_or_admin
 from src.api.deps import get_user_service
@@ -17,18 +19,30 @@ from src.api.schemas import (
     UserInfo,
     UserUpdate,
 )
-from src.core.user_import import (
+from src.exceptions import UserNotFoundError
+from src.services.user_import import (
     build_relations_template_workbook,
     build_student_workbook,
     build_teacher_workbook,
-    make_xlsx_response,
     random_password,
+    workbook_to_bytes,
 )
-from src.exceptions import UserNotFoundError
 from src.services.user_service import UserService
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 logger = logging.getLogger(__name__)
+
+
+_XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx_response(wb: object, filename: str) -> Response:
+    encoded = urllib.parse.quote(filename)
+    return Response(
+        content=workbook_to_bytes(wb),  # type: ignore[arg-type]
+        media_type=_XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
+    )
 
 
 def _to_user_info(user: dict, profile: dict | None = None) -> dict:
@@ -181,7 +195,7 @@ def reset_password(
 def download_student_template(current_user: dict = Depends(require_teacher_or_admin)):
     """下载学生批量导入模板。"""
     wb = build_student_workbook(rows=None)
-    return make_xlsx_response(wb, "学生账号导入模板.xlsx")
+    return _xlsx_response(wb, "学生账号导入模板.xlsx")
 
 
 @router.get("/students/export")
@@ -192,7 +206,7 @@ def export_students_excel(
     """导出所有学生账号为 Excel。"""
     rows = svc.export_students()
     filename = f"学生账号_{date.today().strftime('%Y%m%d')}.xlsx"
-    return make_xlsx_response(build_student_workbook(rows), filename)
+    return _xlsx_response(build_student_workbook(rows), filename)
 
 
 @router.post("/students/import")
@@ -222,7 +236,7 @@ async def import_students_excel(
 def download_relations_template(current_user: dict = Depends(require_teacher_or_admin)):
     """下载师生关系批量导入模板。"""
     wb = build_relations_template_workbook()
-    return make_xlsx_response(wb, "师生关系导入模板.xlsx")
+    return _xlsx_response(wb, "师生关系导入模板.xlsx")
 
 
 @router.post("/mentors/relations/import")
@@ -248,7 +262,7 @@ async def import_mentor_relations(
 def download_teacher_template(current_user: dict = Depends(require_admin)):
     """下载教师批量导入模板。"""
     wb = build_teacher_workbook(rows=None)
-    return make_xlsx_response(wb, "教师账号导入模板.xlsx")
+    return _xlsx_response(wb, "教师账号导入模板.xlsx")
 
 
 @router.get("/teachers/export")
@@ -259,7 +273,7 @@ def export_teachers_excel(
     """导出所有教师账号。"""
     rows = svc.export_teachers()
     filename = f"教师账号_{date.today().strftime('%Y%m%d')}.xlsx"
-    return make_xlsx_response(build_teacher_workbook(rows), filename)
+    return _xlsx_response(build_teacher_workbook(rows), filename)
 
 
 @router.post("/teachers/import")

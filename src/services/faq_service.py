@@ -1,19 +1,17 @@
 """FAQ 业务逻辑服务层。
 
 职责：封装 FAQ 的 CRUD、向量同步、Excel 导入导出和语义搜索全部业务逻辑。
-本模块不包含任何 FastAPI / HTTP 相关导入（StreamingResponse 除外，用于流式文件响应）。
+本模块不包含任何 FastAPI / HTTP 相关导入。
 """
 
 import io
 import logging
-import urllib.parse
 import uuid
 import zipfile
 from datetime import date
 
 import pymysql
 from dashscope.common.error import DashScopeException
-from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 
 from src.core.faq_match import rewrite_query as _rewrite_query
@@ -350,14 +348,14 @@ class FAQService(BaseService):
 
     # ── Excel 导出 ────────────────────────────────────────────
 
-    def export_to_xlsx(self, kb_name: str) -> StreamingResponse:
-        """导出知识库所有 FAQ 为 Excel StreamingResponse。
+    def export_to_xlsx(self, kb_name: str) -> tuple[bytes, str]:
+        """导出知识库所有 FAQ 为 Excel 文件字节。
 
         Args:
             kb_name: 知识库名称。
 
         Returns:
-            包含 .xlsx 文件内容的 StreamingResponse。
+            (文件字节, 文件名) 元组。
 
         Raises:
             KnowledgeBaseNotFoundError: 知识库不存在。
@@ -366,23 +364,23 @@ class FAQService(BaseService):
         faqs = self._faq_store.list_faqs(kb_name)
         wb: Workbook = build_faq_workbook(faqs=faqs)
         filename = f"{kb_name}_FAQ_{date.today().strftime('%Y%m%d')}.xlsx"
-        return _make_xlsx_response(wb, filename)
+        return _make_xlsx_bytes(wb), filename
 
-    def get_template(self, kb_name: str) -> StreamingResponse:
-        """下载 FAQ Excel 导入模板（含表头和示例行）。
+    def get_template(self, kb_name: str) -> tuple[bytes, str]:
+        """下载 FAQ Excel 导入模板（含表头和示例行）字节。
 
         Args:
             kb_name: 知识库名称（用于存在性校验）。
 
         Returns:
-            包含模板 .xlsx 文件内容的 StreamingResponse。
+            (文件字节, 文件名) 元组。
 
         Raises:
             KnowledgeBaseNotFoundError: 知识库不存在。
         """
         self._require_kb(kb_name)
         wb: Workbook = build_faq_workbook(faqs=None)
-        return _make_xlsx_response(wb, "FAQ_导入模板.xlsx")
+        return _make_xlsx_bytes(wb), "FAQ_导入模板.xlsx"
 
     # ── 语义搜索 ─────────────────────────────────────────────
 
@@ -476,22 +474,15 @@ class FAQService(BaseService):
 # ── 模块级工具函数 ────────────────────────────────────────────
 
 
-def _make_xlsx_response(wb: Workbook, filename: str) -> StreamingResponse:
-    """将 openpyxl Workbook 转为 StreamingResponse。
+def _make_xlsx_bytes(wb: Workbook) -> bytes:
+    """将 openpyxl Workbook 序列化为字节。
 
     Args:
         wb: openpyxl Workbook 实例。
-        filename: 下载文件名（支持中文，自动 URL 编码）。
 
     Returns:
-        StreamingResponse，Content-Type 为 xlsx。
+        .xlsx 文件内容字节。
     """
     stream = io.BytesIO()
     wb.save(stream)
-    stream.seek(0)
-    encoded = urllib.parse.quote(filename)
-    return StreamingResponse(
-        stream,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
-    )
+    return stream.getvalue()

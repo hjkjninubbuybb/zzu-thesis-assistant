@@ -130,6 +130,19 @@ class UserService(BaseService):
             raise UserNotFoundError(f"用户 {user_id} 不存在")
         self._user_store.delete_user(user_id)
 
+    def add_login_log(self, user_id: int, ip_addr: str = "", user_agent: str = "") -> None:
+        """记录用户登录日志（失败时静默忽略）。
+
+        Args:
+            user_id: 用户 ID。
+            ip_addr: 客户端 IP 地址。
+            user_agent: User-Agent 字符串。
+        """
+        try:
+            self._user_store.add_login_log(user_id, ip_addr, user_agent)
+        except Exception as e:
+            logger.warning("[UserService] 记录登录日志失败: %s", e)
+
     # ── 档案操作 ──────────────────────────────────────────────
 
     def get_profile(self, user: dict) -> dict | None:
