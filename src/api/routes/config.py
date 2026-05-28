@@ -105,6 +105,29 @@ def read_config(
     return svc.read_config()
 
 
+def _config_update_payload(body: ConfigUpdate) -> dict:
+    """将 ConfigUpdate 模型转换为服务层期望的 dict。"""
+    splitter_dict = body.splitter.model_dump(exclude_none=True) if body.splitter is not None else None
+    return {
+        "llm_base_url": body.llm_base_url,
+        "llm_model": body.llm_model,
+        "llm_fast_model": body.llm_fast_model,
+        "embedding_model": body.embedding_model,
+        "splitter": splitter_dict,
+        "vector_top_k": body.vector_top_k,
+        "bm25_top_k": body.bm25_top_k,
+        "hybrid_top_k": body.hybrid_top_k,
+        "rrf_k": body.rrf_k,
+        "query_enhance": body.query_enhance,
+        "protect_raw_top_n": body.protect_raw_top_n,
+        "reranker_model": body.reranker_model,
+        "reranker_top_n": body.reranker_top_n,
+        "max_reformulations": body.max_reformulations,
+        "agent_recursion_limit": body.agent_recursion_limit,
+        "agent_retry_count": body.agent_retry_count,
+    }
+
+
 @router.post("")
 def update_config(
     body: ConfigUpdate,
@@ -112,28 +135,6 @@ def update_config(
     svc: ConfigService = Depends(get_config_service),
 ) -> dict:
     try:
-        splitter_dict = None
-        if body.splitter is not None:
-            splitter_dict = body.splitter.model_dump(exclude_none=True)
-        return svc.update_config(
-            {
-                "llm_base_url": body.llm_base_url,
-                "llm_model": body.llm_model,
-                "llm_fast_model": body.llm_fast_model,
-                "embedding_model": body.embedding_model,
-                "splitter": splitter_dict,
-                "vector_top_k": body.vector_top_k,
-                "bm25_top_k": body.bm25_top_k,
-                "hybrid_top_k": body.hybrid_top_k,
-                "rrf_k": body.rrf_k,
-                "query_enhance": body.query_enhance,
-                "protect_raw_top_n": body.protect_raw_top_n,
-                "reranker_model": body.reranker_model,
-                "reranker_top_n": body.reranker_top_n,
-                "max_reformulations": body.max_reformulations,
-                "agent_recursion_limit": body.agent_recursion_limit,
-                "agent_retry_count": body.agent_retry_count,
-            }
-        )
+        return svc.update_config(_config_update_payload(body))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

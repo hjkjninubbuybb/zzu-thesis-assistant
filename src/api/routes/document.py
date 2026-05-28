@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import urllib.parse
+from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import (
@@ -116,6 +117,37 @@ async def reindex_document_endpoint(
         raise HTTPException(status_code=500, detail=f"重新索引失败: {e}") from e
 
 
+async def _run_upload_and_clean(
+    svc: DocumentService,
+    kb_name: str,
+    content_bytes: bytes,
+    filename: str,
+    splitter_type: str,
+    chunk_size: int,
+    chunk_overlap_ratio: float,
+    doc_type: str,
+) -> dict:
+    """在线程中执行 upload_and_clean，统一转换服务层异常。"""
+    try:
+        return await asyncio.to_thread(
+            svc.upload_and_clean,
+            kb_name,
+            content_bytes,
+            filename,
+            splitter_type,
+            chunk_size,
+            chunk_overlap_ratio,
+            doc_type,
+        )
+    except UnsupportedFileTypeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileTooLargeError as e:
+        raise HTTPException(status_code=413, detail=str(e)) from e
+    except Exception as e:
+        logger.error("[%s] upload_and_clean 失败: %s", kb_name, e)
+        raise HTTPException(status_code=500, detail=f"上传失败: {e}") from e
+
+
 @router.post("/{kb_name}/upload-and-clean", response_model=CleanResult)
 async def upload_and_clean(
     kb_name: str,
@@ -129,24 +161,16 @@ async def upload_and_clean(
 ):
     """上传文件 → 解析 → 清洗 → 返回清洗文本供审核。"""
     content_bytes = await file.read()
-    try:
-        result = await asyncio.to_thread(
-            svc.upload_and_clean,
-            kb_name,
-            content_bytes,
-            file.filename or "upload",
-            splitter_type,
-            chunk_size,
-            chunk_overlap_ratio,
-            doc_type,
-        )
-    except UnsupportedFileTypeError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except FileTooLargeError as e:
-        raise HTTPException(status_code=413, detail=str(e)) from e
-    except Exception as e:
-        logger.error("[%s] upload_and_clean 失败: %s", kb_name, e)
-        raise HTTPException(status_code=500, detail=f"上传失败: {e}") from e
+    result = await _run_upload_and_clean(
+        svc,
+        kb_name,
+        content_bytes,
+        file.filename or "upload",
+        splitter_type,
+        chunk_size,
+        chunk_overlap_ratio,
+        doc_type,
+    )
     return CleanResult(**result)
 
 
@@ -218,6 +242,41 @@ async def get_review_detail(
     )
 
 
+@dataclass
+class _UploadParams:
+    kb_name: str
+    splitter_type: str
+    chunk_size: int
+    chunk_overlap_ratio: float
+    enable_cleaning: bool
+    doc_type: str
+
+
+async def _run_upload_document(svc: DocumentService, tmp_path: Path, filename: str, p: _UploadParams) -> dict:
+    """在线程中执行 upload_document，统一转换服务层异常。"""
+    try:
+        return await asyncio.to_thread(
+            svc.upload_document,
+            p.kb_name,
+            tmp_path,
+            filename,
+            p.splitter_type,
+            p.chunk_size,
+            p.chunk_overlap_ratio,
+            p.enable_cleaning,
+            p.doc_type,
+        )
+    except KnowledgeBaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except UnsupportedFileTypeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileTooLargeError as e:
+        raise HTTPException(status_code=413, detail=str(e)) from e
+    except Exception as e:
+        logger.error("[%s] 上传失败: %s", p.kb_name, e)
+        raise HTTPException(status_code=500, detail=f"上传失败: {e}") from e
+
+
 @router.post("/{kb_name}/upload", response_model=DocInfo)
 async def upload_document(
     kb_name: str,
@@ -234,35 +293,14 @@ async def upload_document(
     import shutil
     import tempfile
 
+    params = _UploadParams(kb_name, splitter_type, chunk_size, chunk_overlap_ratio, enable_cleaning, doc_type)
     safe_filename = Path(file.filename or "upload").name
     ext = Path(safe_filename).suffix.lower()
-
     with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
         shutil.copyfileobj(file.file, tmp)
         tmp_path = Path(tmp.name)
-
     try:
-        doc = await asyncio.to_thread(
-            svc.upload_document,
-            kb_name,
-            tmp_path,
-            safe_filename,
-            splitter_type,
-            chunk_size,
-            chunk_overlap_ratio,
-            enable_cleaning,
-            doc_type,
-        )
-        return DocInfo(**doc)
-    except KnowledgeBaseNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except UnsupportedFileTypeError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except FileTooLargeError as e:
-        raise HTTPException(status_code=413, detail=str(e)) from e
-    except Exception as e:
-        logger.error("[%s] 上传失败: %s", kb_name, e)
-        raise HTTPException(status_code=500, detail=f"上传失败: {e}") from e
+        return DocInfo(**await _run_upload_document(svc, tmp_path, safe_filename, params))
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -287,6 +325,16 @@ def get_download_token(
     return {"token": token, "expires_in": 120}
 
 
+def _verify_download_auth(token: str | None, authorization: str | None, doc_id: int, kb_name: str) -> None:
+    """验证下载请求的认证凭据（短期 token 或 Bearer token）。"""
+    if token:
+        verify_download_token(token, doc_id, kb_name)
+    elif authorization and authorization.startswith("Bearer "):
+        decode_token(authorization[len("Bearer ") :], token_type="access")
+    else:
+        raise HTTPException(status_code=401, detail="需要认证：请提供 ?token= 或 Authorization header")
+
+
 @router.get("/{kb_name}/download/{doc_id}")
 def download_document(
     kb_name: str,
@@ -301,19 +349,12 @@ def download_document(
     - ?token=xxx  : 由 /download-token/{doc_id} 签发的短期下载令牌（推荐，供浏览器直接跳转）
     - Authorization: Bearer xxx : 普通登录 token（兼容旧调用方式）
     """
-    if token:
-        verify_download_token(token, doc_id, kb_name)
-    elif authorization and authorization.startswith("Bearer "):
-        decode_token(authorization[len("Bearer ") :], token_type="access")
-    else:
-        raise HTTPException(status_code=401, detail="需要认证：请提供 ?token= 或 Authorization header")
-
+    _verify_download_auth(token, authorization, doc_id, kb_name)
     try:
         file_path = svc.get_file_path(doc_id, kb_name)
         doc_name = svc.get_document_name(doc_id, kb_name)
     except DocumentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-
     encoded_name = urllib.parse.quote(doc_name, safe="")
     return FileResponse(
         path=str(file_path),

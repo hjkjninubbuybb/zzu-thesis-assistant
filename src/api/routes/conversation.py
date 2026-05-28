@@ -100,28 +100,8 @@ _TITLE_SYSTEM_PROMPT = """你是一个对话标题生成助手。你的任务是
 5. 直接输出标题本身，不要加任何解释、引号、前后缀"""
 
 
-@router.post("/{conv_id}/summarize-title", response_model=ConversationInfo)
-def summarize_title(conv_id: int, current_user: dict = Depends(get_current_user)):
-    """基于首轮对话自动生成语义化标题（fast LLM）。"""
-    conv = _ds.get_conversation(conv_id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="对话不存在")
-    if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权修改此对话")
-
-    messages = _ds.list_messages(conv_id)
-    if not messages:
-        raise HTTPException(status_code=400, detail="对话尚无消息，无法总结标题")
-
-    # 取首轮 user + assistant
-    first_user = next((m for m in messages if m["role"] == "user"), None)
-    first_assistant = next((m for m in messages if m["role"] == "assistant"), None)
-    if not first_user:
-        raise HTTPException(status_code=400, detail="对话缺少用户提问")
-
-    user_text = (first_user["content"] or "").strip()[:500]
-    assistant_text = ((first_assistant["content"] if first_assistant else "") or "").strip()[:500]
-
+def _generate_title(user_text: str, assistant_text: str) -> str:
+    """用快速 LLM 为首轮对话生成语义化标题，失败时回退为前 20 字。"""
     try:
         llm = get_llm(fast=True, streaming=False)
         prompt = (
@@ -131,21 +111,35 @@ def summarize_title(conv_id: int, current_user: dict = Depends(get_current_user)
             f"请直接输出标题："
         )
         resp = llm.invoke(prompt)
-        title = (getattr(resp, "content", "") or "").strip()
-        # 清理：去引号、句号、换行
-        title = title.strip('"\'""。 \n\t')
-        if not title:
-            title = user_text[:20] or "新对话"
-        # 兜底：超过 20 字截断
+        title = (getattr(resp, "content", "") or "").strip().strip('"\'""。 \n\t')
         if len(title) > 20:
             title = title[:20]
+        return title or user_text[:20] or "新对话"
     except Exception as e:
         logger.warning("[summarize_title] LLM 调用失败: %s", e)
-        title = user_text[:20] or "新对话"
+        return user_text[:20] or "新对话"
 
+
+@router.post("/{conv_id}/summarize-title", response_model=ConversationInfo)
+def summarize_title(conv_id: int, current_user: dict = Depends(get_current_user)):
+    """基于首轮对话自动生成语义化标题（fast LLM）。"""
+    conv = _ds.get_conversation(conv_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    if current_user["role"] == "student" and conv.get("user_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="无权修改此对话")
+    messages = _ds.list_messages(conv_id)
+    if not messages:
+        raise HTTPException(status_code=400, detail="对话尚无消息，无法总结标题")
+    first_user = next((m for m in messages if m["role"] == "user"), None)
+    if not first_user:
+        raise HTTPException(status_code=400, detail="对话缺少用户提问")
+    first_asst = next((m for m in messages if m["role"] == "assistant"), None)
+    user_text = (first_user["content"] or "").strip()[:500]
+    asst_text = ((first_asst["content"] if first_asst else "") or "").strip()[:500]
+    title = _generate_title(user_text, asst_text)
     logger.info("[summarize_title] conv_id=%d title=%s", conv_id, title)
-    row = _ds.update_conversation_title(conv_id, title)
-    return row
+    return _ds.update_conversation_title(conv_id, title)
 
 
 @router.delete("/{conv_id}", response_model=MessageResponse)
