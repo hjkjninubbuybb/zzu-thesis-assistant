@@ -4,6 +4,7 @@
 FastAPI 在同一请求内自动缓存相同依赖，不会重复构造 Store。
 """
 
+from src.services.analytics_service import AnalyticsService
 from src.storage.conversation_store import ConversationStore
 from src.storage.doc_store import DocStore
 from src.storage.faq_store import FAQStore
@@ -46,3 +47,10 @@ def get_user_store() -> UserStore:
 
 def get_vector_store() -> VectorStore:
     return VectorStore()
+
+
+# ── Service 工厂 ──────────────────────────────────────────────
+
+
+def get_analytics_service() -> AnalyticsService:
+    return AnalyticsService()
