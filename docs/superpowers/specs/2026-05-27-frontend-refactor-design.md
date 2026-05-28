@@ -58,6 +58,7 @@ frontend/src/
 │   │   ├── ui/               # shadcn/ui 基础组件（可控副本）
 │   │   └── layout/           # AppLayout、Sidebar、StudentLayout 等
 │   ├── hooks/                # 全局 Hook（useToast、useConfirm、useMediaQuery）
+│   ├── services/             # 被 2+ feature 共用的查询 service（如 useKBList 所依赖的 sharedKnowledgeService）
 │   ├── store/                # Zustand stores（authStore、uiStore、uploadStore）
 │   ├── lib/
 │   │   ├── api.ts            # Axios 实例 + 按业务域组织的 API 模块
@@ -146,6 +147,29 @@ features/conversations/
 │
 └── index.ts
 ```
+
+`features/student/`（学生端专属功能，含仪表盘和个人中心）：
+
+```
+features/student/
+├── components/
+│   ├── StudentHome.tsx          # feature 根组件：学生仪表盘（统计卡片、快速入口）
+│   │                            # 迁移自 pages/student/StudentHomePage.tsx（514 行）
+│   └── StudentProfile.tsx       # 学生个人中心（基本信息 + 导师信息 + 修改密码）
+│                                # 迁移自 pages/student/StudentProfilePage.tsx（186 行）
+│
+├── hooks/
+│   ├── queryKeys.ts
+│   ├── useStudentHome.ts        # 仪表盘数据：最近对话、FAQ 统计、知识库状态
+│   └── useStudentProfile.ts    # 个人信息查询 + 修改密码 mutation
+│
+├── services/
+│   └── studentService.ts       # 封装学生端 API 调用（conversationApi + knowledgeApi）
+│
+└── index.ts                    # 导出 StudentHome、StudentProfile
+```
+
+> **注意**：学生端的 FAQ 浏览（`StudentFaqPage`）和工单（`StudentTicketsPage`）**不单独建 student 子组件**，直接复用 `features/faq/` 和 `features/tickets/` 的 feature 根组件；`pages/student/FaqPage.tsx` 和 `pages/student/TicketsPage.tsx` 只负责引用对应 feature 的学生视图变体（通过 prop 或 route context 区分 portal）。
 
 ---
 
@@ -535,22 +559,35 @@ export default [
     plugins: { boundaries },
     settings: {
       "boundaries/elements": [
-        { type: "app",      pattern: "src/app/*" },
-        { type: "pages",    pattern: "src/pages/*" },
-        { type: "features", pattern: "src/features/*" },
-        { type: "shared",   pattern: "src/shared/*" },
+        { type: "app",     pattern: "src/app/*" },
+        { type: "pages",   pattern: "src/pages/*" },
+        // 用 capture 把每个 feature 的名称捕获为 featureName，
+        // 这样规则可以区分 features/a 和 features/b，从而阻止跨 feature 引用
+        { type: "feature", pattern: "src/features/([^/]+)/**", capture: ["featureName"] },
+        { type: "shared",  pattern: "src/shared/*" },
       ],
     },
     rules: {
-      // pages 可以引用 features 和 shared，不能引用 app
       "boundaries/element-types": ["error", {
         default: "disallow",
         rules: [
-          { from: "app",      allow: ["pages", "features", "shared"] },
-          { from: "pages",    allow: ["features", "shared"] },
-          { from: "features", allow: ["shared"] },
-          { from: "shared",   allow: ["shared"] },
+          { from: "app",     allow: ["pages", "feature", "shared"] },
+          { from: "pages",   allow: ["feature", "shared"] },
+          // feature 只能引用 shared 和"自身"（featureName 相同）
+          {
+            from: "feature",
+            allow: [
+              "shared",
+              ["feature", { featureName: "${from.featureName}" }],
+            ],
+          },
+          { from: "shared",  allow: ["shared"] },
         ],
+      }],
+      // 即使是 pages → feature，也只允许通过 index.ts 引用，不得穿透内部文件
+      "boundaries/entry-point": ["error", {
+        default: "disallow",
+        rules: [{ target: ["feature"], allow: ["index.ts"] }],
       }],
     },
   },
@@ -570,16 +607,23 @@ export default [
 
 features 之间不能互相 import，当多个 feature 需要同一份数据时，有两种方式：
 
-**方式 A：提升到 shared/hooks**（推荐，数据被 2+ feature 使用）
+**方式 A：提升到 shared/services + shared/hooks**（推荐，数据被 2+ feature 使用）
 
-把公共查询提升到 `shared/hooks/`，各 feature 从这里引用：
+公共查询的数据转换放在 `shared/services/`，Hook 封装放在 `shared/hooks/`，各 feature 从这里引用，保持层次一致（hooks → services → api.ts）：
 
 ```ts
+// shared/services/knowledgeSharedService.ts
+import { knowledgeApi } from "@/shared/lib/api";
+export const knowledgeSharedService = {
+  list: () => knowledgeApi.listKBs(),
+};
+
 // shared/hooks/useKBList.ts（提升后的共享 Hook）
+import { knowledgeSharedService } from "@/shared/services/knowledgeSharedService";
 export function useKBList() {
   return useQuery({
     queryKey: ["knowledge", "list"],
-    queryFn: () => knowledgeApi.listKBs(),  // 直接调 shared/lib/api.ts
+    queryFn: knowledgeSharedService.list,  // 通过 shared/services，保持层次一致
   });
 }
 
@@ -639,16 +683,53 @@ const activeKBName = useActiveKB(); // 来自 uiStore，knowledge feature 负责
 
 ## 附录：现有代码迁移对照表
 
+### 管理端页面
+
+| 现有文件 | 行数 | 迁移目标 |
+|---------|-----|---------|
+| `pages/KnowledgeBasePage.tsx` | 1069 | `features/knowledge/`（导出 `DocumentKnowledgeTab`） |
+| `pages/KnowledgeManagementPage.tsx` | 43 | `pages/admin/KnowledgePage.tsx`（薄容器，组合 knowledge + faq 两个 Tab，保留 Tab 切换逻辑） |
+| `pages/DocumentPage.tsx` | 973 | `features/documents/` |
+| `pages/DocumentChunkReviewPage.tsx` | 162 | `features/documents/components/ChunkReview.tsx` + `pages/admin/DocumentChunkReviewPage.tsx` |
+| `pages/DocumentCleanReviewPage.tsx` | 153 | `features/documents/components/CleanReview.tsx` + `pages/admin/DocumentCleanReviewPage.tsx` |
+| `pages/SettingsPage.tsx` | 969 | `features/settings/` |
+| `pages/FaqPage.tsx` | 947 | `features/faq/`（导出 `FaqKnowledgeTab` 供 KnowledgePage 复用） |
+| `pages/ConversationsPage.tsx` | 640 | `features/conversations/` |
+| `pages/StudentsPage.tsx` | — | `features/users/components/StudentsTab.tsx` |
+| `pages/TeachersPage.tsx` | — | `features/users/components/TeachersTab.tsx` |
+| `pages/MentorRelationsTab.tsx` | 416 | `features/users/components/MentorRelationsTab.tsx` |
+| `pages/UsersPage.tsx` | 52 | `pages/admin/UsersPage.tsx`（薄容器，组合三个 Tab）→ `features/users/` |
+| `pages/AnalyticsPage.tsx` | — | `features/analytics/` |
+| `pages/OverviewPage.tsx` | — | `features/analytics/components/OverviewPanel.tsx` 或独立 feature `overview` |
+| `pages/LoginPage.tsx` | 226 | `features/auth/components/LoginForm.tsx` + `pages/LoginPage.tsx`（路由入口保留） |
+
+### 学生端页面
+
+| 现有文件 | 行数 | 迁移目标 |
+|---------|-----|---------|
+| `pages/student/StudentHomePage.tsx` | 514 | `features/student/components/StudentHome.tsx` |
+| `pages/student/StudentProfilePage.tsx` | 186 | `features/student/components/StudentProfile.tsx` |
+| `pages/student/StudentFaqPage.tsx` | 227 | `pages/student/FaqPage.tsx` → 复用 `features/faq/` 学生视图 |
+| `pages/student/StudentTicketsPage.tsx` | 276 | `pages/student/TicketsPage.tsx` → 复用 `features/tickets/` 学生视图 |
+
+### 共享组件与基础设施
+
 | 现有文件 | 迁移目标 |
 |---------|---------|
-| `pages/KnowledgeBasePage.tsx`（1069 行） | 拆分到 `features/knowledge/`，页面文件缩减至 ~10 行 |
-| `pages/DocumentPage.tsx`（973 行） | 拆分到 `features/documents/` |
-| `pages/SettingsPage.tsx`（969 行） | 拆分到 `features/settings/` |
-| `pages/FaqPage.tsx`（947 行） | 拆分到 `features/faq/` |
-| `pages/ConversationsPage.tsx`（640 行） | 拆分到 `features/conversations/` |
-| `pages/StudentsPage.tsx` + `TeachersPage.tsx` | 合并到 `features/users/` |
-| `components/chat/*` | 迁移到 `features/conversations/components/` |
+| `components/chat/*` | `features/conversations/components/` |
 | `components/AuthProvider.tsx` | 替换为 `shared/store/authStore.ts` |
 | `lib/uploadContext.tsx` | 替换为 `shared/store/uploadStore.ts` |
 | `components/ui/Toast.tsx` | 替换为 shadcn `Toast` + `uiStore.showToast` |
 | `components/ui/ConfirmDialog.tsx` | 替换为 shadcn `Dialog` + `uiStore.showConfirm` |
+
+### KnowledgeManagementPage 关系说明
+
+现有代码中存在两个知识库相关页面：
+
+- **`KnowledgeBasePage.tsx`（1069 行）**：真正的知识库管理实现（集合 CRUD、文档列表、向量检索配置等），导出 `DocumentKnowledgeTab` 组件供上层复用
+- **`KnowledgeManagementPage.tsx`（43 行）**：薄容器，用 Tab 组合 `DocumentKnowledgeTab`（来自 KnowledgeBasePage）和 `FaqKnowledgeTab`（来自 FaqPage），是真正的路由落地页
+
+重构后：
+- `KnowledgeBasePage` 的实现全部迁入 `features/knowledge/`
+- `FaqPage` 的实现全部迁入 `features/faq/`
+- 新的 `pages/admin/KnowledgePage.tsx` 继续扮演"薄容器 + Tab 切换"角色，引用两个 feature 的导出组件
