@@ -7,6 +7,7 @@ FastAPI 在同一请求内自动缓存相同依赖，不会重复构造 Store。
 from fastapi import Depends
 
 from src.services.analytics_service import AnalyticsService
+from src.services.chat_service import ChatService
 from src.services.config_service import ConfigService
 from src.services.document_service import DocumentService
 from src.services.faq_service import FAQService
@@ -15,6 +16,7 @@ from src.services.ticket_service import TicketService
 from src.services.user_service import UserService
 from src.storage.conversation_store import ConversationStore
 from src.storage.doc_store import DocStore
+from src.storage.document_store import DocumentStore
 from src.storage.faq_store import FAQStore
 from src.storage.kb_store import KBStore
 from src.storage.settings_store import SettingsStore
@@ -57,11 +59,29 @@ def get_vector_store() -> VectorStore:
     return VectorStore()
 
 
+def get_document_store() -> DocumentStore:
+    return DocumentStore()
+
+
 # ── Service 工厂 ──────────────────────────────────────────────
 
 
 def get_analytics_service() -> AnalyticsService:
     return AnalyticsService()
+
+
+def get_chat_service(
+    settings_store: SettingsStore = Depends(get_settings_store),
+    kb_store: KBStore = Depends(get_kb_store),
+    vector_store: VectorStore = Depends(get_vector_store),
+    doc_store: DocumentStore = Depends(get_document_store),
+) -> ChatService:
+    return ChatService(
+        settings_store=settings_store,
+        kb_store=kb_store,
+        vector_store=vector_store,
+        doc_store=doc_store,
+    )
 
 
 def get_config_service(
