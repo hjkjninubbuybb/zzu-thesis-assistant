@@ -1,99 +1,91 @@
 """导师答疑（QA Requests）路由。"""
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.api.auth import get_current_user, require_teacher_or_admin
+from src.api.deps import get_ticket_service
 from src.api.schemas import QARequestCreate, QARequestInfo, QARequestReply
-from src.storage.document_store import DocumentStore
-from src.storage.user_store import UserStore
+from src.exceptions import DocumentNotFoundError, PermissionDeniedError
+from src.services.ticket_service import TicketService
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
 logger = logging.getLogger(__name__)
 
-_ds = DocumentStore()
-_us = UserStore()
-
 
 @router.post("", response_model=QARequestInfo, status_code=status.HTTP_201_CREATED)
-def create_ticket(body: QARequestCreate, current_user: dict = Depends(get_current_user)):
+async def create_ticket(
+    body: QARequestCreate,
+    current_user: dict = Depends(get_current_user),
+    svc: TicketService = Depends(get_ticket_service),
+):
     """学生发起答疑请求。"""
     if current_user["role"] != "student":
         raise HTTPException(status_code=403, detail="只有学生可以发起答疑请求")
-
-    mentor = _us.get_student_mentor(current_user["id"])
-    if not mentor:
-        raise HTTPException(status_code=400, detail="您尚未分配指导教师，无法发起答疑请求")
-
-    ticket = _ds.create_qa_request(
-        student_id=current_user["id"],
-        mentor_id=mentor["id"],
-        conversation_id=body.conversation_id,
-        message_id=body.message_id,
-        question=body.question,
-    )
-    return ticket
+    try:
+        return await asyncio.to_thread(
+            svc.create,
+            current_user["id"],
+            body.conversation_id,
+            body.message_id,
+            body.question,
+        )
+    except PermissionDeniedError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("", response_model=list[QARequestInfo])
-def list_tickets(current_user: dict = Depends(get_current_user)):
+async def list_tickets(
+    current_user: dict = Depends(get_current_user),
+    svc: TicketService = Depends(get_ticket_service),
+):
     """获取答疑请求列表。学生看自己的，教师看分配给自己的。"""
-    if current_user["role"] == "student":
-        return _ds.list_qa_requests(student_id=current_user["id"])
-    elif current_user["role"] == "teacher":
-        return _ds.list_qa_requests(mentor_id=current_user["id"])
-    elif current_user["role"] == "admin":
-        return _ds.list_qa_requests()
-    return []
+    return await asyncio.to_thread(svc.list_tickets, current_user["role"], current_user["id"])
 
 
 @router.get("/{ticket_id}", response_model=QARequestInfo)
-def get_ticket(ticket_id: int, current_user: dict = Depends(get_current_user)):
+async def get_ticket(
+    ticket_id: int,
+    current_user: dict = Depends(get_current_user),
+    svc: TicketService = Depends(get_ticket_service),
+):
     """获取答疑详情。"""
-    ticket = _ds.get_qa_request(ticket_id)
-    if not ticket:
-        raise HTTPException(status_code=404, detail="请求不存在")
-
-    # 权限检查
-    if current_user["role"] == "student" and ticket["student_id"] != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权查看此请求")
-    if current_user["role"] == "teacher" and ticket["mentor_id"] != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权查看此请求")
-
-    return ticket
+    try:
+        return await asyncio.to_thread(svc.get, ticket_id, current_user["role"], current_user["id"])
+    except DocumentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except PermissionDeniedError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
 
 
 @router.post("/{ticket_id}/reply", response_model=QARequestInfo)
-def reply_ticket(
+async def reply_ticket(
     ticket_id: int,
     body: QARequestReply,
     current_user: dict = Depends(require_teacher_or_admin),
+    svc: TicketService = Depends(get_ticket_service),
 ):
     """导师回复答疑请求。"""
-    ticket = _ds.get_qa_request(ticket_id)
-    if not ticket:
-        raise HTTPException(status_code=404, detail="请求不存在")
-
-    if current_user["role"] == "teacher" and ticket["mentor_id"] != current_user["id"]:
-        raise HTTPException(status_code=403, detail="只能回复分配给自己的请求")
-
-    updated = _ds.update_qa_request(ticket_id, answer=body.answer, status="replied")
-    return updated
+    try:
+        return await asyncio.to_thread(svc.reply, ticket_id, body.answer, current_user["id"], current_user["role"])
+    except DocumentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except PermissionDeniedError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
 
 
 @router.post("/{ticket_id}/close", response_model=QARequestInfo)
-def close_ticket(ticket_id: int, current_user: dict = Depends(get_current_user)):
+async def close_ticket(
+    ticket_id: int,
+    current_user: dict = Depends(get_current_user),
+    svc: TicketService = Depends(get_ticket_service),
+):
     """关闭答疑请求。"""
-    ticket = _ds.get_qa_request(ticket_id)
-    if not ticket:
-        raise HTTPException(status_code=404, detail="请求不存在")
-
-    # 学生或导师都可以关闭
-    if current_user["role"] == "student" and ticket["student_id"] != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权操作")
-    if current_user["role"] == "teacher" and ticket["mentor_id"] != current_user["id"]:
-        raise HTTPException(status_code=403, detail="无权操作")
-
-    updated = _ds.update_qa_request(ticket_id, answer=ticket["answer"], status="closed")
-    return updated
+    try:
+        return await asyncio.to_thread(svc.close, ticket_id, current_user["role"], current_user["id"])
+    except DocumentNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except PermissionDeniedError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e

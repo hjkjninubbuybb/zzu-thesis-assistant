@@ -10,6 +10,7 @@ from src.services.analytics_service import AnalyticsService
 from src.services.config_service import ConfigService
 from src.services.faq_service import FAQService
 from src.services.knowledge_service import KnowledgeService
+from src.services.ticket_service import TicketService
 from src.storage.conversation_store import ConversationStore
 from src.storage.doc_store import DocStore
 from src.storage.faq_store import FAQStore
@@ -85,3 +86,10 @@ def get_knowledge_service(
         settings_store=settings_store,
         vector_store=vector_store,
     )
+
+
+def get_ticket_service(
+    ticket_store: TicketStore = Depends(get_ticket_store),
+    user_store: UserStore = Depends(get_user_store),
+) -> TicketService:
+    return TicketService(ticket_store=ticket_store, user_store=user_store)
