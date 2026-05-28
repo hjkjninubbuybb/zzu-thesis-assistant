@@ -8,8 +8,11 @@ import io
 import logging
 import urllib.parse
 import uuid
+import zipfile
 from datetime import date
 
+import pymysql
+from dashscope.common.error import DashScopeException
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 
@@ -253,7 +256,7 @@ class FAQService(BaseService):
         try:
             wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
             ws = wb.active
-        except Exception as e:
+        except (ValueError, OSError, zipfile.BadZipFile) as e:
             raise ValueError(f"Excel 文件解析失败：{e}") from e
 
         from src.core.faq_service import parse_faq_sheet  # avoid circular import at module level
@@ -306,7 +309,7 @@ class FAQService(BaseService):
                         "vector_id": str(uuid.uuid4()),
                     }
                 )
-            except Exception as e:
+            except pymysql.Error as e:
                 self.logger.warning("[FAQService] import MySQL 插入失败: %s", e)
                 all_errors.append({"row": 0, "question": r["question"][:50], "reason": f"数据库写入失败：{e}"})
                 failed_count += 1
@@ -325,7 +328,7 @@ class FAQService(BaseService):
                 else:
                     try:
                         self._faq_store.update_faq(r["faq_id"], vector_id=r["vector_id"])
-                    except Exception as e:
+                    except pymysql.Error as e:
                         self.logger.warning("[FAQService] 更新 vector_id 失败: %s", e)
                     success_count += 1
 
@@ -407,7 +410,7 @@ class FAQService(BaseService):
         try:
             embed_model = get_embed_model(text_type="query")
             vector: list[float] = embed_model.get_text_embedding(rewritten)
-        except Exception as e:
+        except (ValueError, RuntimeError, DashScopeException) as e:
             self.logger.warning("[FAQService] search embed 失败: %s", e)
             raise RuntimeError("查询向量化失败，请稍后重试") from e
 
