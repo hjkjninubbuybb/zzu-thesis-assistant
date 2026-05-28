@@ -292,6 +292,78 @@ class FAQService:
         await self._vector_store.delete_faq(faq_id)
 ```
 
+### `base.py` — 可选基类
+
+推荐继承，非强制。唯一职责是提供带类名前缀的 logger，不做异常拦截：
+
+```python
+# services/base.py
+import logging
+
+class BaseService:
+    """所有 Service 的可选基类，提供统一日志前缀。
+
+    不强制继承，但继承后 self.logger 自动带类名前缀，
+    异常日志格式统一。不继承也不影响 Service 正常工作。
+    """
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+```
+
+### `chat_service.py` — 最复杂 Service 的接口设计
+
+`ChatService` 协调 FAQ 防线 + RAG pipeline + SSE 事件流，是整个 services 层最复杂的组件：
+
+```python
+# services/chat_service.py
+from collections.abc import AsyncGenerator, Callable
+from src.core.faq_match import FAQMatcher
+from src.storage.interfaces.settings_store import BaseSettingsStore
+from src.services.base import BaseService
+
+class ChatService(BaseService):
+    """聊天业务编排：FAQ 防线 → RAG pipeline → SSE 事件流。"""
+
+    def __init__(
+        self,
+        faq_matcher: FAQMatcher,
+        rag_orchestrator,                    # core/agent/factory.py 返回的编排器
+        retriever_factory: Callable,         # 运行时按 kb_name 创建 HybridRetriever
+        settings_store: BaseSettingsStore,
+    ):
+        super().__init__()
+        self._faq_matcher = faq_matcher
+        self._rag_orchestrator = rag_orchestrator
+        self._retriever_factory = retriever_factory
+        self._settings_store = settings_store
+
+    async def stream_response(
+        self,
+        query: str,
+        kb_name: str,
+        history: list[dict],
+        user_id: int,
+    ) -> AsyncGenerator[dict, None]:
+        """生成 SSE 事件流。
+
+        Args:
+            query: 用户问题。
+            kb_name: 知识库名称。
+            history: 对话历史（最近 N 轮）。
+            user_id: 当前用户 ID（用于对话记录）。
+
+        Yields:
+            dict，包含 event 字段，取值：
+            status / token / sources / file / suggestions / done
+        """
+        ...
+```
+
+**SSE 边界划分：**
+- `ChatService.stream_response()` 只产出事件 dict，不知道 HTTP
+- `api/routes/chat.py` 负责把 `AsyncGenerator` 包装成 `EventSourceResponse`
+- 调用 LangGraph（同步图）时用 `asyncio.to_thread` 包装，不阻塞事件循环
+
 ### 关键约束
 
 - Service 方法**不抛 `HTTPException`**，只抛业务异常（`AppException` 子类）
@@ -401,13 +473,11 @@ core/agent/
 ├── factory.py           # build_orchestrator()：组装检索器 + 图
 ├── prompts.py           # 本 Agent 所有提示词（PromptTemplate）
 ├── safety_guards.py     # 安全拦截规则（修改必须附测试用例）
-├── nodes/               # 每个节点一个文件，超 200 行拆包
-│   ├── __init__.py
-│   ├── router.py        # router_node：路由决策（hard_rag/download/direct）
-│   ├── grader.py        # grader_node：文档相关性评分
-│   ├── rewriter.py      # rewriter_node：查询重写
-│   ├── generator.py     # generator_node：答案生成 + safety_guards 拦截
-│   └── document_linker.py  # document_linker_node：文件卡片下发
+├── router.py            # router_node：路由决策（hard_rag/download/direct）
+├── grader.py            # grader_node：文档相关性评分
+├── rewriter.py          # rewriter_node：查询重写
+├── generator.py         # generator_node：答案生成 + safety_guards 拦截
+├── document_linker.py   # document_linker_node：文件卡片下发
 └── tools/               # Agent 工具（拆分自 tools.py）
     ├── __init__.py
     ├── calendar.py      # get_academic_calendar（含三级缓存逻辑）
@@ -466,7 +536,7 @@ REWRITER_PROMPT = ChatPromptTemplate.from_messages([
 **节点文件标准写法：**
 
 ```python
-# core/agent/nodes/router.py
+# core/agent/router.py
 from src.core.agent.state import AgentState
 from src.core.agent.prompts import ROUTER_PROMPT
 from src.core.shared.llm_factory import get_fast_llm
@@ -493,7 +563,7 @@ core/rag/
 └── embedding.py         # Embedding 调用封装
 ```
 
-**注意：** 现有 `rag/query_enhancer.py` 和 `agent/nodes/rewriter.py` 存在功能重叠（都做查询改写）。应明确分工：
+**注意：** 现有 `rag/query_enhancer.py` 和 `core/agent/rewriter.py` 存在功能重叠（都做查询改写）。应明确分工：
 - `query_enhancer.py`：基于规则的查询扩写（无 LLM 调用）
 - `rewriter_node`：基于 LLM 的查询重写（CRAG 循环内）
 
@@ -747,11 +817,10 @@ src/
 │   │   ├── indexing.py / faq.py / safety.py
 │   ├── shared/                  # 【新增】跨 Agent 共享基础设施
 │   │   ├── llm_factory.py
-│   │   ├── embedding.py
-│   │   └── exceptions.py        # 统一业务异常层级
+│   │   └── embedding.py
 │   ├── agent/                   # 主 RAG Agent（自包含）
 │   │   ├── state.py / graph.py / factory.py / prompts.py / safety_guards.py
-│   │   ├── nodes/               # router / grader / rewriter / generator / document_linker
+│   │   ├── router.py / grader.py / rewriter.py / generator.py / document_linker.py
 │   │   └── tools/               # calendar / knowledge
 │   ├── rag/                     # 检索基础设施
 │   │   ├── retriever.py / reranker.py / query_enhancer.py / embedding.py
@@ -826,4 +895,185 @@ src/
 
 ---
 
-*文档版本：v1.0 | 设计日期：2026-05-27*
+---
+
+## 十二、可测性契约
+
+本节说明每层独立可测的**结构前提**，不包含测试代码。重构完成后测试计划单独安排。
+
+### 原则：依赖方向 = 可 mock 方向
+
+每层只依赖接口（Protocol），不依赖具体实现，测试时用假实现替换即可。
+
+### `storage/` 层
+
+可测性前提：Store 实现类的连接来自外部注入，不在类内部调用全局 `get_conn()`：
+
+```python
+# ✅ 可测写法：连接工厂由外部传入
+class FAQStore:
+    def __init__(self, conn_factory=None):
+        self._conn_factory = conn_factory or get_conn
+```
+
+测试时传入返回内存 mock 的 `conn_factory`，不需要真实 MySQL。
+
+### `core/` 层
+
+可测性前提：
+- 所有节点函数只接收 `AgentState`，不在函数体内构造 LLM 实例
+- LLM 通过 `get_fast_llm()` / `get_capable_llm()` 工厂获取，工厂函数可在测试中 patch
+
+```python
+# ✅ 可测写法：测试时 patch get_fast_llm 即可
+def router_node(state: AgentState) -> dict:
+    chain = ROUTER_PROMPT | get_fast_llm()
+    ...
+```
+
+`BaseRetriever` / `BaseReranker` 等 Protocol 接口使 `core/` 层可注入假检索器测试 Agent 逻辑。
+
+### `services/` 层
+
+可测性前提：构造函数参数全部是接口类型，不在方法体内 `new` 任何具体实现：
+
+```python
+# ✅ 测试时直接传入 mock
+faq_service = FAQService(
+    faq_store=MockFAQStore(),
+    vector_store=MockVectorStore(),
+    faq_matcher=MockFAQMatcher(),
+)
+```
+
+这是整个架构"测得了"目标能否实现的核心层。
+
+### `api/` 层
+
+可测性前提：路由函数通过 `Depends(get_xxx_service)` 获取 Service，测试时用 FastAPI 的 `dependency_overrides` 替换：
+
+```python
+# 测试文件中
+app.dependency_overrides[get_faq_service] = lambda: MockFAQService()
+```
+
+路由函数本身不需要单独测试——它只是 HTTP 翻译层，通过集成测试覆盖即可。`api/deps.py` 是可测性的关键枢纽：所有 Service 依赖都在这里注册，override 这一个文件即可替换所有依赖。
+
+---
+
+## 十三、迁移序列
+
+### 可运行检查点定义
+
+每个阶段结束时验证以下三条，全部通过即为"可运行"：
+1. `poetry run dev` 启动无报错
+2. `POST /api/auth/login` 返回 token
+3. `GET /api/faq/` 返回列表（不报 500）
+
+---
+
+### Phase 0：地基准备
+
+**目标：** 建立异常模块，确认现有 storage 层状态。
+
+操作：
+1. 新建 `src/exceptions.py`（按第二节内容）
+2. 确认 `storage/document_store.py` 组合模式已完成（验证现有专用 Store 可独立 import）
+3. 不改任何现有路由或 core 代码
+
+**检查点：** 启动正常，`src.exceptions` 可被 import，无循环依赖。
+
+---
+
+### Phase 1：storage/interfaces/
+
+**目标：** 给所有 Store 加 Protocol 接口，让 services 层可以面向接口编程。
+
+操作：
+1. 创建 `storage/interfaces/` 目录，每个 Store 一个接口文件（只有方法签名）
+2. 验证现有 Store 实现方法签名与接口对齐
+3. 在 Store 实现类 docstring 里注明实现了哪个 Protocol
+
+**不动：** 路由文件、core 文件、任何业务逻辑。
+
+**检查点：** 三条可运行验证通过。新增接口文件纯声明，不影响运行时。
+
+---
+
+### Phase 2：services/ 层
+
+**目标：** 新增业务编排层，路由文件逐步改为只调 Service。
+
+按复杂度从低到高的顺序：
+
+| 步骤 | Service | 主要依赖 |
+|------|---------|----------|
+| 2-A | `AnalyticsService` | `SettingsStore` |
+| 2-B | `ConfigService` | `SettingsStore` |
+| 2-C | `KnowledgeService` | `KBStore` |
+| 2-D | `FAQService` | `FAQStore` + `VectorStore` + `FAQMatcher` |
+| 2-E | `TicketService` | `TicketStore` |
+| 2-F | `UserService` | `UserStore`（含 `core/user_import.py`） |
+| 2-G | `DocumentService` | `DocStore` + `KBStore` + `core/indexing` |
+| 2-H | `ChatService` | `FAQMatcher` + `rag_orchestrator` + `SettingsStore` |
+
+**每个步骤的操作模式（以 2-C 为例）：**
+1. 新建 `services/knowledge_service.py`，把路由文件里的业务逻辑搬进来
+2. 在 `api/deps.py` 注册 `get_knowledge_service()`
+3. 改写路由函数，改成调 `KnowledgeService`，删除直接 Store 调用
+4. 跑检查点
+
+**Phase 2 完成后额外验证：**
+```bash
+# services 层不得 import fastapi
+grep -r "from fastapi\|import fastapi" src/services/
+# routes 层不得直接 import storage 或 core
+grep -r "from src.storage\|from src.core" src/api/routes/
+```
+两条命令均无输出即通过。
+
+---
+
+### Phase 3：api/ 精简
+
+**目标：** 拆分 `schemas.py`，让每个路由函数控制在 30 行以内。
+
+操作：
+1. 新建 `api/schemas/` 目录，按业务域拆分 `schemas.py`（375 行 → 8 个文件）
+2. `api/schemas/__init__.py` re-export 所有模型，保持现有 import 路径不变
+3. 逐个检查路由函数行数，超 30 行说明 Phase 2 有遗漏，补充到对应 Service
+
+**检查点：** 所有路由函数 ≤ 30 行，`schemas` import 路径不变。
+
+---
+
+### Phase 4：core/ 补全
+
+**目标：** 拆分大文件，整理 core 内部结构。
+
+操作：
+1. `core/indexing.py`（884 行）→ `core/indexing/` 目录（按第六节设计）
+2. `core/tools.py` → `core/agent/tools/`（`calendar.py` + `knowledge.py`）
+3. `core/llm_factory.py` → `core/shared/llm_factory.py`，原路径加 re-export 保持兼容
+4. `core/interfaces.py`（299 行）→ `core/interfaces/` 目录，按接口类型拆文件
+
+**检查点：** 三条可运行验证通过 + `core/indexing.py` 不存在（已被目录替换）。
+
+---
+
+### 迁移完成标志
+
+所有阶段完成后运行以下检查，三条命令均无输出即为迁移完成：
+
+```bash
+# routes 直接 import storage/core 违规
+grep -r "from src.storage\|from src.core" src/api/routes/
+# services 层 import fastapi 违规
+grep -r "from fastapi\|import fastapi" src/services/
+# core 层 import storage/api 违规
+grep -r "from src.storage\|from src.api" src/core/
+```
+
+---
+
+*文档版本：v1.1 | 设计日期：2026-05-27 | 更新日期：2026-05-28*
