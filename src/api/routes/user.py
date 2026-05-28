@@ -313,8 +313,11 @@ def add_mentor_relations(
     svc: UserService = Depends(get_user_service),
 ):
     """批量绑定师生关系（管理员专用）。"""
-    mentor_user = svc._user_store.get_user_by_id(body.mentor_id)
-    if not mentor_user or mentor_user["role"] != "teacher":
+    try:
+        mentor_user = svc.get_user(body.mentor_id)
+    except UserNotFoundError:
+        raise HTTPException(status_code=400, detail="指定导师不存在")
+    if mentor_user["role"] != "teacher":
         raise HTTPException(status_code=400, detail="指定的导师 ID 无效或非教师角色")
     for sid in body.student_ids:
         svc.add_mentor_relation(body.mentor_id, sid)
