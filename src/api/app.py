@@ -15,9 +15,9 @@ warnings.filterwarnings("ignore", message=".*allowed_objects.*")
 from datetime import date, timedelta
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api.auth import ensure_default_admin, require_teacher_or_admin
@@ -28,8 +28,19 @@ from src.api.routes.conversation import router as conversation_router
 from src.api.routes.faq import router as faq_router
 from src.api.routes.ticket import router as ticket_router
 from src.api.routes.user import router as user_router
+from src.exceptions import AppException
 
 app = FastAPI(title="RAG 1.0 API", version="1.0.0")
+
+
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+    """处理所有业务异常，统一返回格式。"""
+    return JSONResponse(
+        status_code=exc.http_status,
+        content={"code": exc.code, "message": str(exc)},
+    )
+
 
 app.add_middleware(
     CORSMiddleware,

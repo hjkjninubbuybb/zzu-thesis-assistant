@@ -1,0 +1,48 @@
+"""统一依赖注入工厂函数。
+
+所有 Service 的创建都在这里。换实现时只改这一个文件。
+FastAPI 在同一请求内自动缓存相同依赖，不会重复构造 Store。
+"""
+
+from src.storage.conversation_store import ConversationStore
+from src.storage.doc_store import DocStore
+from src.storage.faq_store import FAQStore
+from src.storage.kb_store import KBStore
+from src.storage.settings_store import SettingsStore
+from src.storage.ticket_store import TicketStore
+from src.storage.user_store import UserStore
+from src.storage.vector_store import VectorStore
+
+# ── Store 工厂 ──────────────────────────────────────────────
+
+
+def get_kb_store() -> KBStore:
+    return KBStore()
+
+
+def get_doc_store() -> DocStore:
+    return DocStore()
+
+
+def get_faq_store() -> FAQStore:
+    return FAQStore()
+
+
+def get_settings_store() -> SettingsStore:
+    return SettingsStore()
+
+
+def get_ticket_store() -> TicketStore:
+    return TicketStore()
+
+
+def get_conversation_store() -> ConversationStore:
+    return ConversationStore()
+
+
+def get_user_store() -> UserStore:
+    return UserStore()
+
+
+def get_vector_store() -> VectorStore:
+    return VectorStore()
