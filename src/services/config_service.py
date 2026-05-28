@@ -76,7 +76,7 @@ class ConfigService(BaseService):
         try:
             models = await self._fetch_remote_models(url, key)
             return {"ok": True, "message": f"连接成功，发现 {len(models)} 个模型", "models": models}
-        except Exception as e:
+        except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.RequestError) as e:
             logger.warning("[ConfigService.test_api_connection] 失败: %s", e)
             return {"ok": False, "message": f"连接失败: {e}"}
 
@@ -92,7 +92,7 @@ class ConfigService(BaseService):
             return sorted(_ALLOWED_LLM_MODELS)
         try:
             return await self._fetch_remote_models(url, key)
-        except Exception:
+        except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.RequestError):
             return sorted(_ALLOWED_LLM_MODELS)
 
     def read_config(self) -> dict:
@@ -115,15 +115,18 @@ class ConfigService(BaseService):
 
         Raises:
             ValueError: embedding_model 不在允许列表中。
-            StorageError: 写入 config.yaml 失败。
+            StorageError: 读取或写入 config.yaml 失败。
         """
         if "embedding_model" in updates and updates["embedding_model"] not in _ALLOWED_EMBED_MODELS:
             raise ValueError(
                 f"不支持的 Embedding 模型 '{updates['embedding_model']}'，可选: {sorted(_ALLOWED_EMBED_MODELS)}"
             )
 
-        with open(CONFIG_PATH, encoding="utf-8") as f:
-            raw: dict = yaml.safe_load(f) or {}
+        try:
+            with open(CONFIG_PATH, encoding="utf-8") as f:
+                raw: dict = yaml.safe_load(f) or {}
+        except (OSError, yaml.YAMLError) as e:
+            raise StorageError(f"读取配置文件失败: {e}") from e
 
         # LLM
         if updates.get("llm_base_url") is not None:
