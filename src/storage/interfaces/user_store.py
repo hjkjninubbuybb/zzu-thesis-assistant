@@ -9,10 +9,9 @@ class BaseUserStore(Protocol):
     def create_user(
         self,
         username: str,
-        password_hash: str,
-        role: str = "student",
+        hashed_pwd: str,
         display_name: str = "",
-        email: str = "",
+        role: str = "student",
     ) -> dict:
         """新建用户，返回新建行 dict。"""
         ...
@@ -30,8 +29,8 @@ class BaseUserStore(Protocol):
         role: str | None = None,
         page: int = 1,
         page_size: int = 20,
-    ) -> list[dict]:
-        """分页列出用户，支持角色过滤。"""
+    ) -> tuple[list[dict], int]:
+        """分页列出用户，返回 (用户列表, 总数)，支持角色过滤。"""
         ...
 
     def update_user(self, user_id: int, **kwargs: object) -> dict | None:
@@ -49,10 +48,10 @@ class BaseUserStore(Protocol):
     def upsert_student_profile(
         self,
         user_id: int,
-        student_id: str = "",
-        major: str = "",
+        student_id: str,
         grade: str = "",
-        thesis_title: str = "",
+        major: str = "",
+        class_name: str = "",
     ) -> dict:
         """创建或更新学生档案，返回档案行 dict。"""
         ...
@@ -61,18 +60,26 @@ class BaseUserStore(Protocol):
         """查询学生档案，不存在返回 None。"""
         ...
 
+    def get_user_by_student_id(self, student_id: str) -> dict | None:
+        """通过学号查用户，不存在返回 None。"""
+        ...
+
     def upsert_teacher_profile(
         self,
         user_id: int,
-        employee_id: str = "",
-        title: str = "",
+        employee_id: str,
         department: str = "",
+        title: str = "",
     ) -> dict:
         """创建或更新教师档案，返回档案行 dict。"""
         ...
 
     def get_teacher_profile(self, user_id: int) -> dict | None:
         """查询教师档案，不存在返回 None。"""
+        ...
+
+    def get_user_by_employee_id(self, employee_id: str) -> dict | None:
+        """通过工号查用户，不存在返回 None。"""
         ...
 
     def add_login_log(
@@ -82,6 +89,10 @@ class BaseUserStore(Protocol):
         user_agent: str = "",
     ) -> None:
         """记录登录日志。"""
+        ...
+
+    def list_login_logs(self, user_id: int, limit: int = 20) -> list[dict]:
+        """列出用户的登录日志。"""
         ...
 
     def add_mentor_relation(self, mentor_id: int, student_id: int) -> None:

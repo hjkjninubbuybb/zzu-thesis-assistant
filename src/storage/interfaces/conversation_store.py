@@ -47,10 +47,10 @@ class BaseConversationStore(Protocol):
         conversation_id: int,
         role: str,
         content: str,
-        sources: list | None = None,
-        files: list | None = None,
+        sources_json: str | None = None,
+        files_json: str | None = None,
     ) -> dict:
-        """追加消息，返回新建行 dict。"""
+        """追加消息，返回新建行 dict（sources/files 已反序列化为 list）。"""
         ...
 
     def list_messages(self, conversation_id: int) -> list[dict]:
