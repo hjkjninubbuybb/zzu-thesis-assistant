@@ -8,6 +8,7 @@ from fastapi import Depends
 
 from src.services.analytics_service import AnalyticsService
 from src.services.config_service import ConfigService
+from src.services.knowledge_service import KnowledgeService
 from src.storage.conversation_store import ConversationStore
 from src.storage.doc_store import DocStore
 from src.storage.faq_store import FAQStore
@@ -63,3 +64,15 @@ def get_config_service(
     settings_store: SettingsStore = Depends(get_settings_store),
 ) -> ConfigService:
     return ConfigService(settings_store=settings_store)
+
+
+def get_knowledge_service(
+    kb_store: KBStore = Depends(get_kb_store),
+    settings_store: SettingsStore = Depends(get_settings_store),
+    vector_store: VectorStore = Depends(get_vector_store),
+) -> KnowledgeService:
+    return KnowledgeService(
+        kb_store=kb_store,
+        settings_store=settings_store,
+        vector_store=vector_store,
+    )
