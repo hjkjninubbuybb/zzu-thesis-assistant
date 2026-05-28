@@ -113,6 +113,7 @@ ignore = [
 "src/storage/*.py" = ["W291", "RUF005", "SIM117"]  # SQL 多行字符串尾部空格 + 列表拼接 + with 合并
 "src/api/app.py" = ["E402"]  # warnings 过滤必须在 import 前
 "src/api/routes/*.py" = ["B904", "B005", "B007", "RUF005"]  # HTTPException 异常链 + strip 多字符 + 循环变量
+"src/exceptions.py" = ["N818"]  # AppException 为基类命名约定，不用 Error 后缀
 "tests/**/*.py" = ["D", "S101"]
 
 [tool.ruff.lint.pydocstyle]
