@@ -79,7 +79,7 @@ export function StudentHome() {
     conversations,
     recentConversations,
     todayConversations,
-    activeKb,
+    activeKB: activeKb,
     faqs,
     isLoading,
   } = useStudentHome();
