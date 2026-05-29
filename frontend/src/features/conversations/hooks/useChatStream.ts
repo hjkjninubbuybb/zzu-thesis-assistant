@@ -8,6 +8,7 @@ import {
   applyStatusStep,
   applyToolStep,
   ensureConversation,
+  saveUserMessage,
   saveAssistantTurn,
 } from "./chatStreamHelpers";
 
@@ -60,15 +61,7 @@ export function useChatStream(msgState: ChatMessagesState): ChatStreamState {
       );
       if (!convId) return;
 
-      let userDbMsg: { id: number } | null = null;
-      try {
-        userDbMsg = await chatService.addMessage(convId, {
-          role: "user",
-          content: query,
-        });
-      } catch {
-        /* 继续 */
-      }
+      const userDbMsg = await saveUserMessage(convId, query);
 
       const isFirstTurn = messages.length === 0;
       const assistantId = crypto.randomUUID();

@@ -59,6 +59,18 @@ export async function ensureConversation(
   }
 }
 
+/** Saves the user message to DB. Returns the message id or null on failure. */
+export async function saveUserMessage(
+  convId: number,
+  content: string,
+): Promise<{ id: number } | null> {
+  try {
+    return await chatService.addMessage(convId, { role: "user", content });
+  } catch {
+    return null;
+  }
+}
+
 /** Saves the assistant turn to DB and optionally triggers title summarization. */
 export async function saveAssistantTurn(
   convId: number,
