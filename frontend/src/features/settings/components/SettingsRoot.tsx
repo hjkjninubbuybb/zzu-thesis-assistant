@@ -1,5 +1,6 @@
 import { Loader2, Save } from "lucide-react";
-import { useSettings, useModelOptions } from "../hooks/useSettings";
+import { useSettings } from "../hooks/useSettings";
+import { useModelOptions } from "../hooks/useModelOptions";
 import { useApiKeyManager } from "../hooks/useApiKeyManager";
 import { ApiKeySection } from "./ApiKeySection";
 import { ModelSettings } from "./ModelSettings";
@@ -12,7 +13,7 @@ const settle = (d: number): React.CSSProperties => ({
 });
 
 export function SettingsRoot() {
-  const { form, isLoading, set, saveMutation } = useSettings();
+  const { config, isLoading, updateConfig, isSaving, save } = useSettings();
   const apiKeyManager = useApiKeyManager();
   const { combinedLlmModels, combinedEmbeddingModels, combinedRerankerModels } =
     useModelOptions(apiKeyManager.availableModels);
@@ -36,11 +37,11 @@ export function SettingsRoot() {
           </p>
         </div>
         <button
-          onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
+          onClick={save}
+          disabled={isSaving}
           className="flex items-center gap-2 px-5 py-2.5 bg-stone-800 text-white text-sm rounded-lg hover:bg-stone-900 disabled:opacity-60 transition-colors shadow-sm"
         >
-          {saveMutation.isPending ? (
+          {isSaving ? (
             <Loader2 size={14} className="animate-spin" />
           ) : (
             <Save size={14} />
@@ -56,8 +57,8 @@ export function SettingsRoot() {
 
         <div style={settle(160)}>
           <ModelSettings
-            form={form}
-            set={set}
+            form={config}
+            set={updateConfig}
             llmModels={combinedLlmModels}
             embeddingModels={combinedEmbeddingModels}
             rerankerModels={combinedRerankerModels}
@@ -65,15 +66,15 @@ export function SettingsRoot() {
         </div>
 
         <div style={settle(240)}>
-          <RetrievalSettings form={form} set={set} />
+          <RetrievalSettings form={config} set={updateConfig} />
         </div>
 
         <div style={settle(320)}>
-          <AgentSettings form={form} set={set} />
+          <AgentSettings form={config} set={updateConfig} />
         </div>
 
         <div style={settle(400)}>
-          <SplitterSettings form={form} set={set} />
+          <SplitterSettings form={config} set={updateConfig} />
         </div>
       </div>
     </div>
