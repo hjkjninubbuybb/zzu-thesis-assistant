@@ -25,6 +25,16 @@ export function OverviewPanel() {
     queryKey: ["admin-active-kb"],
     queryFn: knowledgeApi.getAdminKb,
   });
+  const { data: health, isLoading: healthLoading } = useQuery({
+    queryKey: ["health"],
+    queryFn: async () => {
+      const r = await fetch("/health");
+      if (!r.ok) throw new Error("health check failed");
+      return r.json() as Promise<Record<string, boolean>>;
+    },
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
+  });
 
   const isLoading = kbLoading || statsLoading;
   const blobReady = useDelayedTrue(50);
@@ -40,7 +50,9 @@ export function OverviewPanel() {
   const upTotal =
     (analytics?.feedback_up ?? 0) + (analytics?.feedback_down ?? 0);
   const upPct =
-    upTotal > 0 ? Math.round((analytics!.feedback_up / upTotal) * 100) : 0;
+    upTotal > 0
+      ? Math.round(((analytics?.feedback_up ?? 0) / upTotal) * 100)
+      : 0;
 
   return (
     <div className="p-7 flex-1 overflow-y-auto glass-card rounded-2xl">
@@ -79,6 +91,8 @@ export function OverviewPanel() {
                 animate={statusReady}
                 config={config}
                 activeKbName={activeKb?.kb_name}
+                health={health}
+                healthLoading={healthLoading}
               />
             </div>
           )}

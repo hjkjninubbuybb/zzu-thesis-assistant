@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, AlertCircle, Cpu } from "lucide-react";
 import type { SystemConfig } from "@shared/types/api";
 
@@ -6,22 +5,15 @@ export function SystemStatusCard({
   animate,
   config,
   activeKbName,
+  health,
+  healthLoading,
 }: {
   animate: boolean;
   config: SystemConfig | undefined;
   activeKbName: string | undefined;
+  health: Record<string, boolean> | undefined;
+  healthLoading: boolean;
 }) {
-  const { data: health } = useQuery({
-    queryKey: ["health"],
-    queryFn: async () => {
-      const r = await fetch("/health");
-      if (!r.ok) throw new Error("health check failed");
-      return r.json() as Promise<Record<string, boolean>>;
-    },
-    staleTime: 60000,
-    refetchOnWindowFocus: false,
-  });
-
   const services = [
     { label: "FastAPI 后端", ok: health?.fastapi ?? null, delay: 200 },
     { label: "Qdrant 向量库", ok: health?.qdrant ?? null, delay: 350 },
@@ -66,43 +58,72 @@ export function SystemStatusCard({
       </div>
 
       <div className="flex flex-col gap-2.5">
-        {services.map((s) => (
-          <div
-            key={s.label}
-            className="flex items-center justify-between"
-            style={{
-              opacity: animate ? 1 : 0,
-              transform: animate ? "translateX(0)" : "translateX(-8px)",
-              transition: `opacity 0.4s ease ${s.delay}ms, transform 0.4s ease ${s.delay}ms`,
-            }}
-          >
-            <span className="text-xs" style={{ color: "#A09A8D" }}>
-              {s.label}
-            </span>
-            <div className="flex items-center gap-1.5">
-              {s.ok === null ? (
-                <Loader2
-                  size={12}
-                  className="animate-spin"
-                  style={{ color: "#5A5A5A" }}
-                />
-              ) : s.ok ? (
-                <CheckCircle2 size={12} style={{ color: "#5EE67A" }} />
-              ) : (
-                <AlertCircle size={12} style={{ color: "#FF6B6B" }} />
-              )}
-              <span
-                className="text-xs"
+        {healthLoading
+          ? services.map((s) => (
+              <div
+                key={s.label}
+                className="flex items-center justify-between"
                 style={{
-                  color:
-                    s.ok === null ? "#5A5A5A" : s.ok ? "#5EE67A" : "#FF6B6B",
+                  opacity: animate ? 1 : 0,
+                  transition: `opacity 0.4s ease ${s.delay}ms`,
                 }}
               >
-                {s.ok === null ? "检测中" : s.ok ? "运行中" : "不可用"}
-              </span>
-            </div>
-          </div>
-        ))}
+                <span className="text-xs" style={{ color: "#A09A8D" }}>
+                  {s.label}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Loader2
+                    size={12}
+                    className="animate-spin"
+                    style={{ color: "#5A5A5A" }}
+                  />
+                  <span className="text-xs" style={{ color: "#5A5A5A" }}>
+                    检测中
+                  </span>
+                </div>
+              </div>
+            ))
+          : services.map((s) => (
+              <div
+                key={s.label}
+                className="flex items-center justify-between"
+                style={{
+                  opacity: animate ? 1 : 0,
+                  transform: animate ? "translateX(0)" : "translateX(-8px)",
+                  transition: `opacity 0.4s ease ${s.delay}ms, transform 0.4s ease ${s.delay}ms`,
+                }}
+              >
+                <span className="text-xs" style={{ color: "#A09A8D" }}>
+                  {s.label}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {s.ok === null ? (
+                    <Loader2
+                      size={12}
+                      className="animate-spin"
+                      style={{ color: "#5A5A5A" }}
+                    />
+                  ) : s.ok ? (
+                    <CheckCircle2 size={12} style={{ color: "#5EE67A" }} />
+                  ) : (
+                    <AlertCircle size={12} style={{ color: "#FF6B6B" }} />
+                  )}
+                  <span
+                    className="text-xs"
+                    style={{
+                      color:
+                        s.ok === null
+                          ? "#5A5A5A"
+                          : s.ok
+                            ? "#5EE67A"
+                            : "#FF6B6B",
+                    }}
+                  >
+                    {s.ok === null ? "检测中" : s.ok ? "运行中" : "不可用"}
+                  </span>
+                </div>
+              </div>
+            ))}
       </div>
 
       <div
