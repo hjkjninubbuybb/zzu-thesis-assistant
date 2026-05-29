@@ -21,6 +21,7 @@ export function useSettings() {
   });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (cfg) setForm(configToForm(cfg));
   }, [cfg]);
 

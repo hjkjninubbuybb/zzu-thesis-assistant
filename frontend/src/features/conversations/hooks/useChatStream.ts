@@ -73,7 +73,7 @@ export function useChatStream(msgState: ChatMessagesState): ChatStreamState {
 
       let accumulatedText = "";
       let finalSources: SourceItem[] = [];
-      let finalFiles: FileItem[] = [];
+      const finalFiles: FileItem[] = [];
       let finalSuggestions: string[] = [];
 
       try {

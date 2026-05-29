@@ -105,6 +105,7 @@ export function DocumentManagement() {
 
   useEffect(() => {
     if (sysConfig && !paramsInitialized) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDefaultParamsMap(buildDefaultParamsMap(sysConfig));
       setParamsInitialized(true);
     }

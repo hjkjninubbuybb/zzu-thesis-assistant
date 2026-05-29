@@ -4,7 +4,8 @@ import { Slot } from "radix-ui";
 
 import { cn } from "@shared/lib/utils";
 
-const badgeVariants = cva(
+// eslint-disable-next-line react-refresh/only-export-components
+export const badgeVariants = cva(
   "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
@@ -45,4 +46,4 @@ function Badge({
   );
 }
 
-export { Badge, badgeVariants };
+export { Badge };

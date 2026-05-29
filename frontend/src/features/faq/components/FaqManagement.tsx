@@ -60,6 +60,7 @@ export function FaqManagement() {
     if (!kbs) return;
     const names = kbs.map((kb) => kb.name);
     if (selectedKb && !names.includes(selectedKb)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedKb("");
       localStorage.removeItem(FK_STORAGE_KEY);
     }

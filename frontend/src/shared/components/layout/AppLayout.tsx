@@ -19,6 +19,7 @@ function UploadFloat() {
 
   useEffect(() => {
     if (isUploading) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true);
     } else if (visible) {
       const timer = setTimeout(() => setVisible(false), 3000);

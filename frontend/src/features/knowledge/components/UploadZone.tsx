@@ -19,6 +19,7 @@ export interface QueueItem {
 
 // ── Constants ──────────────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_UPLOAD_PARAMS: UploadParams = {
   splitter_type: "recursive",
   chunk_size: 256,
@@ -27,6 +28,7 @@ export const DEFAULT_UPLOAD_PARAMS: UploadParams = {
   doc_type: "policy",
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const DOC_TYPE_LABELS: Record<DocType, string> = {
   policy: "政策文件",
   manual: "操作手册",
@@ -35,10 +37,11 @@ export const DOC_TYPE_LABELS: Record<DocType, string> = {
 
 // ── Helpers ────────────────────────────────────────────────
 
-export function formatSize(bytes: number) {
+// eslint-disable-next-line react-refresh/only-export-components
+export const formatSize = (bytes: number): string => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
+};
 
 // ── UploadZone ─────────────────────────────────────────────
 

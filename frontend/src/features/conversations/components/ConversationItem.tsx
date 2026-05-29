@@ -4,7 +4,8 @@ import type { ConversationInfo } from "@shared/types/api";
 
 // ── 对话列表分组 ─────────────────────────────────────────
 
-export function groupByDate(conversations: ConversationInfo[]) {
+// eslint-disable-next-line react-refresh/only-export-components
+export const groupByDate = (conversations: ConversationInfo[]) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today);
@@ -28,7 +29,7 @@ export function groupByDate(conversations: ConversationInfo[]) {
   }
 
   return groups.filter((g) => g.items.length > 0);
-}
+};
 
 // ── 对话侧栏条目（支持重命名） ────────────────────────────
 
@@ -59,6 +60,7 @@ export function ConversationItem({
   }, [editing]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!editing) setDraft(conv.title);
   }, [conv.title, editing]);
 

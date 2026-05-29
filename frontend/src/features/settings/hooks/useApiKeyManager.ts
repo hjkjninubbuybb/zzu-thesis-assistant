@@ -32,6 +32,7 @@ export function useApiKeyManager() {
 
   useEffect(() => {
     if (apiKeyInfo) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setApiUrlInput(apiKeyInfo.api_base_url || "");
     }
   }, [apiKeyInfo]);

@@ -23,6 +23,7 @@ export function CleanReview() {
 
   useEffect(() => {
     if (review && !loaded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setContent(review.cleaned_content ?? "");
       setLoaded(true);
     }
@@ -32,6 +33,7 @@ export function CleanReview() {
   useEffect(() => {
     const state = location.state as { cleanedContent?: string } | null;
     if (state?.cleanedContent && !loaded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setContent(state.cleanedContent);
       setLoaded(true);
     }

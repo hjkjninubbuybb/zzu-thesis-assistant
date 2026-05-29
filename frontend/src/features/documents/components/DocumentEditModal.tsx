@@ -34,6 +34,7 @@ export function DocumentEditModal({
 
   useEffect(() => {
     if (doc) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSummary(doc.summary ?? "");
       setContent(doc.content ?? "");
     }

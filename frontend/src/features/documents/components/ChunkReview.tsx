@@ -22,6 +22,7 @@ export function ChunkReview() {
       chunkCount?: number;
     } | null;
     if (state?.chunks && !loaded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setChunks(state.chunks);
       setLoaded(true);
     }
@@ -36,6 +37,7 @@ export function ChunkReview() {
 
   useEffect(() => {
     if (review && !loaded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setChunks(review.chunks ?? []);
       setLoaded(true);
     }

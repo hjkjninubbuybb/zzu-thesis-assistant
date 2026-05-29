@@ -9,7 +9,7 @@ export function AcademicMarkdown({
   sources?: SourceItem[];
 }) {
   // 处理 AI 生成的带有空格的 sandbox 链接
-  let processedContent = content.replace(
+  const processedContent = content.replace(
     /\[(.*?)\]\(sandbox:\/mnt\/data\/(.*?)\)/g,
     (_, p1, p2) => {
       return `[${p1}](#sandbox:${encodeURIComponent(p2)})`;
