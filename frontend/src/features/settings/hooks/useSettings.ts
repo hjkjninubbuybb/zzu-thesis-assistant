@@ -27,7 +27,6 @@ export function useSettings() {
   const saveMutation = useMutation({
     mutationFn: () =>
       settingsService.update({
-        llm_base_url: form.llm_base_url,
         llm_model: form.llm_model,
         llm_fast_model: form.llm_fast_model,
         embedding_model: form.embedding_model,
