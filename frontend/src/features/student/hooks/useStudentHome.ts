@@ -1,23 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
-import { faqApi } from "@shared/lib/api";
 import { studentService } from "../services/studentService";
 import { studentKeys } from "./queryKeys";
 
 export function useStudentHome() {
   const { data: conversationData, isLoading: convLoading } = useQuery({
-    queryKey: studentKeys.allConversations(),
+    queryKey: studentKeys.recentChats(),
     queryFn: studentService.listAllConversations,
   });
 
-  const { data: activeKb, isLoading: kbLoading } = useQuery({
+  const { data: activeKB, isLoading: kbLoading } = useQuery({
     queryKey: studentKeys.activeKB(),
     queryFn: studentService.getActiveKb,
   });
 
-  const activeKbName = activeKb?.kb_name;
+  const activeKbName = activeKB?.kb_name;
   const { data: faqs } = useQuery({
     queryKey: ["faqs-home", activeKbName],
-    queryFn: () => faqApi.list(activeKbName!),
+    queryFn: () => studentService.listFaqs(activeKbName!),
     enabled: !!activeKbName,
     select: (data) => data.filter((f) => f.enabled).slice(0, 5),
   });
@@ -33,7 +32,7 @@ export function useStudentHome() {
     conversations,
     recentConversations: recentConvs,
     todayConversations: todayConvs,
-    activeKb,
+    activeKB,
     faqs: faqs ?? [],
     isLoading: convLoading || kbLoading,
   };

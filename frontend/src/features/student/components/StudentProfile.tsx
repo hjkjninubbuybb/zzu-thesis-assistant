@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type CSSProperties } from "react";
 import {
   User,
   GraduationCap,
@@ -13,7 +13,7 @@ import type { StudentProfile as StudentProfileType } from "@shared/types/api";
 import { getErrorMessage } from "@shared/lib/errorHandler";
 import { useStudentProfile } from "../hooks/useStudentProfile";
 
-const cardStyle = (delay: number): React.CSSProperties => ({
+const cardStyle = (delay: number): CSSProperties => ({
   animation: `fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms both`,
 });
 
@@ -81,7 +81,9 @@ export function StudentProfile() {
 
         {/* 修改密码 */}
         <ChangePasswordCard
-          onSubmit={(oldPwd, newPwd) => changePassword({ oldPwd, newPwd })}
+          onSubmit={(oldPwd, newPwd, callbacks) =>
+            changePassword({ oldPwd, newPwd }, callbacks)
+          }
           isLoading={isChangingPassword}
         />
       </div>
@@ -90,7 +92,11 @@ export function StudentProfile() {
 }
 
 interface ChangePasswordCardProps {
-  onSubmit: (oldPwd: string, newPwd: string) => void;
+  onSubmit: (
+    oldPwd: string,
+    newPwd: string,
+    callbacks: { onSuccess: () => void; onError: (err: unknown) => void },
+  ) => void;
   isLoading: boolean;
 }
 
@@ -107,20 +113,20 @@ function ChangePasswordCard({ onSubmit, isLoading }: ChangePasswordCardProps) {
     newPwd === confirmPwd &&
     newPwd.length >= 6;
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
     setLocalError(null);
     setSuccess(false);
-    try {
-      onSubmit(oldPwd, newPwd);
-      setSuccess(true);
-      setOldPwd("");
-      setNewPwd("");
-      setConfirmPwd("");
-    } catch (err) {
-      setLocalError(getErrorMessage(err));
-    }
+    onSubmit(oldPwd, newPwd, {
+      onSuccess: () => {
+        setSuccess(true);
+        setOldPwd("");
+        setNewPwd("");
+        setConfirmPwd("");
+      },
+      onError: (err) => setLocalError(getErrorMessage(err)),
+    });
   };
 
   return (
