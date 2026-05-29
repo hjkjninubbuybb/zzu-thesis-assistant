@@ -13,7 +13,7 @@ const ALL_TABS: { key: TabKey; label: string; adminOnly?: boolean }[] = [
 ];
 
 export function UsersRoot() {
-  const isAdmin = useIsAdmin;
+  const isAdmin = useIsAdmin();
   const [tab, setTab] = useState<TabKey>("students");
 
   const tabs = ALL_TABS.filter((t) => !t.adminOnly || isAdmin);

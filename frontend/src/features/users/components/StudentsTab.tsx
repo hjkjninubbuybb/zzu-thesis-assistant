@@ -16,7 +16,7 @@ import type { UserInfo, ImportResult } from "@shared/types/api";
 
 export function StudentsTab() {
   const qc = useQueryClient();
-  const isAdmin = useIsAdmin;
+  const isAdmin = useIsAdmin();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
