@@ -36,9 +36,12 @@ class FAQItem(BaseModel):
     updated_at: datetime
 
 
+class FAQSearchItem(FAQItem):
+    score: float | None = None
+
+
 class FAQSearchResponse(BaseModel):
-    rewritten_query: str
-    items: list[FAQItem]
+    items: list[FAQSearchItem]
 
 
 class FAQImportError(BaseModel):

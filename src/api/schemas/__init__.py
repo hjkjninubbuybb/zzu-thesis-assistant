@@ -36,6 +36,7 @@ from src.api.schemas.faq import (
     FAQImportError,
     FAQImportResult,
     FAQItem,
+    FAQSearchItem,
     FAQSearchResponse,
     FAQUpdate,
 )
@@ -84,6 +85,7 @@ __all__ = [
     "FAQImportError",
     "FAQImportResult",
     "FAQItem",
+    "FAQSearchItem",
     "FAQSearchResponse",
     "FAQUpdate",
     "FeedbackRequest",
