@@ -186,3 +186,153 @@ def test_get_template_returns_bytes_and_fixed_filename(svc, mock_kb_store):
 
     assert isinstance(data, bytes)
     assert filename == "FAQ_导入模板.xlsx"
+
+
+# ── search ────────────────────────────────────────────────────────────
+
+
+def _faq_row(faq_id: int, kb: str = "kb1", status: str = "approved") -> dict:
+    """构造测试用 FAQ 行 dict。"""
+    import datetime
+
+    return {
+        "id": faq_id,
+        "kb_name": kb,
+        "question": f"Q{faq_id}",
+        "answer": f"A{faq_id}",
+        "category": "",
+        "sort_order": 0,
+        "enabled": True,
+        "status": status,
+        "author_id": None,
+        "created_at": datetime.datetime(2024, 1, 1),
+        "updated_at": datetime.datetime(2024, 1, 1),
+    }
+
+
+def test_search_kb_not_found(svc, mock_kb_store):
+    mock_kb_store.get_kb.return_value = None
+
+    with pytest.raises(KnowledgeBaseNotFoundError):
+        svc.search("missing", "query")
+
+
+def test_search_embed_failure(svc, mock_kb_store):
+    from dashscope.common.error import DashScopeException
+
+    mock_kb_store.get_kb.return_value = {"name": "kb1"}
+
+    with patch("src.core.rag.embedding.get_embed_model") as mock_embed:
+        mock_embed.return_value.get_text_embedding.side_effect = DashScopeException("err")
+        with pytest.raises(RuntimeError, match="向量化失败"):
+            svc.search("kb1", "query")
+
+
+def test_search_vector_store_failure(svc, mock_kb_store, mock_vector_store):
+    from src.storage.vector_store import VectorStoreError
+
+    mock_kb_store.get_kb.return_value = {"name": "kb1"}
+
+    with patch("src.core.rag.embedding.get_embed_model") as mock_embed:
+        mock_embed.return_value.get_text_embedding.return_value = [0.1] * 10
+        mock_vector_store.search.side_effect = VectorStoreError("qdrant down")
+        with pytest.raises(RuntimeError, match="向量检索失败"):
+            svc.search("kb1", "query")
+
+
+def test_search_passes_score_threshold(svc, mock_kb_store, mock_faq_store, mock_vector_store):
+    mock_kb_store.get_kb.return_value = {"name": "kb1"}
+    mock_vector_store.search.return_value = []
+    mock_faq_store.search_by_text.return_value = []
+
+    with patch("src.core.rag.embedding.get_embed_model") as mock_embed:
+        mock_embed.return_value.get_text_embedding.return_value = [0.1] * 10
+        svc.search("kb1", "query")
+
+    call_args = mock_vector_store.search.call_args[0]
+    assert call_args[3] == 0.4  # score_threshold 第 4 个位置参数
+
+
+def test_search_vector_result_has_score(svc, mock_kb_store, mock_faq_store, mock_vector_store):
+    mock_kb_store.get_kb.return_value = {"name": "kb1"}
+    mock_vector_store.search.return_value = [{"faq_id": 1, "score": 0.92}]
+    mock_faq_store.get_faq.return_value = _faq_row(1)
+    mock_faq_store.search_by_text.return_value = []
+
+    with patch("src.core.rag.embedding.get_embed_model") as mock_embed:
+        mock_embed.return_value.get_text_embedding.return_value = [0.1] * 10
+        result = svc.search("kb1", "query")
+
+    assert result["items"][0]["score"] == 0.92
+
+
+def test_search_text_result_has_null_score(svc, mock_kb_store, mock_faq_store, mock_vector_store):
+    mock_kb_store.get_kb.return_value = {"name": "kb1"}
+    mock_vector_store.search.return_value = []
+    mock_faq_store.search_by_text.return_value = [_faq_row(2)]
+
+    with patch("src.core.rag.embedding.get_embed_model") as mock_embed:
+        mock_embed.return_value.get_text_embedding.return_value = [0.1] * 10
+        result = svc.search("kb1", "query")
+
+    assert result["items"][0]["score"] is None
+
+
+def test_search_deduplicates_by_faq_id(svc, mock_kb_store, mock_faq_store, mock_vector_store):
+    mock_kb_store.get_kb.return_value = {"name": "kb1"}
+    mock_vector_store.search.return_value = [{"faq_id": 1, "score": 0.8}]
+    mock_faq_store.get_faq.return_value = _faq_row(1)
+    # FAQ 1 同时出现在文本搜索结果中
+    mock_faq_store.search_by_text.return_value = [_faq_row(1), _faq_row(2)]
+
+    with patch("src.core.rag.embedding.get_embed_model") as mock_embed:
+        mock_embed.return_value.get_text_embedding.return_value = [0.1] * 10
+        result = svc.search("kb1", "query")
+
+    ids = [item["id"] for item in result["items"]]
+    assert ids.count(1) == 1  # 不重复
+    assert 2 in ids
+
+
+def test_search_vector_results_before_text(svc, mock_kb_store, mock_faq_store, mock_vector_store):
+    mock_kb_store.get_kb.return_value = {"name": "kb1"}
+    mock_vector_store.search.return_value = [{"faq_id": 1, "score": 0.8}]
+    mock_faq_store.get_faq.return_value = _faq_row(1)
+    mock_faq_store.search_by_text.return_value = [_faq_row(2)]
+
+    with patch("src.core.rag.embedding.get_embed_model") as mock_embed:
+        mock_embed.return_value.get_text_embedding.return_value = [0.1] * 10
+        result = svc.search("kb1", "query")
+
+    items = result["items"]
+    assert items[0]["id"] == 1 and items[0]["score"] == 0.8
+    assert items[1]["id"] == 2 and items[1]["score"] is None
+
+
+def test_search_returns_all_statuses(svc, mock_kb_store, mock_faq_store, mock_vector_store):
+    mock_kb_store.get_kb.return_value = {"name": "kb1"}
+    mock_vector_store.search.return_value = [{"faq_id": 1, "score": 0.9}]
+    mock_faq_store.get_faq.return_value = _faq_row(1, status="draft")
+    mock_faq_store.search_by_text.return_value = []
+
+    with patch("src.core.rag.embedding.get_embed_model") as mock_embed:
+        mock_embed.return_value.get_text_embedding.return_value = [0.1] * 10
+        result = svc.search("kb1", "query")
+
+    assert len(result["items"]) == 1
+    assert result["items"][0]["status"] == "draft"
+
+
+def test_search_no_rewrite_query_called(svc, mock_kb_store, mock_faq_store, mock_vector_store):
+    mock_kb_store.get_kb.return_value = {"name": "kb1"}
+    mock_vector_store.search.return_value = []
+    mock_faq_store.search_by_text.return_value = []
+
+    with (
+        patch("src.core.rag.embedding.get_embed_model") as mock_embed,
+        patch("src.core.faq_match.rewrite_query") as mock_rewrite,
+    ):
+        mock_embed.return_value.get_text_embedding.return_value = [0.1] * 10
+        svc.search("kb1", "query")
+
+    mock_rewrite.assert_not_called()
