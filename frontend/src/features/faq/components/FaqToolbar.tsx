@@ -8,6 +8,7 @@ import {
   FileText,
   Upload,
   ChevronDown,
+  X,
 } from "lucide-react";
 import type { KBInfo } from "@shared/types/api";
 
@@ -40,6 +41,7 @@ interface FaqToolbarProps {
   onCreateClick: () => void;
   onExportExcel: () => void;
   onDownloadTemplate: () => void;
+  onClearSearch: () => void;
 }
 
 /** Toolbar row: KB selector, search, stats, import/export menu, create button. */
@@ -58,6 +60,7 @@ export function FaqToolbar({
   onCreateClick,
   onExportExcel,
   onDownloadTemplate,
+  onClearSearch,
 }: FaqToolbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -103,15 +106,22 @@ export function FaqToolbar({
             <input
               value={searchText}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="AI 语义搜索 FAQ..."
+              placeholder="混合搜索 FAQ（语义+关键词）..."
               className="w-full border border-[#E8E4DC] rounded-xl pl-9 pr-12 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 bg-white transition-colors"
             />
-            <div
-              className={`absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${isAiSearch ? "bg-violet-100 text-violet-600" : "bg-[#F2EFE9] text-[#8A8A8A]"}`}
-            >
-              <Sparkles size={10} />
-              AI
-            </div>
+            {searchText ? (
+              <button
+                onClick={onClearSearch}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-[#8A8A8A] hover:text-[#334155] hover:bg-[#F2EFE9] transition-colors"
+              >
+                <X size={12} />
+              </button>
+            ) : (
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#F2EFE9] text-[#8A8A8A]">
+                <Sparkles size={10} />
+                AI
+              </div>
+            )}
           </div>
 
           <StatPill label="条 FAQ" value={totalCount} />

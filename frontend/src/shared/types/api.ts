@@ -201,9 +201,12 @@ export interface FAQUpdate {
   status?: "draft" | "pending" | "approved" | "rejected";
 }
 
+export interface FAQSearchItem extends FAQItem {
+  score: number | null;
+}
+
 export interface FAQSearchResponse {
-  rewritten_query: string;
-  items: FAQItem[];
+  items: FAQSearchItem[];
 }
 
 export interface FAQImportError {
