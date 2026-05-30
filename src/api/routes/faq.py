@@ -88,11 +88,11 @@ async def update_faq(
 @router.get("/{kb_name}/search", response_model=FAQSearchResponse)
 async def search_faqs(
     kb_name: str,
-    q: str = QueryParam(..., min_length=1, description="搜索词，LLM 改写后语义向量检索"),
-    current_user: dict = Depends(get_current_user),
+    q: str = QueryParam(..., min_length=1, description="搜索词（向量+关键词混合检索）"),
+    current_user: dict = Depends(require_teacher_or_admin),
     svc: FAQService = Depends(get_faq_service),
 ) -> dict:
-    """LLM 改写查询 + 语义向量检索 FAQ（仅返回已启用的条目）。"""
+    """向量+关键词混合检索 FAQ（管理端，不过滤状态）。"""
     try:
         return await asyncio.to_thread(svc.search, kb_name, q)
     except KnowledgeBaseNotFoundError as e:
