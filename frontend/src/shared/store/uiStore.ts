@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 
 export interface ToastPayload {
   id: string;
@@ -54,23 +55,29 @@ const useUIStore = create<UIState>((set) => ({
 
 // Selector hooks
 export const useToast = () =>
-  useUIStore((s) => ({
-    toasts: s.toasts,
-    showToast: s.showToast,
-    dismissToast: s.dismissToast,
-  }));
+  useUIStore(
+    useShallow((s) => ({
+      toasts: s.toasts,
+      showToast: s.showToast,
+      dismissToast: s.dismissToast,
+    })),
+  );
 export const useConfirm = () =>
-  useUIStore((s) => ({
-    dialog: s.confirmDialog,
-    showConfirm: s.showConfirm,
-    dismissConfirm: s.dismissConfirm,
-  }));
+  useUIStore(
+    useShallow((s) => ({
+      dialog: s.confirmDialog,
+      showConfirm: s.showConfirm,
+      dismissConfirm: s.dismissConfirm,
+    })),
+  );
 export const useActiveKB = () => useUIStore((s) => s.activeKBName);
 export const useSetActiveKB = () => useUIStore((s) => s.setActiveKBName);
 export const useSidebar = () =>
-  useUIStore((s) => ({
-    collapsed: s.sidebarCollapsed,
-    set: s.setSidebarCollapsed,
-  }));
+  useUIStore(
+    useShallow((s) => ({
+      collapsed: s.sidebarCollapsed,
+      set: s.setSidebarCollapsed,
+    })),
+  );
 
 export default useUIStore;
