@@ -10,7 +10,11 @@ import {
   User,
   MessageSquareQuote,
 } from "lucide-react";
-import type { FAQItem, FAQUpdate } from "@shared/types/api";
+import type {
+  FAQItem,
+  FAQSearchItem,
+  FAQUpdate,
+} from "@shared/types/api";
 import { useAuthUser, useIsAdmin } from "@shared/store/authStore";
 
 // ── Status badge ───────────────────────────────────────────
@@ -36,12 +40,21 @@ function StatusBadge({ status }: { status: FAQItem["status"] }) {
 
 interface FaqCardProps {
   faq: FAQItem;
+  score?: number | null;
+  searchMode?: boolean;
   onEdit: (faq: FAQItem) => void;
   onDelete: (faq: FAQItem) => void;
   onUpdate: (id: number, payload: FAQUpdate) => void;
 }
 
-function FaqCard({ faq, onEdit, onDelete, onUpdate }: FaqCardProps) {
+function FaqCard({
+  faq,
+  score,
+  searchMode,
+  onEdit,
+  onDelete,
+  onUpdate,
+}: FaqCardProps) {
   const [expanded, setExpanded] = useState(false);
   const user = useAuthUser();
   const isAdmin = useIsAdmin();
@@ -65,6 +78,16 @@ function FaqCard({ faq, onEdit, onDelete, onUpdate }: FaqCardProps) {
         {faq.category && (
           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#F2EFE9] text-[#8A8A8A] shrink-0">
             {faq.category}
+          </span>
+        )}
+        {searchMode && score != null && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 font-medium shrink-0">
+            {Math.round(score * 100)}%
+          </span>
+        )}
+        {searchMode && score == null && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F2EFE9] text-[#8A8A8A] font-medium shrink-0">
+            关键词
           </span>
         )}
         <span className="text-xs w-20 text-right shrink-0 text-[#8A8A8A]">
@@ -146,25 +169,40 @@ function FaqCard({ faq, onEdit, onDelete, onUpdate }: FaqCardProps) {
 
 interface FaqTableProps {
   faqs: FAQItem[];
+  searchMode?: boolean;
   onEdit: (faq: FAQItem) => void;
   onDelete: (faq: FAQItem) => void;
   onUpdate: (id: number, payload: FAQUpdate) => void;
 }
 
 /** Renders the list of FAQ cards with edit / delete / toggle actions. */
-export function FaqTable({ faqs, onEdit, onDelete, onUpdate }: FaqTableProps) {
+export function FaqTable({
+  faqs,
+  searchMode,
+  onEdit,
+  onDelete,
+  onUpdate,
+}: FaqTableProps) {
   if (faqs.length === 0) return null;
 
   return (
     <div className="space-y-1.5">
-      {faqs.map((faq) => (
-        <FaqCard
+      {faqs.map((faq, i) => (
+        <div
           key={faq.id}
-          faq={faq}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onUpdate={onUpdate}
-        />
+          style={{
+            animation: `appleFadeUp 0.55s cubic-bezier(0.25, 1, 0.5, 1) ${Math.min(160 + i * 45, 600)}ms both`,
+          }}
+        >
+          <FaqCard
+            faq={faq}
+            score={"score" in faq ? (faq as FAQSearchItem).score : undefined}
+            searchMode={searchMode}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onUpdate={onUpdate}
+          />
+        </div>
       ))}
     </div>
   );
