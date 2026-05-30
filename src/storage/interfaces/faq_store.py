@@ -40,3 +40,7 @@ class BaseFAQStore(Protocol):
     def delete_faq(self, faq_id: int) -> dict | None:
         """删除 FAQ，返回被删除的行或 None。"""
         ...
+
+    def search_by_text(self, kb_name: str, query: str, limit: int = 20) -> list[dict]:
+        """Question 或 answer 包含 query 的 FAQ，不过滤 status/enabled，按 sort_order ASC, id DESC 排序。"""
+        ...

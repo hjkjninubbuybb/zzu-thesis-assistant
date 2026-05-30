@@ -144,3 +144,26 @@ class FAQStore:
                 cur.execute("DELETE FROM faqs WHERE id = %s", (faq_id,))
                 conn.commit()
             return row
+
+    def search_by_text(self, kb_name: str, query: str, limit: int = 20) -> list[dict]:
+        """Question 或 answer 包含 query 的 FAQ 列表。
+
+        Args:
+            kb_name: 知识库名称。
+            query: 搜索关键词（做 LIKE 匹配）。
+            limit: 最大返回条数。
+
+        Returns:
+            匹配的 FAQ 行列表，不过滤 status/enabled，按 sort_order ASC, id DESC 排序。
+        """
+        like = f"%{query}%"
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                """SELECT * FROM faqs
+                   WHERE kb_name = %s
+                     AND (question LIKE %s OR answer LIKE %s)
+                   ORDER BY sort_order ASC, id DESC
+                   LIMIT %s""",
+                (kb_name, like, like, limit),
+            )
+            return cur.fetchall()
