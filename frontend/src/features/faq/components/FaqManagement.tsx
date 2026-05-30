@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { knowledgeApi, faqApi } from "@shared/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
 import { useIsAdmin } from "@shared/store/authStore";
 import { useConfirm, useToast } from "@shared/store/uiStore";
+import { useKBList } from "@shared/hooks/useKBList";
 import type { FAQItem, FAQUpdate } from "@shared/types/api";
 import { faqService } from "../services/faqService";
 import { useFaqList } from "../hooks/useFaqList";
+import { useFaqSearch } from "../hooks/useFaqSearch";
 import { FaqTable, FaqEmptyNoKb, FaqEmptyList } from "./FaqTable";
 import { FaqForm } from "./FaqForm";
 import { FaqImportDialog } from "./FaqImportDialog";
@@ -47,14 +48,15 @@ export function FaqManagement() {
   } = useFaqList(selectedKb);
 
   useEffect(() => {
+    if (!searchText) {
+      setDebouncedSearch("");
+      return;
+    }
     const timer = setTimeout(() => setDebouncedSearch(searchText.trim()), 500);
     return () => clearTimeout(timer);
   }, [searchText]);
 
-  const { data: kbs } = useQuery({
-    queryKey: ["knowledge-bases"],
-    queryFn: knowledgeApi.list,
-  });
+  const { data: kbs } = useKBList();
 
   useEffect(() => {
     if (!kbs) return;
@@ -66,12 +68,10 @@ export function FaqManagement() {
     }
   }, [kbs, selectedKb]);
 
-  const { data: searchData, isFetching: isSearching } = useQuery({
-    queryKey: ["faqs-search", selectedKb, debouncedSearch],
-    queryFn: () => faqApi.search(selectedKb, debouncedSearch),
-    enabled: !!selectedKb && debouncedSearch.length > 0,
-    staleTime: 30_000,
-  });
+  const { data: searchData, isFetching: isSearching } = useFaqSearch(
+    selectedKb,
+    debouncedSearch,
+  );
 
   const isAiSearch = debouncedSearch.length > 0;
   const invalidate = () =>
@@ -106,6 +106,11 @@ export function FaqManagement() {
     setSearchText("");
   };
 
+  const handleClearSearch = () => {
+    setSearchText("");
+    setDebouncedSearch("");
+  };
+
   const handleUpdate = (id: number, payload: FAQUpdate) =>
     updateFaq({ id, payload });
 
@@ -127,7 +132,7 @@ export function FaqManagement() {
   };
 
   return (
-    <>
+    <div className="flex flex-col gap-5">
       <div style={settle(0)}>
         <FaqToolbar
           kbs={kbs}
@@ -138,6 +143,7 @@ export function FaqManagement() {
             setSearchText(v);
             setCategoryFilter("全部");
           }}
+          onClearSearch={handleClearSearch}
           isSearching={isSearching}
           isAiSearch={isAiSearch}
           totalCount={faqs.length}
@@ -150,8 +156,8 @@ export function FaqManagement() {
         />
       </div>
 
-      {selectedKb && (
-        <div style={settle(60)}>
+      {selectedKb && !isAiSearch && (
+        <div style={settle(50)}>
           <FaqFilterBar
             categories={allCategories}
             categoryFilter={categoryFilter}
@@ -162,25 +168,37 @@ export function FaqManagement() {
         </div>
       )}
 
-      {!selectedKb && <FaqEmptyNoKb />}
-      {selectedKb && !isLoading && faqs.length === 0 && <FaqEmptyList />}
-      {selectedKb &&
-        !isLoading &&
-        displayFaqs.length === 0 &&
-        faqs.length > 0 && (
-          <p className="text-xs text-center py-12 text-[#AAAAAA]">
-            没有匹配的 FAQ
-          </p>
+      <div
+        className="flex-1 border border-[#F0EDE8] rounded-2xl overflow-hidden bg-white/50"
+        style={settle(100)}
+      >
+        {!selectedKb && <FaqEmptyNoKb />}
+        {selectedKb && isLoading && (
+          <div className="flex items-center justify-center h-48 text-sm text-[#9A9A9A]">
+            加载中...
+          </div>
         )}
-
-      {selectedKb && !isLoading && displayFaqs.length > 0 && (
-        <FaqTable
-          faqs={displayFaqs}
-          onEdit={setEditTarget}
-          onDelete={handleDeleteClick}
-          onUpdate={handleUpdate}
-        />
-      )}
+        {selectedKb && !isLoading && faqs.length === 0 && <FaqEmptyList />}
+        {selectedKb &&
+          !isLoading &&
+          displayFaqs.length === 0 &&
+          faqs.length > 0 && (
+            <p className="text-xs text-center py-12 text-[#AAAAAA]">
+              没有匹配的 FAQ
+            </p>
+          )}
+        {selectedKb && !isLoading && displayFaqs.length > 0 && (
+          <div className="p-3">
+            <FaqTable
+              faqs={displayFaqs}
+              searchMode={isAiSearch}
+              onEdit={setEditTarget}
+              onDelete={handleDeleteClick}
+              onUpdate={handleUpdate}
+            />
+          </div>
+        )}
+      </div>
 
       {createOpen && (
         <FaqForm
@@ -219,6 +237,6 @@ export function FaqManagement() {
           showToast={showToast}
         />
       )}
-    </>
+    </div>
   );
 }
