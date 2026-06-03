@@ -1,7 +1,7 @@
-import { create } from "zustand";
-import type { DocType, UploadParams, CleanResult } from "@shared/types/api";
+import { create } from 'zustand';
+import type { DocType, UploadParams, CleanResult } from '@shared/types/api';
 
-export type UploadStatus = "pending" | "uploading" | "done" | "error";
+export type UploadStatus = 'pending' | 'uploading' | 'done' | 'error';
 
 export interface UploadItem {
   id: string;
@@ -17,12 +17,7 @@ export interface UploadItem {
 
 interface UploadState {
   queue: UploadItem[];
-  enqueue: (
-    kbName: string,
-    docType: DocType,
-    files: File[],
-    params: UploadParams,
-  ) => void;
+  enqueue: (kbName: string, docType: DocType, files: File[], params: UploadParams) => void;
   updateItem: (id: string, patch: Partial<UploadItem>) => void;
   removeItem: (id: string) => void;
   clearDone: (kbName: string, docType: DocType) => void;
@@ -38,7 +33,7 @@ const useUploadStore = create<UploadState>((set) => ({
       kbName,
       docType,
       params,
-      status: "pending",
+      status: 'pending',
       progress: 0,
     }));
     set((s) => ({ queue: [...s.queue, ...items] }));
@@ -51,18 +46,13 @@ const useUploadStore = create<UploadState>((set) => ({
 
   removeItem: (id) =>
     set((s) => ({
-      queue: s.queue.filter((q) => !(q.id === id && q.status !== "uploading")),
+      queue: s.queue.filter((q) => !(q.id === id && q.status !== 'uploading')),
     })),
 
   clearDone: (kbName, docType) =>
     set((s) => ({
       queue: s.queue.filter(
-        (q) =>
-          !(
-            q.kbName === kbName &&
-            q.docType === docType &&
-            q.status === "done"
-          ),
+        (q) => !(q.kbName === kbName && q.docType === docType && q.status === 'done'),
       ),
     })),
 }));

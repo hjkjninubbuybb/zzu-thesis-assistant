@@ -1,20 +1,11 @@
-import { useState, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import type {
-  DocType,
-  SplitterType,
-  UploadParams,
-  SystemConfig,
-} from "@shared/types/api";
-import {
-  useUploadQueue,
-  useEnqueue,
-  useRemoveItem,
-} from "@shared/store/uploadStore";
-import { documentService } from "../services/documentService";
-import { UploadPanel } from "./UploadPanel";
-import { DocumentList } from "./DocumentList";
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import type { DocType, SplitterType, UploadParams, SystemConfig } from '@shared/types/api';
+import { useUploadQueue, useEnqueue, useRemoveItem } from '@shared/store/uploadStore';
+import { documentService } from '../services/documentService';
+import { UploadPanel } from './UploadPanel';
+import { DocumentList } from './DocumentList';
 
 const DOC_TYPES: {
   type: DocType;
@@ -24,56 +15,52 @@ const DOC_TYPES: {
   badge: string;
 }[] = [
   {
-    type: "policy",
-    label: "政策文件",
-    color: "text-blue-600",
-    barColor: "bg-blue-500",
-    badge: "bg-blue-50 text-blue-700",
+    type: 'policy',
+    label: '政策文件',
+    color: 'text-blue-600',
+    barColor: 'bg-blue-500',
+    badge: 'bg-blue-50 text-blue-700',
   },
   {
-    type: "manual",
-    label: "操作手册",
-    color: "text-purple-600",
-    barColor: "bg-purple-500",
-    badge: "bg-purple-50 text-purple-700",
+    type: 'manual',
+    label: '操作手册',
+    color: 'text-purple-600',
+    barColor: 'bg-purple-500',
+    badge: 'bg-purple-50 text-purple-700',
   },
   {
-    type: "form",
-    label: "填报模板",
-    color: "text-amber-600",
-    barColor: "bg-amber-500",
-    badge: "bg-amber-50 text-amber-700",
+    type: 'form',
+    label: '填报模板',
+    color: 'text-amber-600',
+    barColor: 'bg-amber-500',
+    badge: 'bg-amber-50 text-amber-700',
   },
 ];
 
-function buildDefaultParamsMap(
-  cfg: SystemConfig | undefined,
-): Record<DocType, UploadParams> {
+function buildDefaultParamsMap(cfg: SystemConfig | undefined): Record<DocType, UploadParams> {
   const gs = cfg?.splitter?.chunk_size ?? 256;
   const go = cfg?.splitter?.chunk_overlap_ratio ?? 0.2;
   return {
     policy: {
-      splitter_type: (cfg?.splitter?.policy?.type ??
-        "recursive") as SplitterType,
+      splitter_type: (cfg?.splitter?.policy?.type ?? 'recursive') as SplitterType,
       chunk_size: cfg?.splitter?.policy?.chunk_size ?? gs,
       chunk_overlap_ratio: cfg?.splitter?.policy?.chunk_overlap_ratio ?? go,
       enable_cleaning: cfg?.splitter?.policy?.enable_cleaning ?? true,
-      doc_type: "policy",
+      doc_type: 'policy',
     },
     manual: {
-      splitter_type: (cfg?.splitter?.manual?.type ??
-        "recursive") as SplitterType,
+      splitter_type: (cfg?.splitter?.manual?.type ?? 'recursive') as SplitterType,
       chunk_size: cfg?.splitter?.manual?.chunk_size ?? gs,
       chunk_overlap_ratio: cfg?.splitter?.manual?.chunk_overlap_ratio ?? go,
       enable_cleaning: cfg?.splitter?.manual?.enable_cleaning ?? true,
-      doc_type: "manual",
+      doc_type: 'manual',
     },
     form: {
-      splitter_type: (cfg?.splitter?.form?.type ?? "recursive") as SplitterType,
+      splitter_type: (cfg?.splitter?.form?.type ?? 'recursive') as SplitterType,
       chunk_size: cfg?.splitter?.form?.chunk_size ?? gs,
       chunk_overlap_ratio: cfg?.splitter?.form?.chunk_overlap_ratio ?? 0.0,
       enable_cleaning: cfg?.splitter?.form?.enable_cleaning ?? false,
-      doc_type: "form",
+      doc_type: 'form',
     },
   };
 }
@@ -84,21 +71,21 @@ const settle = (d: number): React.CSSProperties => ({
 
 export function DocumentManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const selectedKb = searchParams.get("kb") ?? "";
-  const activeType = (searchParams.get("type") as DocType) ?? "policy";
+  const selectedKb = searchParams.get('kb') ?? '';
+  const activeType = (searchParams.get('type') as DocType) ?? 'policy';
   const navigate = useNavigate();
 
   const allQueue = useUploadQueue();
   const enqueue = useEnqueue();
   const removeItem = useRemoveItem();
 
-  const [defaultParamsMap, setDefaultParamsMap] = useState<
-    Record<DocType, UploadParams>
-  >(buildDefaultParamsMap(undefined));
+  const [defaultParamsMap, setDefaultParamsMap] = useState<Record<DocType, UploadParams>>(
+    buildDefaultParamsMap(undefined),
+  );
   const [paramsInitialized, setParamsInitialized] = useState(false);
 
   const { data: sysConfig } = useQuery({
-    queryKey: ["system-config"],
+    queryKey: ['system-config'],
     queryFn: () => documentService.getSystemConfig(),
     staleTime: 5 * 60 * 1000,
   });
@@ -112,14 +99,14 @@ export function DocumentManagement() {
   }, [sysConfig, paramsInitialized]);
 
   const { data: kbs } = useQuery({
-    queryKey: ["knowledge-bases"],
+    queryKey: ['knowledge-bases'],
     queryFn: () => documentService.listKBs(),
   });
 
   // Watch for completed uploads with cleanResult and navigate to review page
   useEffect(() => {
     const justDone = allQueue.find(
-      (q) => q.status === "done" && q.cleanResult && q.kbName === selectedKb,
+      (q) => q.status === 'done' && q.cleanResult && q.kbName === selectedKb,
     );
     if (justDone?.cleanResult) {
       const { doc_id } = justDone.cleanResult;
@@ -133,7 +120,7 @@ export function DocumentManagement() {
     (q) =>
       q.kbName === selectedKb &&
       q.docType === activeType &&
-      (q.status === "pending" || q.status === "uploading"),
+      (q.status === 'pending' || q.status === 'uploading'),
   );
 
   const isUploading = activeUploads.length > 0;
@@ -165,9 +152,7 @@ export function DocumentManagement() {
       </div>
 
       <div className="mb-6" style={settle(60)}>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          选择知识库
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">选择知识库</label>
         <select
           value={selectedKb}
           onChange={(e) => switchKb(e.target.value)}
@@ -190,10 +175,7 @@ export function DocumentManagement() {
 
       {selectedKb && (
         <>
-          <div
-            className="flex gap-1 mb-6 border-b border-gray-200"
-            style={settle(100)}
-          >
+          <div className="flex gap-1 mb-6 border-b border-gray-200" style={settle(100)}>
             {DOC_TYPES.map((t) => (
               <button
                 key={t.type}
@@ -201,7 +183,7 @@ export function DocumentManagement() {
                 className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors -mb-px border-b-2 ${
                   activeType === t.type
                     ? `border-gray-900 text-gray-900`
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
                 {t.label}

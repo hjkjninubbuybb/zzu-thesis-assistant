@@ -1,13 +1,8 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import {
-  CheckCircle2,
-  X as XIcon,
-  MessageSquareQuote,
-  Loader2,
-} from "lucide-react";
-import { ticketService } from "../services/ticketService";
-import type { QARequestInfo } from "@shared/types/api";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { CheckCircle2, X as XIcon, MessageSquareQuote, Loader2 } from 'lucide-react';
+import { ticketService } from '../services/ticketService';
+import type { QARequestInfo } from '@shared/types/api';
 
 export function TicketToFaqModal({
   ticket,
@@ -19,36 +14,31 @@ export function TicketToFaqModal({
   onSuccess: () => void;
 }) {
   const [question, setQuestion] = useState(ticket.question);
-  const [answer, setAnswer] = useState(ticket.answer || "");
-  const [category, setCategory] = useState("");
-  const [kbName, setKbName] = useState("");
+  const [answer, setAnswer] = useState(ticket.answer || '');
+  const [category, setCategory] = useState('');
+  const [kbName, setKbName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { data: kbs } = useQuery({
-    queryKey: ["kbs"],
+    queryKey: ['kbs'],
     queryFn: ticketService.listKbs,
   });
 
   const handleSubmit = async () => {
     if (!kbName) {
-      setError("请选择目标知识库");
+      setError('请选择目标知识库');
       return;
     }
     if (!question.trim() || !answer.trim()) {
-      setError("问题和回答不能为空");
+      setError('问题和回答不能为空');
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      await ticketService.createFaq(
-        kbName,
-        question.trim(),
-        answer.trim(),
-        category.trim(),
-      );
+      await ticketService.createFaq(kbName, question.trim(), answer.trim(), category.trim());
       onSuccess();
     } catch (err: unknown) {
       setError(ticketService.extractError(err));
@@ -65,14 +55,9 @@ export function TicketToFaqModal({
             <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
               <MessageSquareQuote size={16} />
             </div>
-            <h3 className="text-sm font-semibold text-slate-700">
-              转化为 FAQ 申请
-            </h3>
+            <h3 className="text-sm font-semibold text-slate-700">转化为 FAQ 申请</h3>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <XIcon size={18} />
           </button>
         </div>
@@ -136,10 +121,7 @@ export function TicketToFaqModal({
         </div>
 
         <div className="px-6 py-4 bg-gray-50 border-t border-[#F0EDE8] flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
             取消
           </button>
           <button
@@ -147,11 +129,7 @@ export function TicketToFaqModal({
             disabled={loading || !kbName || !question.trim() || !answer.trim()}
             className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white text-sm font-medium rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-md"
           >
-            {loading ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <CheckCircle2 size={14} />
-            )}
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
             提交 FAQ 申请
           </button>
         </div>

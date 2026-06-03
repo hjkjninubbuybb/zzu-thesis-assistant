@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Ticket,
   MessageSquare,
@@ -11,31 +11,31 @@ import {
   Calendar,
   ExternalLink,
   Plus,
-} from "lucide-react";
-import { ticketService } from "../services/ticketService";
-import { ticketKeys } from "../hooks/queryKeys";
-import type { QARequestInfo } from "@shared/types/api";
-import { useIsAdmin, useIsTeacher } from "@shared/store/authStore";
-import { TicketToFaqModal } from "./TicketToFaqModal";
+} from 'lucide-react';
+import { ticketService } from '../services/ticketService';
+import { ticketKeys } from '../hooks/queryKeys';
+import type { QARequestInfo } from '@shared/types/api';
+import { useIsAdmin, useIsTeacher } from '@shared/store/authStore';
+import { TicketToFaqModal } from './TicketToFaqModal';
 
 // ── 状态标签 ──────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: QARequestInfo["status"] }) {
+function StatusBadge({ status }: { status: QARequestInfo['status'] }) {
   const map = {
     pending: {
-      label: "待处理",
+      label: '待处理',
       icon: Clock,
-      class: "bg-amber-50 text-amber-600 border-amber-100",
+      class: 'bg-amber-50 text-amber-600 border-amber-100',
     },
     replied: {
-      label: "已回复",
+      label: '已回复',
       icon: CheckCircle2,
-      class: "bg-emerald-50 text-emerald-600 border-emerald-100",
+      class: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     },
     closed: {
-      label: "已关闭",
+      label: '已关闭',
       icon: CheckCircle2,
-      class: "bg-slate-50 text-slate-500 border-slate-100",
+      class: 'bg-slate-50 text-slate-500 border-slate-100',
     },
   };
   const config = map[status];
@@ -62,7 +62,7 @@ export function TicketReplyModal({
   const qc = useQueryClient();
   const isTeacher = useIsTeacher();
   const isAdmin = useIsAdmin();
-  const [reply, setReply] = useState("");
+  const [reply, setReply] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showFaqModal, setShowFaqModal] = useState(false);
 
@@ -96,16 +96,11 @@ export function TicketReplyModal({
                 <Ticket size={16} />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-[#334155]">
-                  答疑详情
-                </h2>
+                <h2 className="text-sm font-semibold text-[#334155]">答疑详情</h2>
                 <p className="text-[10px] text-[#9A9A9A]">ID: #{ticket.id}</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-[#9A9A9A] hover:text-[#334155]"
-            >
+            <button onClick={onClose} className="text-[#9A9A9A] hover:text-[#334155]">
               <ChevronRight size={18} className="rotate-90" />
             </button>
           </div>
@@ -121,8 +116,7 @@ export function TicketReplyModal({
               </div>
               <div className="flex items-center justify-between text-[10px] text-[#9A9A9A]">
                 <div className="flex items-center gap-1">
-                  <Calendar size={10} />{" "}
-                  {new Date(ticket.created_at).toLocaleString()}
+                  <Calendar size={10} /> {new Date(ticket.created_at).toLocaleString()}
                 </div>
                 <a
                   href={`/admin/conversations?id=${ticket.conversation_id}`}
@@ -135,26 +129,23 @@ export function TicketReplyModal({
               </div>
             </div>
 
-            {(ticket.answer || ticket.status === "replied") && (
+            {(ticket.answer || ticket.status === 'replied') && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-[11px] text-emerald-600 font-medium uppercase tracking-wider">
                   <MessageSquare size={12} /> 导师的回复
                 </div>
                 <div className="bg-emerald-50/50 rounded-2xl p-4 text-sm text-[#334155] leading-relaxed border border-emerald-100">
-                  {ticket.answer || (
-                    <span className="text-gray-400 italic">尚未回复</span>
-                  )}
+                  {ticket.answer || <span className="text-gray-400 italic">尚未回复</span>}
                 </div>
                 {ticket.replied_at && (
                   <div className="text-[10px] text-[#9A9A9A] flex items-center gap-1">
-                    <Clock size={10} /> 回复时间:{" "}
-                    {new Date(ticket.replied_at).toLocaleString()}
+                    <Clock size={10} /> 回复时间: {new Date(ticket.replied_at).toLocaleString()}
                   </div>
                 )}
               </div>
             )}
 
-            {ticket.status === "pending" && canAct && (
+            {ticket.status === 'pending' && canAct && (
               <div className="space-y-3 pt-2">
                 <div className="h-px bg-[#F0EDE8]" />
                 <label className="block text-[11px] text-slate-600 font-medium uppercase tracking-wider">
@@ -176,7 +167,7 @@ export function TicketReplyModal({
           <div className="px-6 py-4 bg-[#FAFAF9] border-t border-[#F0EDE8] flex items-center justify-between shrink-0">
             <StatusBadge status={ticket.status} />
             <div className="flex gap-2">
-              {ticket.status !== "pending" && canAct && (
+              {ticket.status !== 'pending' && canAct && (
                 <button
                   onClick={() => setShowFaqModal(true)}
                   className="flex items-center gap-1.5 px-4 py-2 border border-blue-100 text-blue-600 text-sm rounded-xl hover:bg-blue-50 transition"
@@ -184,23 +175,19 @@ export function TicketReplyModal({
                   <Plus size={14} /> 设为 FAQ
                 </button>
               )}
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm text-[#6A6A6A]"
-              >
+              <button onClick={onClose} className="px-4 py-2 text-sm text-[#6A6A6A]">
                 取消
               </button>
-              {ticket.status === "pending" && canAct && (
+              {ticket.status === 'pending' && canAct && (
                 <button
                   onClick={() => replyMut.mutate()}
                   disabled={replyMut.isPending || !reply.trim()}
                   className="flex items-center gap-2 px-5 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 disabled:opacity-50 transition"
                 >
-                  <Send size={14} />{" "}
-                  {replyMut.isPending ? "提交中..." : "提交回复"}
+                  <Send size={14} /> {replyMut.isPending ? '提交中...' : '提交回复'}
                 </button>
               )}
-              {ticket.status === "replied" && (
+              {ticket.status === 'replied' && (
                 <button
                   onClick={() => closeMut.mutate()}
                   disabled={closeMut.isPending}

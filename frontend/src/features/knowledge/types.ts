@@ -1,4 +1,4 @@
-import type { KBInfo } from "@shared/types/api";
+import type { KBInfo } from '@shared/types/api';
 
 export type { KBInfo };
 

@@ -1,42 +1,37 @@
-import { useState, useRef } from "react";
-import { X, Loader2, Upload, FileText } from "lucide-react";
-import { faqService } from "../services/faqService";
-import { getErrorMessage } from "@shared/lib/errorHandler";
-import type { FAQImportResult } from "@shared/types/api";
+import { useState, useRef } from 'react';
+import { X, Loader2, Upload, FileText } from 'lucide-react';
+import { faqService } from '../services/faqService';
+import { getErrorMessage } from '@shared/lib/errorHandler';
+import type { FAQImportResult } from '@shared/types/api';
 
 interface FaqImportDialogProps {
   kbName: string;
   onClose: () => void;
   onImported: () => void;
-  showToast: (msg: string, type: "success" | "error") => void;
+  showToast: (msg: string, type: 'success' | 'error') => void;
 }
 
 /** Excel import dialog for bulk FAQ upload. */
-export function FaqImportDialog({
-  kbName,
-  onClose,
-  onImported,
-  showToast,
-}: FaqImportDialogProps) {
-  const [phase, setPhase] = useState<"idle" | "uploading" | "result">("idle");
+export function FaqImportDialog({ kbName, onClose, onImported, showToast }: FaqImportDialogProps) {
+  const [phase, setPhase] = useState<'idle' | 'uploading' | 'result'>('idle');
   const [result, setResult] = useState<FAQImportResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".xlsx")) {
-      showToast("请上传 .xlsx 格式的 Excel 文件", "error");
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      showToast('请上传 .xlsx 格式的 Excel 文件', 'error');
       return;
     }
-    setPhase("uploading");
+    setPhase('uploading');
     try {
       const r = await faqService.importExcel(kbName, file);
       setResult(r);
-      setPhase("result");
+      setPhase('result');
       if (r.success > 0) onImported();
     } catch (e) {
-      setPhase("idle");
-      showToast(getErrorMessage(e), "error");
+      setPhase('idle');
+      showToast(getErrorMessage(e), 'error');
     }
   };
 
@@ -50,7 +45,7 @@ export function FaqImportDialog({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
-    e.target.value = "";
+    e.target.value = '';
   };
 
   return (
@@ -61,11 +56,9 @@ export function FaqImportDialog({
             <div className="w-7 h-7 rounded-lg bg-[#F2EFE9] flex items-center justify-center">
               <Upload size={14} className="text-[#334155]" />
             </div>
-            <h3 className="text-sm font-semibold text-[#334155]">
-              从 Excel 导入 FAQ
-            </h3>
+            <h3 className="text-sm font-semibold text-[#334155]">从 Excel 导入 FAQ</h3>
           </div>
-          {phase !== "uploading" && (
+          {phase !== 'uploading' && (
             <button
               onClick={onClose}
               className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-[#F8F6F2] flex items-center justify-center transition-colors"
@@ -76,7 +69,7 @@ export function FaqImportDialog({
         </div>
 
         <div className="px-6 py-5">
-          {phase === "idle" && (
+          {phase === 'idle' && (
             <>
               <div
                 onDrop={handleDrop}
@@ -88,21 +81,15 @@ export function FaqImportDialog({
                 onClick={() => fileInputRef.current?.click()}
                 className={`cursor-pointer border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 transition-colors ${
                   dragOver
-                    ? "border-slate-400 bg-[#F2EFE9]"
-                    : "border-[#E8E4DC] hover:border-[#C8C4BC] hover:bg-[#FAFAF9]"
+                    ? 'border-slate-400 bg-[#F2EFE9]'
+                    : 'border-[#E8E4DC] hover:border-[#C8C4BC] hover:bg-[#FAFAF9]'
                 }`}
               >
                 <div className="w-12 h-12 rounded-xl bg-[#F2EFE9] flex items-center justify-center">
-                  <FileText
-                    size={22}
-                    className="text-[#334155]"
-                    strokeWidth={1.4}
-                  />
+                  <FileText size={22} className="text-[#334155]" strokeWidth={1.4} />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-semibold text-[#334155]">
-                    点击选择或拖拽文件到此处
-                  </p>
+                  <p className="text-sm font-semibold text-[#334155]">点击选择或拖拽文件到此处</p>
                   <p className="text-xs mt-1 text-[#A0A0A0]">
                     仅支持 .xlsx 格式，文件大小不超过 5MB
                   </p>
@@ -127,13 +114,11 @@ export function FaqImportDialog({
             </>
           )}
 
-          {phase === "uploading" && (
+          {phase === 'uploading' && (
             <div className="flex flex-col items-center gap-4 py-8">
               <Loader2 size={32} className="animate-spin text-[#334155]" />
               <div className="text-center">
-                <p className="text-sm font-semibold text-[#334155]">
-                  正在上传并向量化…
-                </p>
+                <p className="text-sm font-semibold text-[#334155]">正在上传并向量化…</p>
                 <p className="text-xs mt-1 text-[#A0A0A0]">
                   批量向量化可能需要一些时间，请耐心等待
                 </p>
@@ -141,19 +126,16 @@ export function FaqImportDialog({
             </div>
           )}
 
-          {phase === "result" && result && (
+          {phase === 'result' && result && (
             <div className="space-y-4">
               <div className="grid grid-cols-4 gap-2 text-center">
                 {[
-                  { label: "总行数", value: result.total, color: "#334155" },
-                  { label: "成功", value: result.success, color: "#10B981" },
-                  { label: "跳过", value: result.skipped, color: "#F59E0B" },
-                  { label: "失败", value: result.failed, color: "#EF4444" },
+                  { label: '总行数', value: result.total, color: '#334155' },
+                  { label: '成功', value: result.success, color: '#10B981' },
+                  { label: '跳过', value: result.skipped, color: '#F59E0B' },
+                  { label: '失败', value: result.failed, color: '#EF4444' },
                 ].map(({ label, value, color }) => (
-                  <div
-                    key={label}
-                    className="bg-[#F8F6F2] rounded-xl py-3 px-2"
-                  >
+                  <div key={label} className="bg-[#F8F6F2] rounded-xl py-3 px-2">
                     <p className="text-lg font-bold" style={{ color }}>
                       {value}
                     </p>
@@ -172,15 +154,11 @@ export function FaqImportDialog({
                       className="flex items-start gap-2.5 bg-red-50 rounded-lg px-3 py-2.5 text-xs"
                     >
                       {err.row > 0 && (
-                        <span className="shrink-0 font-mono text-red-400">
-                          第{err.row}行
-                        </span>
+                        <span className="shrink-0 font-mono text-red-400">第{err.row}行</span>
                       )}
                       <span className="text-red-600 flex-1 leading-relaxed">
                         {err.question && (
-                          <span className="font-medium text-red-700">
-                            "{err.question}" —{" "}
-                          </span>
+                          <span className="font-medium text-red-700">"{err.question}" — </span>
                         )}
                         {err.reason}
                       </span>
@@ -192,7 +170,7 @@ export function FaqImportDialog({
           )}
         </div>
 
-        {phase === "result" && (
+        {phase === 'result' && (
           <div className="flex justify-end px-6 py-4 border-t border-[#F0EDE8] bg-[#FAFAF9] rounded-b-2xl">
             <button
               onClick={onClose}

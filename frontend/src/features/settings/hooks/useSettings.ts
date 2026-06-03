@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { settingsService } from "../services/settingsService";
-import { settingsKeys } from "./queryKeys";
-import { useToast } from "@shared/store/uiStore";
-import { handleMutationError } from "@shared/lib/errorHandler";
-import { DEFAULT_FORM, configToForm } from "./settingsForm";
-import type { FormState } from "./settingsForm";
+import { useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { settingsService } from '../services/settingsService';
+import { settingsKeys } from './queryKeys';
+import { useToast } from '@shared/store/uiStore';
+import { handleMutationError } from '@shared/lib/errorHandler';
+import { DEFAULT_FORM, configToForm } from './settingsForm';
+import type { FormState } from './settingsForm';
 
-export type { DocTypeSplitterForm, FormState } from "./settingsForm";
-export { DEFAULT_FORM } from "./settingsForm";
+export type { DocTypeSplitterForm, FormState } from './settingsForm';
+export { DEFAULT_FORM } from './settingsForm';
 
 export function useSettings() {
   const qc = useQueryClient();
@@ -41,7 +41,7 @@ export function useSettings() {
         agent_recursion_limit: form.agent_recursion_limit,
         agent_retry_count: form.agent_retry_count,
         splitter: {
-          strategy: "recursive",
+          strategy: 'recursive',
           policy: {
             splitter_type: form.splitter_policy.splitter_type,
             chunk_size: form.splitter_policy.chunk_size,
@@ -64,15 +64,13 @@ export function useSettings() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: settingsKeys.config() });
-      showToast("配置已保存", "success");
+      showToast('配置已保存', 'success');
     },
     onError: (err) => handleMutationError(err, showToast),
   });
 
-  const updateConfig = <K extends keyof FormState>(
-    key: K,
-    value: FormState[K],
-  ) => setForm((prev) => ({ ...prev, [key]: value }));
+  const updateConfig = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
 
   return {
     config: form,

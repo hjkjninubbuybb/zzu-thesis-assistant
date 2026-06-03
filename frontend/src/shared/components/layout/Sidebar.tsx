@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Database,
@@ -8,57 +8,53 @@ import {
   Settings,
   LogOut,
   Ticket,
-} from "lucide-react";
-import { cn } from "@shared/lib/utils";
-import {
-  useAuthUser,
-  useIsAdmin,
-  useAuthLogout,
-} from "@shared/store/authStore";
+} from 'lucide-react';
+import { cn } from '@shared/lib/utils';
+import { useAuthUser, useIsAdmin, useAuthLogout } from '@shared/store/authStore';
 
 const NAV_ITEMS = [
   {
-    to: "/admin",
-    label: "概览",
+    to: '/admin',
+    label: '概览',
     icon: LayoutDashboard,
     end: true,
-    roles: ["admin", "teacher"],
+    roles: ['admin', 'teacher'],
   },
   {
-    to: "/admin/conversations",
-    label: "对话",
+    to: '/admin/conversations',
+    label: '对话',
     icon: MessagesSquare,
-    roles: ["admin", "teacher"],
+    roles: ['admin', 'teacher'],
   },
   {
-    to: "/admin/tickets",
-    label: "答疑请求",
+    to: '/admin/tickets',
+    label: '答疑请求',
     icon: Ticket,
-    roles: ["admin", "teacher"],
+    roles: ['admin', 'teacher'],
   },
   {
-    to: "/admin/knowledge",
-    label: "知识库管理",
+    to: '/admin/knowledge',
+    label: '知识库管理',
     icon: Database,
-    roles: ["admin"],
+    roles: ['admin'],
   },
   {
-    to: "/admin/users",
-    label: "师生管理",
+    to: '/admin/users',
+    label: '师生管理',
     icon: Users,
-    roles: ["admin", "teacher"],
+    roles: ['admin', 'teacher'],
   },
   {
-    to: "/admin/analytics",
-    label: "使用统计",
+    to: '/admin/analytics',
+    label: '使用统计',
     icon: BarChart2,
-    roles: ["admin", "teacher"],
+    roles: ['admin', 'teacher'],
   },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
-  admin: "管理员",
-  teacher: "教师",
+  admin: '管理员',
+  teacher: '教师',
 };
 
 function NavItem({
@@ -78,10 +74,10 @@ function NavItem({
       end={end}
       className={({ isActive }) =>
         cn(
-          "w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 text-sm",
+          'w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 text-sm',
           isActive
-            ? "bg-[#1A1A1A] text-white shadow-md"
-            : "text-[#9A9A9A] hover:bg-white/50 hover:text-[#1A1A1A] active:scale-[0.97]",
+            ? 'bg-[#1A1A1A] text-white shadow-md'
+            : 'text-[#9A9A9A] hover:bg-white/50 hover:text-[#1A1A1A] active:scale-[0.97]',
         )
       }
     >
@@ -96,18 +92,16 @@ export default function Sidebar() {
   const isAdmin = useIsAdmin();
   const logout = useAuthLogout();
   const navigate = useNavigate();
-  const navItems = NAV_ITEMS.filter((item) =>
-    item.roles.includes(user?.role ?? ""),
-  );
+  const navItems = NAV_ITEMS.filter((item) => item.roles.includes(user?.role ?? ''));
 
   const handleLogout = () => {
     logout();
-    navigate("/admin/login", { replace: true });
+    navigate('/admin/login', { replace: true });
   };
 
   // 显示名：优先 display_name，退而求其次 username
-  const displayName = user?.display_name || user?.username || "用户";
-  const roleLabel = ROLE_LABELS[user?.role ?? ""] ?? "";
+  const displayName = user?.display_name || user?.username || '用户';
+  const roleLabel = ROLE_LABELS[user?.role ?? ''] ?? '';
   // 头像字：取 display_name 或 username 第一个字
   const avatarChar = displayName.slice(0, 1).toUpperCase();
 
@@ -118,9 +112,7 @@ export default function Sidebar() {
         <div className="w-9 h-9 bg-[#1A1A1A] rounded-xl flex items-center justify-center shadow-md shrink-0">
           <span className="text-white text-xs font-bold tracking-tight">R</span>
         </div>
-        <span className="text-sm font-bold text-[#1A1A1A] tracking-tight">
-          RAG 1.0
-        </span>
+        <span className="text-sm font-bold text-[#1A1A1A] tracking-tight">RAG 1.0</span>
       </div>
 
       {/* Main Navigation */}
@@ -133,9 +125,7 @@ export default function Sidebar() {
       {/* Bottom: Settings + Avatar */}
       <div className="flex flex-col px-2 pb-5 gap-1">
         <div className="mx-2 mb-2 h-px bg-white/40" />
-        {isAdmin && (
-          <NavItem to="/admin/settings" label="系统配置" icon={Settings} />
-        )}
+        {isAdmin && <NavItem to="/admin/settings" label="系统配置" icon={Settings} />}
 
         {/* 用户信息 + 退出 */}
         <div className="flex items-center gap-2 px-3 py-2 mt-1 bg-white/30 rounded-xl mx-1">

@@ -1,19 +1,19 @@
-import { useState, useMemo, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useIsAdmin } from "@shared/store/authStore";
-import { useConfirm, useToast } from "@shared/store/uiStore";
-import { useKBList } from "@shared/hooks/useKBList";
-import type { FAQItem, FAQUpdate } from "@shared/types/api";
-import { faqService } from "../services/faqService";
-import { useFaqList } from "../hooks/useFaqList";
-import { useFaqSearch } from "../hooks/useFaqSearch";
-import { FaqTable, FaqEmptyNoKb, FaqEmptyList } from "./FaqTable";
-import { FaqForm } from "./FaqForm";
-import { FaqImportDialog } from "./FaqImportDialog";
-import { FaqToolbar } from "./FaqToolbar";
-import { FaqFilterBar } from "./FaqFilterBar";
+import { useState, useMemo, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useIsAdmin } from '@shared/store/authStore';
+import { useConfirm, useToast } from '@shared/store/uiStore';
+import { useKBList } from '@shared/hooks/useKBList';
+import type { FAQItem, FAQUpdate } from '@shared/types/api';
+import { faqService } from '../services/faqService';
+import { useFaqList } from '../hooks/useFaqList';
+import { useFaqSearch } from '../hooks/useFaqSearch';
+import { FaqTable, FaqEmptyNoKb, FaqEmptyList } from './FaqTable';
+import { FaqForm } from './FaqForm';
+import { FaqImportDialog } from './FaqImportDialog';
+import { FaqToolbar } from './FaqToolbar';
+import { FaqFilterBar } from './FaqFilterBar';
 
-const FK_STORAGE_KEY = "faq-selected-kb";
+const FK_STORAGE_KEY = 'faq-selected-kb';
 
 const settle = (d: number): React.CSSProperties => ({
   animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
@@ -25,32 +25,35 @@ export function FaqManagement() {
   const { showToast } = useToast();
   const { showConfirm, dismissConfirm } = useConfirm();
 
-  const [selectedKb, setSelectedKb] = useState(
-    () => localStorage.getItem(FK_STORAGE_KEY) ?? "",
-  );
-  const [categoryFilter, setCategoryFilter] = useState("全部");
-  const [statusFilter, setStatusFilter] = useState("全部");
-  const [searchText, setSearchText] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedKb, setSelectedKb] = useState(() => localStorage.getItem(FK_STORAGE_KEY) ?? '');
+  const [categoryFilter, setCategoryFilter] = useState('全部');
+  const [statusFilter, setStatusFilter] = useState('全部');
+  const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<FAQItem | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
   const qc = useQueryClient();
   const {
     faqs,
+    total: faqTotal,
+    totalPages: faqTotalPages,
     isLoading,
     createFaq,
     updateFaq,
     deleteFaq,
     isCreating,
     isUpdating,
-  } = useFaqList(selectedKb);
+  } = useFaqList(selectedKb, page);
 
   useEffect(() => {
     if (!searchText) {
-      setDebouncedSearch("");
-      return;
+      // setState 在 effect 里同步调用会触发 react-hooks 警告；这里通过 0ms
+      // setTimeout 推到下一个 tick，避免级联渲染。
+      const id = setTimeout(() => setDebouncedSearch(''), 0);
+      return () => clearTimeout(id);
     }
     const timer = setTimeout(() => setDebouncedSearch(searchText.trim()), 500);
     return () => clearTimeout(timer);
@@ -63,19 +66,15 @@ export function FaqManagement() {
     const names = kbs.map((kb) => kb.name);
     if (selectedKb && !names.includes(selectedKb)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedKb("");
+      setSelectedKb('');
       localStorage.removeItem(FK_STORAGE_KEY);
     }
   }, [kbs, selectedKb]);
 
-  const { data: searchData, isFetching: isSearching } = useFaqSearch(
-    selectedKb,
-    debouncedSearch,
-  );
+  const { data: searchData, isFetching: isSearching } = useFaqSearch(selectedKb, debouncedSearch);
 
   const isAiSearch = debouncedSearch.length > 0;
-  const invalidate = () =>
-    qc.invalidateQueries({ queryKey: ["faq", selectedKb] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['faq', selectedKb] });
 
   const allCategories = useMemo(
     () => Array.from(new Set(faqs.map((f) => f.category).filter(Boolean))),
@@ -85,42 +84,39 @@ export function FaqManagement() {
   const displayFaqs = useMemo(() => {
     let items = isAiSearch ? (searchData?.items ?? []) : faqs;
     const statusMap: Record<string, string> = {
-      已发布: "approved",
-      待审核: "pending",
-      已驳回: "rejected",
-      草稿: "draft",
+      已发布: 'approved',
+      待审核: 'pending',
+      已驳回: 'rejected',
+      草稿: 'draft',
     };
-    if (!isAiSearch && categoryFilter !== "全部")
+    if (!isAiSearch && categoryFilter !== '全部')
       items = items.filter((f) => f.category === categoryFilter);
-    if (!isAiSearch && statusFilter !== "全部")
+    if (!isAiSearch && statusFilter !== '全部')
       items = items.filter((f) => f.status === statusMap[statusFilter]);
     return items;
   }, [isAiSearch, searchData, faqs, categoryFilter, statusFilter]);
 
   const handleKbChange = (val: string) => {
     setSelectedKb(val);
+    setPage(1);
     if (val) localStorage.setItem(FK_STORAGE_KEY, val);
     else localStorage.removeItem(FK_STORAGE_KEY);
-    setCategoryFilter("全部");
-    setStatusFilter("全部");
-    setSearchText("");
+    setCategoryFilter('全部');
+    setStatusFilter('全部');
+    setSearchText('');
   };
 
   const handleClearSearch = () => {
-    setSearchText("");
-    setDebouncedSearch("");
+    setSearchText('');
+    setDebouncedSearch('');
   };
 
-  const handleUpdate = (id: number, payload: FAQUpdate) =>
-    updateFaq({ id, payload });
+  const handleUpdate = (id: number, payload: FAQUpdate) => updateFaq({ id, payload });
 
   const handleDeleteClick = (faq: FAQItem) => {
-    const label =
-      faq.question.length > 30
-        ? faq.question.slice(0, 30) + "..."
-        : faq.question;
+    const label = faq.question.length > 30 ? faq.question.slice(0, 30) + '...' : faq.question;
     showConfirm({
-      title: "删除 FAQ",
+      title: '删除 FAQ',
       description: `将删除 "${label}"，并从向量库中移除对应向量。此操作不可撤销。`,
       onConfirm: () =>
         deleteFaq(faq.id, {
@@ -141,13 +137,12 @@ export function FaqManagement() {
           searchText={searchText}
           onSearchChange={(v) => {
             setSearchText(v);
-            setCategoryFilter("全部");
+            setCategoryFilter('全部');
           }}
           onClearSearch={handleClearSearch}
           isSearching={isSearching}
-          isAiSearch={isAiSearch}
-          totalCount={faqs.length}
-          approvedCount={faqs.filter((f) => f.status === "approved").length}
+          totalCount={faqTotal}
+          approvedCount={faqs.filter((f) => f.status === 'approved').length}
           isAdmin={isAdmin}
           onImportClick={() => setImportOpen(true)}
           onCreateClick={() => setCreateOpen(true)}
@@ -179,14 +174,9 @@ export function FaqManagement() {
           </div>
         )}
         {selectedKb && !isLoading && faqs.length === 0 && <FaqEmptyList />}
-        {selectedKb &&
-          !isLoading &&
-          displayFaqs.length === 0 &&
-          faqs.length > 0 && (
-            <p className="text-xs text-center py-12 text-[#AAAAAA]">
-              没有匹配的 FAQ
-            </p>
-          )}
+        {selectedKb && !isLoading && displayFaqs.length === 0 && faqs.length > 0 && (
+          <p className="text-xs text-center py-12 text-[#AAAAAA]">没有匹配的 FAQ</p>
+        )}
         {selectedKb && !isLoading && displayFaqs.length > 0 && (
           <div className="p-3">
             <FaqTable
@@ -196,6 +186,27 @@ export function FaqManagement() {
               onDelete={handleDeleteClick}
               onUpdate={handleUpdate}
             />
+            {faqTotalPages > 1 && (
+              <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[#F0EDE8]">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-2 py-1 text-xs rounded border border-[#E8E4DF] text-[#6A6A6A] hover:bg-[#F2EFE9] disabled:opacity-40"
+                >
+                  上一页
+                </button>
+                <span className="text-xs text-[#9A9A9A]">
+                  {page} / {faqTotalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(faqTotalPages, p + 1))}
+                  disabled={page === faqTotalPages}
+                  className="px-2 py-1 text-xs rounded border border-[#E8E4DF] text-[#6A6A6A] hover:bg-[#F2EFE9] disabled:opacity-40"
+                >
+                  下一页
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -209,7 +220,7 @@ export function FaqManagement() {
             createFaq(data, {
               onSuccess: () => {
                 setCreateOpen(false);
-                showToast("FAQ 已提交审核", "success");
+                showToast('FAQ 已提交审核', 'success');
               },
             })
           }

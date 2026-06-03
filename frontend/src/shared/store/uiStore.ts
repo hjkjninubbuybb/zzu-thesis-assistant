@@ -1,10 +1,10 @@
-import { create } from "zustand";
-import { useShallow } from "zustand/react/shallow";
+import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface ToastPayload {
   id: string;
   message: string;
-  type: "success" | "error";
+  type: 'success' | 'error';
 }
 
 export interface ConfirmPayload {
@@ -21,7 +21,7 @@ interface UIState {
   activeKBName: string | null;
 
   setSidebarCollapsed: (v: boolean) => void;
-  showToast: (message: string, type: "success" | "error") => void;
+  showToast: (message: string, type: 'success' | 'error') => void;
   dismissToast: (id: string) => void;
   showConfirm: (payload: ConfirmPayload) => void;
   dismissConfirm: () => void;
@@ -44,8 +44,7 @@ const useUIStore = create<UIState>((set) => ({
     }, 3500);
   },
 
-  dismissToast: (id) =>
-    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   showConfirm: (payload) => set({ confirmDialog: payload }),
   dismissConfirm: () => set({ confirmDialog: null }),

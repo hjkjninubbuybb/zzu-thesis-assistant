@@ -1,5 +1,5 @@
-import { knowledgeApi } from "@shared/lib/api";
-import type { KBCreate } from "@shared/types/api";
+import { knowledgeApi } from '@shared/lib/api';
+import type { KBCreate } from '@shared/types/api';
 
 export const knowledgeService = {
   list: () => knowledgeApi.list(),

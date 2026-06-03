@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, UserPlus } from "lucide-react";
-import { userService } from "../services/userService";
-import type { UserInfo } from "@shared/types/api";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { X, UserPlus } from 'lucide-react';
+import { userService } from '../services/userService';
+import type { UserInfo } from '@shared/types/api';
 
 interface MentorCardProps {
   teacher: UserInfo;
@@ -21,10 +21,9 @@ export function MentorCard({
   const qc = useQueryClient();
 
   const removeMut = useMutation({
-    mutationFn: (studentId: number) =>
-      userService.removeMentorRelation(teacher.id, studentId),
+    mutationFn: (studentId: number) => userService.removeMentorRelation(teacher.id, studentId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mentor-students", teacher.id] });
+      qc.invalidateQueries({ queryKey: ['mentor-students', teacher.id] });
     },
   });
 
@@ -53,25 +52,19 @@ export function MentorCard({
             </span>
             <div className="flex items-center gap-2 mt-0.5">
               {profile?.employee_id && (
-                <span className="text-[11px] text-[#9A9A9A] font-mono">
-                  {profile.employee_id}
-                </span>
+                <span className="text-[11px] text-[#9A9A9A] font-mono">{profile.employee_id}</span>
               )}
               {profile?.department && (
-                <span className="text-[11px] text-[#9A9A9A]">
-                  {profile.department}
-                </span>
+                <span className="text-[11px] text-[#9A9A9A]">{profile.department}</span>
               )}
               {profile?.title && (
-                <span className="text-[11px] text-[#9A9A9A]">
-                  {profile.title}
-                </span>
+                <span className="text-[11px] text-[#9A9A9A]">{profile.title}</span>
               )}
             </div>
           </div>
         </div>
         <span className="text-xs text-[#9A9A9A]">
-          {isLoadingStudents ? "..." : `${students.length} 名学生`}
+          {isLoadingStudents ? '...' : `${students.length} 名学生`}
         </span>
       </div>
 
@@ -89,11 +82,9 @@ export function MentorCard({
                 key={s.id}
                 className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg bg-[#F2EFE9] text-xs text-[#4A4A4A] font-medium group"
               >
-                {s.display_name || "—"}
+                {s.display_name || '—'}
                 {sp?.student_id && (
-                  <span className="text-[#9A9A9A] font-mono text-[10px]">
-                    {sp.student_id}
-                  </span>
+                  <span className="text-[#9A9A9A] font-mono text-[10px]">{sp.student_id}</span>
                 )}
                 <button
                   onClick={() => removeMut.mutate(s.id)}

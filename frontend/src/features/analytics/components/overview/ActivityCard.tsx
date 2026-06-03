@@ -1,12 +1,6 @@
-import { useCountUp } from "../../hooks/animationHooks";
+import { useCountUp } from '../../hooks/animationHooks';
 
-export function ActivityCard({
-  todayQs,
-  animate,
-}: {
-  todayQs: number;
-  animate: boolean;
-}) {
+export function ActivityCard({ todayQs, animate }: { todayQs: number; animate: boolean }) {
   const TARGET = 50;
   const pct = animate ? Math.min(todayQs / TARGET, 1) : 0;
   const displayQs = useCountUp(todayQs, 900, animate);
@@ -20,16 +14,13 @@ export function ActivityCard({
         <span className="text-xl font-bold text-[#F0C040]">{displayQs}</span>
       </div>
       <div className="relative">
-        <div
-          className="h-2 rounded-full overflow-hidden"
-          style={{ background: "#F0EDE8" }}
-        >
+        <div className="h-2 rounded-full overflow-hidden" style={{ background: '#F0EDE8' }}>
           <div
             className="h-full rounded-full"
             style={{
               width: `${pct * 100}%`,
-              background: "linear-gradient(90deg, #F0C040, #E85D4A)",
-              transition: "width 1.4s cubic-bezier(0.22, 1, 0.36, 1)",
+              background: 'linear-gradient(90deg, #F0C040, #E85D4A)',
+              transition: 'width 1.4s cubic-bezier(0.22, 1, 0.36, 1)',
             }}
           />
         </div>

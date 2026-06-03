@@ -1,24 +1,20 @@
-import { useState, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Download, Upload, FileDown } from "lucide-react";
-import { userService } from "../services/userService";
-import { userKeys } from "../hooks/queryKeys";
-import { useStudentList } from "../hooks/useStudentList";
-import { StudentTable } from "./StudentTable";
-import {
-  CreateStudentModal,
-  EditStudentModal,
-  ResetPasswordModal,
-} from "./StudentModals";
-import { extractError } from "@shared/lib/api";
-import { useIsAdmin } from "@shared/store/authStore";
-import type { UserInfo, ImportResult } from "@shared/types/api";
+import { useState, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Download, Upload, FileDown } from 'lucide-react';
+import { userService } from '../services/userService';
+import { userKeys } from '../hooks/queryKeys';
+import { useStudentList } from '../hooks/useStudentList';
+import { StudentTable } from './StudentTable';
+import { CreateStudentModal, EditStudentModal, ResetPasswordModal } from './StudentModals';
+import { extractError } from '@shared/lib/errorHandler';
+import { useIsAdmin } from '@shared/store/authStore';
+import type { UserInfo, ImportResult } from '@shared/types/api';
 
 export function StudentsTab() {
   const qc = useQueryClient();
   const isAdmin = useIsAdmin();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [resetTarget, setResetTarget] = useState<UserInfo | null>(null);
   const [editTarget, setEditTarget] = useState<UserInfo | null>(null);
@@ -27,8 +23,7 @@ export function StudentsTab() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { students, total, isLoading, toggleActive, deleteUser } =
-    useStudentList(page, 20);
+  const { students, total, isLoading, toggleActive, deleteUser } = useStudentList(page, 20);
 
   const totalPages = Math.ceil(total / 20) || 1;
 
@@ -36,9 +31,7 @@ export function StudentsTab() {
     ? students.filter(
         (u) =>
           u.display_name.includes(search) ||
-          ((u.profile as { student_id?: string })?.student_id ?? "").includes(
-            search,
-          ),
+          ((u.profile as { student_id?: string })?.student_id ?? '').includes(search),
       )
     : students;
 
@@ -61,7 +54,7 @@ export function StudentsTab() {
       });
     } finally {
       setImporting(false);
-      e.target.value = "";
+      e.target.value = '';
     }
   };
 
@@ -72,10 +65,7 @@ export function StudentsTab() {
   return (
     <div className="flex flex-col gap-5">
       {/* 头部 */}
-      <div
-        className="flex items-center justify-between shrink-0"
-        style={settle(0)}
-      >
+      <div className="flex items-center justify-between shrink-0" style={settle(0)}>
         <p className="text-sm text-[#8A8A8A]">共 {total} 名学生</p>
         {isAdmin && (
           <div className="flex items-center gap-2">
@@ -92,9 +82,9 @@ export function StudentsTab() {
               <Download size={14} /> 导出
             </button>
             <label
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm rounded-xl cursor-pointer transition-colors ${importing ? "opacity-50 cursor-not-allowed" : "text-[#334155] hover:bg-[#F8F6F2]"}`}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm rounded-xl cursor-pointer transition-colors ${importing ? 'opacity-50 cursor-not-allowed' : 'text-[#334155] hover:bg-[#F8F6F2]'}`}
             >
-              <Upload size={14} /> {importing ? "导入中..." : "批量导入"}
+              <Upload size={14} /> {importing ? '导入中...' : '批量导入'}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -117,12 +107,11 @@ export function StudentsTab() {
       {/* 导入结果提示 */}
       {importResult && (
         <div
-          className={`flex items-center justify-between px-5 py-3 rounded-xl text-sm border ${importResult.failed > 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"} animate-apple-fade`}
+          className={`flex items-center justify-between px-5 py-3 rounded-xl text-sm border ${importResult.failed > 0 ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'} animate-apple-fade`}
         >
           <span>
-            导入完成：成功 {importResult.success} 条，跳过{" "}
-            {importResult.skipped} 条
-            {importResult.failed > 0 ? `，失败 ${importResult.failed} 条` : ""}
+            导入完成：成功 {importResult.success} 条，跳过 {importResult.skipped} 条
+            {importResult.failed > 0 ? `，失败 ${importResult.failed} 条` : ''}
           </span>
           <button
             onClick={() => setImportResult(null)}
@@ -135,10 +124,7 @@ export function StudentsTab() {
 
       {/* 搜索框 */}
       <div className="relative" style={settle(50)}>
-        <Search
-          size={14}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]"
-        />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -158,7 +144,7 @@ export function StudentsTab() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex items-center justify-center h-48 text-sm text-[#9A9A9A]">
-            {search ? "没有匹配的学生" : "暂无学生账号，点击「添加学生」创建"}
+            {search ? '没有匹配的学生' : '暂无学生账号，点击「添加学生」创建'}
           </div>
         ) : (
           <StudentTable
@@ -167,15 +153,10 @@ export function StudentsTab() {
             isAdmin={isAdmin}
             onMenuToggle={setMenuOpen}
             onEdit={setEditTarget}
-            onToggleActive={(u) =>
-              toggleActive({ id: u.id, isActive: !u.is_active })
-            }
+            onToggleActive={(u) => toggleActive({ id: u.id, isActive: !u.is_active })}
             onResetPassword={setResetTarget}
             onDelete={(u) => {
-              if (
-                confirm(`确定删除学生 "${u.display_name || u.username}" 吗？`)
-              )
-                deleteUser(u.id);
+              if (confirm(`确定删除学生 "${u.display_name || u.username}" 吗？`)) deleteUser(u.id);
             }}
           />
         )}
@@ -183,10 +164,7 @@ export function StudentsTab() {
 
       {/* 分页 */}
       {totalPages > 1 && (
-        <div
-          className="flex items-center justify-center gap-3 mt-2"
-          style={settle(150)}
-        >
+        <div className="flex items-center justify-center gap-3 mt-2" style={settle(150)}>
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
@@ -207,21 +185,11 @@ export function StudentsTab() {
         </div>
       )}
 
-      {showCreate && (
-        <CreateStudentModal onClose={() => setShowCreate(false)} />
-      )}
+      {showCreate && <CreateStudentModal onClose={() => setShowCreate(false)} />}
       {resetTarget && (
-        <ResetPasswordModal
-          user={resetTarget}
-          onClose={() => setResetTarget(null)}
-        />
+        <ResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} />
       )}
-      {editTarget && (
-        <EditStudentModal
-          user={editTarget}
-          onClose={() => setEditTarget(null)}
-        />
-      )}
+      {editTarget && <EditStudentModal user={editTarget} onClose={() => setEditTarget(null)} />}
     </div>
   );
 }

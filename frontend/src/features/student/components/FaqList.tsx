@@ -1,7 +1,7 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowRight, HelpCircle } from "lucide-react";
-import type { FAQItem } from "@shared/types/api";
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, HelpCircle } from 'lucide-react';
+import type { FAQItem } from '@shared/types/api';
 
 interface FaqItemProps {
   faq: FAQItem;
@@ -13,7 +13,7 @@ function FaqItem({ faq, index }: FaqItemProps) {
 
   return (
     <button
-      onClick={() => navigate("/s/faq")}
+      onClick={() => navigate('/s/faq')}
       className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#EEF2FF] transition-colors group w-full text-left"
       style={{
         opacity: 0,
@@ -24,9 +24,7 @@ function FaqItem({ faq, index }: FaqItemProps) {
         <HelpCircle size={14} className="text-[#10B981]" strokeWidth={1.8} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-[#202938] truncate">
-          {faq.question}
-        </p>
+        <p className="text-xs font-medium text-[#202938] truncate">{faq.question}</p>
         <p className="text-[10px] text-[#9CA3AF] mt-0.5">{faq.category}</p>
       </div>
       <ArrowRight
@@ -45,10 +43,7 @@ interface FaqListProps {
 
 export function FaqList({ faqs, onViewMore, cardStyle }: FaqListProps) {
   return (
-    <div
-      className="glass-card rounded-2xl p-5 flex flex-col gap-3 hover-lift"
-      style={cardStyle}
-    >
+    <div className="glass-card rounded-2xl p-5 flex flex-col gap-3 hover-lift" style={cardStyle}>
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-[#202938]">常见问题</h3>
         <button
@@ -62,11 +57,7 @@ export function FaqList({ faqs, onViewMore, cardStyle }: FaqListProps) {
 
       {faqs.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center py-8 text-center">
-          <HelpCircle
-            size={28}
-            className="text-[#D9DEE5] mb-2"
-            strokeWidth={1.2}
-          />
+          <HelpCircle size={28} className="text-[#D9DEE5] mb-2" strokeWidth={1.2} />
           <p className="text-sm text-[#9CA3AF]">暂无常见问题</p>
         </div>
       ) : (

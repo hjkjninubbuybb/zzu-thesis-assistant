@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Loader2, Save, Database, RotateCcw } from "lucide-react";
-import { useToast } from "@shared/store/uiStore";
-import { handleMutationError } from "@shared/lib/errorHandler";
-import { documentService } from "../services/documentService";
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { X, Loader2, Save, Database, RotateCcw } from 'lucide-react';
+import { useToast } from '@shared/store/uiStore';
+import { handleMutationError } from '@shared/lib/errorHandler';
+import { documentService } from '../services/documentService';
 
 function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -16,27 +16,23 @@ interface DocumentEditModalProps {
   onClose: () => void;
 }
 
-export function DocumentEditModal({
-  kbName,
-  docId,
-  onClose,
-}: DocumentEditModalProps) {
+export function DocumentEditModal({ kbName, docId, onClose }: DocumentEditModalProps) {
   const qc = useQueryClient();
   const { showToast } = useToast();
-  const [summary, setSummary] = useState("");
-  const [content, setContent] = useState("");
-  const [activeTab, setActiveTab] = useState<"content" | "summary">("content");
+  const [summary, setSummary] = useState('');
+  const [content, setContent] = useState('');
+  const [activeTab, setActiveTab] = useState<'content' | 'summary'>('content');
 
   const { data: doc, isLoading } = useQuery({
-    queryKey: ["document-detail", kbName, docId],
+    queryKey: ['document-detail', kbName, docId],
     queryFn: () => documentService.get(kbName, docId),
   });
 
   useEffect(() => {
     if (doc) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSummary(doc.summary ?? "");
-      setContent(doc.content ?? "");
+      setSummary(doc.summary ?? '');
+      setContent(doc.content ?? '');
     }
   }, [doc]);
 
@@ -44,8 +40,8 @@ export function DocumentEditModal({
     mutationFn: (body: { summary?: string; content?: string }) =>
       documentService.update(kbName, docId, body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["documents", kbName] });
-      showToast("修改已保存", "success");
+      qc.invalidateQueries({ queryKey: ['documents', kbName] });
+      showToast('修改已保存', 'success');
     },
     onError: (err) => handleMutationError(err, showToast),
   });
@@ -53,8 +49,8 @@ export function DocumentEditModal({
   const reindexMutation = useMutation({
     mutationFn: () => documentService.reindex(kbName, docId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["documents", kbName] });
-      showToast("重新索引已提交", "success");
+      qc.invalidateQueries({ queryKey: ['documents', kbName] });
+      showToast('重新索引已提交', 'success');
     },
     onError: (err) => handleMutationError(err, showToast),
   });
@@ -80,14 +76,10 @@ export function DocumentEditModal({
               {doc?.file_name}
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              ID: {docId} • {doc?.chunk_count} Chunks •{" "}
-              {formatSize(doc?.file_size ?? 0)}
+              ID: {docId} • {doc?.chunk_count} Chunks • {formatSize(doc?.file_size ?? 0)}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-gray-100 text-gray-400"
-          >
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-400">
             <X size={20} />
           </button>
         </div>
@@ -95,21 +87,21 @@ export function DocumentEditModal({
         {/* Tabs */}
         <div className="px-6 border-b border-gray-100 flex gap-6 shrink-0">
           <button
-            onClick={() => setActiveTab("content")}
+            onClick={() => setActiveTab('content')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "content"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+              activeTab === 'content'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             清洗后的正文
           </button>
           <button
-            onClick={() => setActiveTab("summary")}
+            onClick={() => setActiveTab('summary')}
             className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "summary"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+              activeTab === 'summary'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             AI 摘要
@@ -118,7 +110,7 @@ export function DocumentEditModal({
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-          {activeTab === "content" ? (
+          {activeTab === 'content' ? (
             <div className="h-full flex flex-col">
               <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
                 文档正文（修改后需点击"重新索引"生效）

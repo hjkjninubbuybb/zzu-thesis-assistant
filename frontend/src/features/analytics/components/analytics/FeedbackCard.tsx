@@ -1,4 +1,4 @@
-import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { ThumbsUp, ThumbsDown } from 'lucide-react';
 
 export function FeedbackCard({
   up,
@@ -25,9 +25,7 @@ export function FeedbackCard({
     <div
       className="glass-card rounded-2xl p-6 flex flex-col gap-5 hover-lift"
       style={{
-        animation: animate
-          ? "appleSettleIn 0.75s cubic-bezier(0.25,1,0.5,1) 400ms both"
-          : "none",
+        animation: animate ? 'appleSettleIn 0.75s cubic-bezier(0.25,1,0.5,1) 400ms both' : 'none',
       }}
     >
       <div>
@@ -49,7 +47,7 @@ export function FeedbackCard({
               <svg
                 width={size}
                 height={size}
-                style={{ transform: "rotate(-225deg)", display: "block" }}
+                style={{ transform: 'rotate(-225deg)', display: 'block' }}
               >
                 <circle
                   cx={cx}
@@ -71,15 +69,12 @@ export function FeedbackCard({
                   strokeDasharray={`${filled} ${circumference}`}
                   strokeLinecap="round"
                   style={{
-                    transition:
-                      "stroke-dasharray 1.4s cubic-bezier(0.22,1,0.36,1)",
+                    transition: 'stroke-dasharray 1.4s cubic-bezier(0.22,1,0.36,1)',
                   }}
                 />
               </svg>
               <div className="absolute text-center">
-                <p className="text-2xl font-bold text-[#1A1A1A] leading-none">
-                  {upPct}%
-                </p>
+                <p className="text-2xl font-bold text-[#1A1A1A] leading-none">{upPct}%</p>
                 <p className="text-[10px] text-[#B8B4AC] mt-1">满意度</p>
               </div>
             </div>
@@ -87,33 +82,24 @@ export function FeedbackCard({
           <div className="flex flex-col gap-2.5 pt-4 border-t border-[#F0EDE8]">
             {[
               {
-                label: "好评",
+                label: '好评',
                 value: up,
                 icon: <ThumbsUp size={12} />,
-                color: "#5EE67A",
+                color: '#5EE67A',
               },
               {
-                label: "差评",
+                label: '差评',
                 value: down,
                 icon: <ThumbsDown size={12} />,
-                color: "#E85D4A",
+                color: '#E85D4A',
               },
             ].map((item) => (
-              <div
-                key={item.label}
-                className="flex items-center justify-between"
-              >
-                <div
-                  className="flex items-center gap-2"
-                  style={{ color: item.color }}
-                >
+              <div key={item.label} className="flex items-center justify-between">
+                <div className="flex items-center gap-2" style={{ color: item.color }}>
                   {item.icon}
                   <span className="text-xs text-[#6A6A6A]">{item.label}</span>
                 </div>
-                <span
-                  className="text-sm font-bold"
-                  style={{ color: item.color }}
-                >
+                <span className="text-sm font-bold" style={{ color: item.color }}>
                   {item.value}
                 </span>
               </div>

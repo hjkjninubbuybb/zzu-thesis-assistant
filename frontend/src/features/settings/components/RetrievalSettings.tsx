@@ -1,6 +1,6 @@
-import { Search } from "lucide-react";
-import { Section, Field, NumberInput } from "./SettingsPrimitives";
-import type { FormState } from "../hooks/useSettings";
+import { Search } from 'lucide-react';
+import { Section, Field, NumberInput } from './SettingsPrimitives';
+import type { FormState } from '../hooks/useSettings';
 
 interface RetrievalSettingsProps {
   form: FormState;
@@ -17,7 +17,7 @@ export function RetrievalSettings({ form, set }: RetrievalSettingsProps) {
               value={form.vector_top_k}
               min={1}
               max={50}
-              onChange={(v) => set("vector_top_k", v)}
+              onChange={(v) => set('vector_top_k', v)}
             />
           </Field>
           <Field label="BM25 Top-K">
@@ -25,7 +25,7 @@ export function RetrievalSettings({ form, set }: RetrievalSettingsProps) {
               value={form.bm25_top_k}
               min={1}
               max={50}
-              onChange={(v) => set("bm25_top_k", v)}
+              onChange={(v) => set('bm25_top_k', v)}
             />
           </Field>
           <Field label="Hybrid Top-K">
@@ -33,16 +33,11 @@ export function RetrievalSettings({ form, set }: RetrievalSettingsProps) {
               value={form.hybrid_top_k}
               min={1}
               max={50}
-              onChange={(v) => set("hybrid_top_k", v)}
+              onChange={(v) => set('hybrid_top_k', v)}
             />
           </Field>
           <Field label="RRF K">
-            <NumberInput
-              value={form.rrf_k}
-              min={1}
-              max={200}
-              onChange={(v) => set("rrf_k", v)}
-            />
+            <NumberInput value={form.rrf_k} min={1} max={200} onChange={(v) => set('rrf_k', v)} />
           </Field>
         </div>
         <div className="border-t border-stone-100 pt-4">
@@ -51,7 +46,7 @@ export function RetrievalSettings({ form, set }: RetrievalSettingsProps) {
               value={form.reranker_top_n}
               min={1}
               max={20}
-              onChange={(v) => set("reranker_top_n", v)}
+              onChange={(v) => set('reranker_top_n', v)}
             />
           </Field>
         </div>

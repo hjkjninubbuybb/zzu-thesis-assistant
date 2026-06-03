@@ -1,12 +1,12 @@
-import { useRef, useCallback } from "react";
-import { Loader2, Upload } from "lucide-react";
-import type { DocType, UploadParams } from "@shared/types/api";
-import { UploadQueueList } from "./UploadQueueList";
-import { UploadParamsPanel } from "./UploadParamsPanel";
+import { useRef, useCallback } from 'react';
+import { Loader2, Upload } from 'lucide-react';
+import type { DocType, UploadParams } from '@shared/types/api';
+import { UploadQueueList } from './UploadQueueList';
+import { UploadParamsPanel } from './UploadParamsPanel';
 
 // ── Types ──────────────────────────────────────────────────
 
-export type FileStatus = "pending" | "uploading" | "done" | "error";
+export type FileStatus = 'pending' | 'uploading' | 'done' | 'error';
 
 export interface QueueItem {
   id: string;
@@ -21,18 +21,18 @@ export interface QueueItem {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_UPLOAD_PARAMS: UploadParams = {
-  splitter_type: "recursive",
+  splitter_type: 'recursive',
   chunk_size: 256,
   chunk_overlap_ratio: 0.2,
   enable_cleaning: true,
-  doc_type: "policy",
+  doc_type: 'policy',
 };
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const DOC_TYPE_LABELS: Record<DocType, string> = {
-  policy: "政策文件",
-  manual: "操作手册",
-  form: "填报模板",
+  policy: '政策文件',
+  manual: '操作手册',
+  form: '填报模板',
 };
 
 // ── Helpers ────────────────────────────────────────────────
@@ -82,8 +82,8 @@ export function UploadZone({
     [onAddFiles],
   );
 
-  const pendingCount = queue.filter((q) => q.status === "pending").length;
-  const hasDone = queue.some((q) => q.status === "done");
+  const pendingCount = queue.filter((q) => q.status === 'pending').length;
+  const hasDone = queue.some((q) => q.status === 'done');
 
   return (
     <div className="p-5 border-b border-[#F0EDE8]">
@@ -104,19 +104,14 @@ export function UploadZone({
           className="hidden"
           onChange={(e) => {
             if (e.target.files?.length) onAddFiles(e.target.files);
-            e.target.value = "";
+            e.target.value = '';
           }}
         />
-        <Upload
-          size={20}
-          className="mx-auto mb-2"
-          style={{ color: "#8A8A8A" }}
-        />
-        <p className="text-sm" style={{ color: "#8A8A8A" }}>
-          拖拽文件到此处，或{" "}
-          <span className="text-[#334155] font-medium">点击选择</span>
+        <Upload size={20} className="mx-auto mb-2" style={{ color: '#8A8A8A' }} />
+        <p className="text-sm" style={{ color: '#8A8A8A' }}>
+          拖拽文件到此处，或 <span className="text-[#334155] font-medium">点击选择</span>
         </p>
-        <p className="text-xs mt-1" style={{ color: "#AAAAAA" }}>
+        <p className="text-xs mt-1" style={{ color: '#AAAAAA' }}>
           支持 .pdf / .txt / .md / .docx / .doc，可多选
         </p>
       </div>
@@ -140,20 +135,14 @@ export function UploadZone({
           disabled={pendingCount === 0 || uploading}
           className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white text-sm rounded-xl hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {uploading ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <Upload size={13} />
-          )}
-          {uploading
-            ? "入库中..."
-            : `上传入库${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
+          {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+          {uploading ? '入库中...' : `上传入库${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
         </button>
         {hasDone && !uploading && (
           <button
             onClick={onClearDone}
             className="text-xs hover:text-gray-700 transition-colors"
-            style={{ color: "#8A8A8A" }}
+            style={{ color: '#8A8A8A' }}
           >
             清除已完成
           </button>

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @plugin "@tailwindcss/typography";
 
 @theme {
@@ -25,7 +25,7 @@
 }
 
 /* ───── Student theme override ───── */
-[data-theme="student"] {
+[data-theme='student'] {
   --color-background: hsl(215 35% 96%); /* 更清透的浅蓝白 */
   --color-foreground: hsl(215 28% 17%);
   --color-secondary: hsl(215 20% 96%);
@@ -49,7 +49,7 @@ body {
   font-family:
     system-ui,
     -apple-system,
-    "Segoe UI",
+    'Segoe UI',
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -332,7 +332,7 @@ body {
     0 6px 28px -14px rgba(40, 32, 20, 0.16);
 }
 
-[data-theme="student"] .glass-card {
+[data-theme='student'] .glass-card {
   background-color: rgba(255, 255, 255, 0.66);
   border-color: rgba(255, 255, 255, 0.7);
   box-shadow:
@@ -340,7 +340,7 @@ body {
     0 12px 36px -16px rgba(20, 30, 60, 0.18);
 }
 
-[data-theme="student"] .glass-soft {
+[data-theme='student'] .glass-soft {
   background-color: rgba(255, 255, 255, 0.84);
   border-color: rgba(255, 255, 255, 0.65);
   box-shadow:
@@ -527,16 +527,12 @@ body {
 .prose-academic strong {
   color: #334155;
   font-weight: 600;
-  background: linear-gradient(
-    120deg,
-    rgba(37, 99, 235, 0.08) 0%,
-    rgba(37, 99, 235, 0.08) 100%
-  );
+  background: linear-gradient(120deg, rgba(37, 99, 235, 0.08) 0%, rgba(37, 99, 235, 0.08) 100%);
   padding: 0 2px;
   border-radius: 2px;
 }
 
-[data-theme="student"] .prose-academic strong {
+[data-theme='student'] .prose-academic strong {
   color: #2563eb;
 }
 
@@ -560,7 +556,7 @@ body {
 
 .prose-academic code::before,
 .prose-academic code::after {
-  content: "";
+  content: '';
 }
 
 /* ───── Citation Marker ───── */

@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import ReactMarkdown from "react-markdown";
-import { extractError } from "@shared/lib/api";
-import type { ChunkPreview } from "@shared/types/api";
-import { documentService } from "../services/documentService";
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import ReactMarkdown from 'react-markdown';
+import { extractError } from '@shared/lib/errorHandler';
+import type { ChunkPreview } from '@shared/types/api';
+import { documentService } from '../services/documentService';
 
 export function ChunkReview() {
   const { kbName, docId } = useParams<{ kbName: string; docId: string }>();
@@ -30,7 +30,7 @@ export function ChunkReview() {
 
   // Fallback: fetch from API if no navigation state (resume scenario)
   const { data: review, isError: reviewError } = useQuery({
-    queryKey: ["review", kbName, docId],
+    queryKey: ['review', kbName, docId],
     queryFn: () => documentService.getReview(kbName!, Number(docId!)),
     enabled: !!kbName && !!docId && !loaded,
   });
@@ -46,18 +46,18 @@ export function ChunkReview() {
   const confirmMutation = useMutation({
     mutationFn: () => documentService.confirmIndex(kbName!, Number(docId!)),
     onSuccess: async () => {
-      qc.invalidateQueries({ queryKey: ["documents", kbName] });
-      qc.invalidateQueries({ queryKey: ["knowledge-bases"] });
+      qc.invalidateQueries({ queryKey: ['documents', kbName] });
+      qc.invalidateQueries({ queryKey: ['knowledge-bases'] });
 
       try {
-        const docs = await documentService.list(kbName!);
-        const nextReview = docs.find((d) => d.status === "pending_review");
+        const { items: docs } = await documentService.list(kbName!, 1, 1000);
+        const nextReview = docs.find((d) => d.status === 'pending_review');
         if (nextReview) {
           navigate(`/admin/document/${kbName}/${nextReview.id}/review`);
           return;
         }
         const nextChunk = docs.find(
-          (d) => d.status === "pending_chunk_review" && d.id !== Number(docId),
+          (d) => d.status === 'pending_chunk_review' && d.id !== Number(docId),
         );
         if (nextChunk) {
           navigate(`/admin/document/${kbName}/${nextChunk.id}/chunks`);
@@ -66,7 +66,7 @@ export function ChunkReview() {
       } catch {
         // 查询失败则回退到列表页
       }
-      navigate("/admin/documents?kb=" + kbName);
+      navigate('/admin/documents?kb=' + kbName);
     },
   });
 
@@ -80,7 +80,7 @@ export function ChunkReview() {
         <div className="flex flex-col items-center justify-center h-full gap-3">
           <div className="text-red-500 text-sm">加载失败，请返回列表重试</div>
           <button
-            onClick={() => navigate("/admin/documents?kb=" + kbName)}
+            onClick={() => navigate('/admin/documents?kb=' + kbName)}
             className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
             返回列表
@@ -101,9 +101,7 @@ export function ChunkReview() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white rounded-t-2xl">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">分块预览</h2>
-          <p className="text-sm text-gray-500">
-            共 {chunks.length} 个分块 — 确认后将向量化入库
-          </p>
+          <p className="text-sm text-gray-500">共 {chunks.length} 个分块 — 确认后将向量化入库</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -120,7 +118,7 @@ export function ChunkReview() {
             disabled={confirmMutation.isPending || chunks.length === 0}
             className="px-4 py-2 text-sm text-white bg-black rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
           >
-            {confirmMutation.isPending ? "入库中..." : "确认入库"}
+            {confirmMutation.isPending ? '入库中...' : '确认入库'}
           </button>
         </div>
       </div>
@@ -135,9 +133,7 @@ export function ChunkReview() {
       {/* Chunk list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {chunks.length === 0 && (
-          <div className="text-center text-gray-400 py-16">
-            没有分块数据，请返回编辑页重新分块
-          </div>
+          <div className="text-center text-gray-400 py-16">没有分块数据，请返回编辑页重新分块</div>
         )}
         {chunks.map((chunk) => (
           <div
@@ -148,9 +144,7 @@ export function ChunkReview() {
               <span className="text-xs font-mono font-medium text-gray-500">
                 #{chunk.index + 1}
               </span>
-              <span className="text-xs text-gray-400">
-                {chunk.content.length} 字符
-              </span>
+              <span className="text-xs text-gray-400">{chunk.content.length} 字符</span>
             </div>
             <div className="p-3 prose prose-sm max-w-none text-sm">
               <ReactMarkdown>{chunk.content}</ReactMarkdown>

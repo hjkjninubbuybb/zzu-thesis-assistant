@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { CheckCircle, ChevronDown, Search } from "lucide-react";
+import { useEffect, useRef, useState } from 'react';
+import { CheckCircle, ChevronDown, Search } from 'lucide-react';
 
 // ── Section ──────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ export function SearchableSelect({
   value,
   options,
   onChange,
-  placeholder = "选择模型...",
+  placeholder = '选择模型...',
 }: {
   value: string;
   options: { value: string; label: string; desc?: string }[];
@@ -61,7 +61,7 @@ export function SearchableSelect({
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
   const filtered = options.filter(
@@ -72,15 +72,12 @@ export function SearchableSelect({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
@@ -90,13 +87,11 @@ export function SearchableSelect({
         className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm flex items-center justify-between cursor-pointer hover:border-stone-400 transition-all shadow-sm"
       >
         <span className="truncate font-medium text-stone-700">
-          {options.find((o) => o.value === value)?.label ||
-            value ||
-            placeholder}
+          {options.find((o) => o.value === value)?.label || value || placeholder}
         </span>
         <ChevronDown
           size={14}
-          className={`text-stone-400 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`text-stone-400 transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </div>
 
@@ -129,27 +124,25 @@ export function SearchableSelect({
                   onClick={() => {
                     onChange(o.value);
                     setOpen(false);
-                    setSearch("");
+                    setSearch('');
                   }}
                   className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${
                     value === o.value
-                      ? "bg-stone-800 text-white"
-                      : "hover:bg-stone-50 text-stone-700"
+                      ? 'bg-stone-800 text-white'
+                      : 'hover:bg-stone-50 text-stone-700'
                   }`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{o.label}</div>
                     {o.desc && (
                       <div
-                        className={`text-[10px] truncate ${value === o.value ? "text-stone-300" : "text-stone-400"}`}
+                        className={`text-[10px] truncate ${value === o.value ? 'text-stone-300' : 'text-stone-400'}`}
                       >
                         {o.desc}
                       </div>
                     )}
                   </div>
-                  {value === o.value && (
-                    <CheckCircle size={14} className="text-white ml-2" />
-                  )}
+                  {value === o.value && <CheckCircle size={14} className="text-white ml-2" />}
                 </div>
               ))
             )}
@@ -171,9 +164,7 @@ export function ModelSelect({
   options: { value: string; label: string; desc?: string }[];
   onChange: (v: string) => void;
 }) {
-  return (
-    <SearchableSelect value={value} options={options} onChange={onChange} />
-  );
+  return <SearchableSelect value={value} options={options} onChange={onChange} />;
 }
 
 // ── NumberInput ──────────────────────────────────────────────
@@ -195,9 +186,7 @@ export function NumberInput({
       min={min}
       max={max}
       value={value}
-      onChange={(e) =>
-        onChange(Math.max(min, Math.min(max, Number(e.target.value))))
-      }
+      onChange={(e) => onChange(Math.max(min, Math.min(max, Number(e.target.value))))}
       className="w-20 border border-stone-300 rounded-xl px-2.5 py-1.5 text-sm text-center outline-none focus:ring-2 focus:ring-stone-400 focus:border-stone-400"
     />
   );

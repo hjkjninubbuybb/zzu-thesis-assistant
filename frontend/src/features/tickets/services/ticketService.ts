@@ -1,18 +1,14 @@
-import { ticketApi, faqApi, knowledgeApi, extractError } from "@shared/lib/api";
-import type { QARequestCreate } from "@shared/types/api";
+import { ticketApi, faqApi, knowledgeApi } from '@shared/lib/api';
+import { extractError } from '@shared/lib/errorHandler';
+import type { QARequestCreate } from '@shared/types/api';
 
 export const ticketService = {
-  listAll: () => ticketApi.list(),
-  listMine: () => ticketApi.list(),
+  listAll: (page: number, pageSize: number) => ticketApi.list(page, pageSize),
+  listMine: (page: number, pageSize: number) => ticketApi.list(page, pageSize),
   create: (payload: QARequestCreate) => ticketApi.create(payload),
   reply: (id: number, answer: string) => ticketApi.reply(id, answer),
   close: (id: number) => ticketApi.close(id),
-  createFaq: async (
-    kbName: string,
-    question: string,
-    answer: string,
-    category: string,
-  ) => {
+  createFaq: async (kbName: string, question: string, answer: string, category: string) => {
     await faqApi.create(kbName, {
       question,
       answer,

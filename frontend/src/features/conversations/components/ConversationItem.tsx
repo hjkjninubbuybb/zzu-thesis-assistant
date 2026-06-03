@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
-import { Loader2, Pencil, Check, X as XIcon, Trash2 } from "lucide-react";
-import type { ConversationInfo } from "@shared/types/api";
+import { useState, useRef, useEffect } from 'react';
+import { Loader2, Pencil, Check, X as XIcon, Trash2 } from 'lucide-react';
+import type { ConversationInfo } from '@shared/types/api';
 
 // ── 对话列表分组 ─────────────────────────────────────────
 
@@ -14,10 +14,10 @@ export const groupByDate = (conversations: ConversationInfo[]) => {
   weekAgo.setDate(weekAgo.getDate() - 7);
 
   const groups: { label: string; items: ConversationInfo[] }[] = [
-    { label: "今天", items: [] },
-    { label: "昨天", items: [] },
-    { label: "最近7天", items: [] },
-    { label: "更早", items: [] },
+    { label: '今天', items: [] },
+    { label: '昨天', items: [] },
+    { label: '最近7天', items: [] },
+    { label: '更早', items: [] },
   ];
 
   for (const conv of conversations) {
@@ -43,7 +43,7 @@ export function ConversationItem({
 }: {
   conv: ConversationInfo;
   active: boolean;
-  theme: "admin" | "student";
+  theme: 'admin' | 'student';
   onSelect: (id: number) => void;
   onRename: (id: number, title: string) => void;
   onDelete: (id: number) => void;
@@ -74,8 +74,7 @@ export function ConversationItem({
     setEditing(false);
   };
 
-  const activeBorder =
-    theme === "admin" ? "border-[#E8E4DC]" : "border-[#D9DEE5]";
+  const activeBorder = theme === 'admin' ? 'border-[#E8E4DC]' : 'border-[#D9DEE5]';
 
   if (editing) {
     return (
@@ -87,8 +86,8 @@ export function ConversationItem({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") commit();
-            else if (e.key === "Escape") cancel();
+            if (e.key === 'Enter') commit();
+            else if (e.key === 'Escape') cancel();
           }}
           maxLength={50}
           className="flex-1 min-w-0 text-sm bg-transparent outline-none text-gray-900"
@@ -121,7 +120,7 @@ export function ConversationItem({
       className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
         active
           ? `bg-white shadow-sm border ${activeBorder} text-gray-900`
-          : "text-gray-600 hover:bg-white/70"
+          : 'text-gray-600 hover:bg-white/70'
       }`}
     >
       <span className="flex-1 truncate">{conv.title}</span>
@@ -164,7 +163,7 @@ export function ConversationList({
 }: {
   conversations: ConversationInfo[];
   activeId: number | null;
-  theme: "admin" | "student";
+  theme: 'admin' | 'student';
   emptyText: string;
   onSelect: (id: number) => void;
   onRename: (id: number, title: string) => void;
@@ -181,8 +180,8 @@ export function ConversationList({
     const handleScroll = () => {
       if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) onLoadMore();
     };
-    el.addEventListener("scroll", handleScroll);
-    return () => el.removeEventListener("scroll", handleScroll);
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
   }, [onLoadMore]);
 
   return (

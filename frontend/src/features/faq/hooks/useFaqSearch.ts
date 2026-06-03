@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { faqService } from "../services/faqService";
-import { faqKeys } from "./queryKeys";
+import { useQuery } from '@tanstack/react-query';
+import { faqService } from '../services/faqService';
+import { faqKeys } from './queryKeys';
 
 export function useFaqSearch(kbName: string, query: string) {
   return useQuery({

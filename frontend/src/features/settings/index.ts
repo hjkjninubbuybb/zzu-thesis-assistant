@@ -1,1 +1,1 @@
-export { SettingsRoot } from "./components/SettingsRoot";
+export { SettingsRoot } from './components/SettingsRoot';

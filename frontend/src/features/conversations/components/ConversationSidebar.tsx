@@ -1,6 +1,6 @@
-import { Plus, BookOpen, ShieldAlert } from "lucide-react";
-import { ConversationList } from "./ConversationItem";
-import type { ConversationInfo } from "@shared/types/api";
+import { Plus, BookOpen, ShieldAlert } from 'lucide-react';
+import { ConversationList } from './ConversationItem';
+import type { ConversationInfo } from '@shared/types/api';
 
 // ── 管理端侧边栏（展示预设知识库，无下拉选择）─────────────
 
@@ -37,17 +37,13 @@ export function AdminConversationSidebar({
               <p className="text-[10px] font-medium text-emerald-700 leading-none mb-0.5">
                 当前知识库
               </p>
-              <p className="text-sm font-semibold text-emerald-900 truncate">
-                {adminKbName}
-              </p>
+              <p className="text-sm font-semibold text-emerald-900 truncate">{adminKbName}</p>
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 rounded-xl mb-2">
             <ShieldAlert size={14} className="text-amber-500 shrink-0" />
-            <p className="text-xs text-amber-700">
-              请在知识库页面选择管理端知识库
-            </p>
+            <p className="text-xs text-amber-700">请在知识库页面选择管理端知识库</p>
           </div>
         )}
         <button
@@ -63,7 +59,7 @@ export function AdminConversationSidebar({
         conversations={conversations}
         activeId={activeId}
         theme="admin"
-        emptyText={adminKbName ? "暂无对话记录" : "等待知识库配置"}
+        emptyText={adminKbName ? '暂无对话记录' : '等待知识库配置'}
         onSelect={onSelect}
         onRename={onRename}
         onDelete={onDelete}
@@ -109,9 +105,7 @@ export function StudentConversationSidebar({
               <p className="text-[10px] font-medium text-[#4338CA] leading-none mb-0.5">
                 当前知识库
               </p>
-              <p className="text-sm font-semibold text-[#312E81] truncate">
-                {activeKbName}
-              </p>
+              <p className="text-sm font-semibold text-[#312E81] truncate">{activeKbName}</p>
             </div>
           </div>
         ) : (
@@ -133,7 +127,7 @@ export function StudentConversationSidebar({
         conversations={conversations}
         activeId={activeId}
         theme="student"
-        emptyText={activeKbName ? "暂无对话记录" : "等待知识库分配"}
+        emptyText={activeKbName ? '暂无对话记录' : '等待知识库分配'}
         onSelect={onSelect}
         onRename={onRename}
         onDelete={onDelete}

@@ -1,6 +1,6 @@
-import { Sparkles } from "lucide-react";
-import { Section, Field, NumberInput } from "./SettingsPrimitives";
-import type { FormState } from "../hooks/useSettings";
+import { Sparkles } from 'lucide-react';
+import { Section, Field, NumberInput } from './SettingsPrimitives';
+import type { FormState } from '../hooks/useSettings';
 
 interface AgentSettingsProps {
   form: FormState;
@@ -16,11 +16,11 @@ export function AgentSettings({ form, set }: AgentSettingsProps) {
             {[0, 1, 2, 3, 4, 5].map((n) => (
               <button
                 key={n}
-                onClick={() => set("max_reformulations", n)}
+                onClick={() => set('max_reformulations', n)}
                 className={`w-9 py-1.5 text-sm rounded-lg border transition-colors ${
                   form.max_reformulations === n
-                    ? "bg-stone-800 text-white border-stone-800"
-                    : "border-stone-300 text-stone-700 hover:bg-stone-50"
+                    ? 'bg-stone-800 text-white border-stone-800'
+                    : 'border-stone-300 text-stone-700 hover:bg-stone-50'
                 }`}
               >
                 {n}
@@ -36,7 +36,7 @@ export function AgentSettings({ form, set }: AgentSettingsProps) {
                 value={form.agent_recursion_limit}
                 min={4}
                 max={50}
-                onChange={(v) => set("agent_recursion_limit", v)}
+                onChange={(v) => set('agent_recursion_limit', v)}
               />
               <span className="text-xs text-stone-400 font-medium">步</span>
             </div>
@@ -47,7 +47,7 @@ export function AgentSettings({ form, set }: AgentSettingsProps) {
                 value={form.agent_retry_count}
                 min={1}
                 max={5}
-                onChange={(v) => set("agent_retry_count", v)}
+                onChange={(v) => set('agent_retry_count', v)}
               />
               <span className="text-xs text-stone-400 font-medium">次</span>
             </div>

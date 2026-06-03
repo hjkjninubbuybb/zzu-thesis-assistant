@@ -1,42 +1,39 @@
-import { chatService } from "../services/chatService";
-import type { FileItem, SourceItem } from "@shared/types/api";
-import type { ThinkingStep } from "../components/ThinkingProcess";
+import { chatService } from '../services/chatService';
+import type { FileItem, SourceItem } from '@shared/types/api';
+import type { ThinkingStep } from '../components/ThinkingProcess';
 
 export const STATUS_TEXT: Record<string, string> = {
-  faq_matching: "正在匹配知识库 FAQ...",
-  faq_answering: "正在生成 FAQ 快答...",
-  building_retriever: "正在构建知识库检索索引...",
-  running_rag: "正在检索并生成答案...",
+  faq_matching: '正在匹配知识库 FAQ...',
+  faq_answering: '正在生成 FAQ 快答...',
+  building_retriever: '正在构建知识库检索索引...',
+  running_rag: '正在检索并生成答案...',
 };
 
 export const TOOL_LABELS: Record<string, string> = {
-  search_knowledge_base: "🔍 检索知识库",
-  get_academic_calendar: "📅 查询郑大校历",
-  list_kb_documents: "📋 查看文档目录",
-  get_document_link: "📎 查找原文文件",
+  search_knowledge_base: '🔍 检索知识库',
+  get_academic_calendar: '📅 查询郑大校历',
+  list_kb_documents: '📋 查看文档目录',
+  get_document_link: '📎 查找原文文件',
 };
 
 export const MAX_REF = 2;
 
 export const INITIAL_THINKING: ThinkingStep[] = [
-  { id: "step-1", label: "正在理解并优化查询...", status: "active" },
-  { id: "step-2", label: "正在检索相关文档...", status: "pending" },
-  { id: "step-3", label: "正在分析并总结回答...", status: "pending" },
+  { id: 'step-1', label: '正在理解并优化查询...', status: 'active' },
+  { id: 'step-2', label: '正在检索相关文档...', status: 'pending' },
+  { id: 'step-3', label: '正在分析并总结回答...', status: 'pending' },
 ];
 
-export function applyStatusStep(
-  prev: ThinkingStep[],
-  step: string,
-): ThinkingStep[] {
+export function applyStatusStep(prev: ThinkingStep[], step: string): ThinkingStep[] {
   const next = [...prev];
-  if (step === "faq_matching" || step === "faq_answering") {
-    next[0] = { ...next[0], status: "active", label: STATUS_TEXT[step] };
-  } else if (step === "building_retriever") {
-    next[0] = { ...next[0], status: "done" };
-    next[1] = { ...next[1], status: "active", label: STATUS_TEXT[step] };
-  } else if (step === "running_rag") {
-    next[1] = { ...next[1], status: "done" };
-    next[2] = { ...next[2], status: "active", label: STATUS_TEXT[step] };
+  if (step === 'faq_matching' || step === 'faq_answering') {
+    next[0] = { ...next[0], status: 'active', label: STATUS_TEXT[step] };
+  } else if (step === 'building_retriever') {
+    next[0] = { ...next[0], status: 'done' };
+    next[1] = { ...next[1], status: 'active', label: STATUS_TEXT[step] };
+  } else if (step === 'running_rag') {
+    next[1] = { ...next[1], status: 'done' };
+    next[2] = { ...next[2], status: 'active', label: STATUS_TEXT[step] };
   }
   return next;
 }
@@ -50,7 +47,7 @@ export async function ensureConversation(
 ): Promise<number | null> {
   if (activeConvId) return activeConvId;
   try {
-    const conv = await chatService.createConversation(chatKb, "新对话");
+    const conv = await chatService.createConversation(chatKb, '新对话');
     onConvCreated(conv.id);
     onInvalidate();
     return conv.id;
@@ -65,7 +62,7 @@ export async function saveUserMessage(
   content: string,
 ): Promise<{ id: number } | null> {
   try {
-    return await chatService.addMessage(convId, { role: "user", content });
+    return await chatService.addMessage(convId, { role: 'user', content });
   } catch {
     return null;
   }
@@ -83,7 +80,7 @@ export async function saveAssistantTurn(
   let assistantDbId: number | undefined;
   try {
     const saved = await chatService.addMessage(convId, {
-      role: "assistant",
+      role: 'assistant',
       content: accumulatedText,
       sources: finalSources.length > 0 ? finalSources : null,
       files: finalFiles.length > 0 ? finalFiles : null,
@@ -104,24 +101,20 @@ export async function saveAssistantTurn(
   return assistantDbId;
 }
 
-export function applyToolStep(
-  prev: ThinkingStep[],
-  tool: string,
-  input: string,
-): ThinkingStep[] {
+export function applyToolStep(prev: ThinkingStep[], tool: string, input: string): ThinkingStep[] {
   const label = TOOL_LABELS[tool] ?? tool;
   const existingIdx = prev.findIndex((s) => s.id === `tool-${tool}`);
   if (existingIdx >= 0) {
     const next = [...prev];
-    next[existingIdx] = { ...next[existingIdx], status: "active", input };
+    next[existingIdx] = { ...next[existingIdx], status: 'active', input };
     return next;
   }
-  const activeIdx = prev.findLastIndex((s) => s.status === "active");
+  const activeIdx = prev.findLastIndex((s) => s.status === 'active');
   const next = [...prev];
   next.splice(activeIdx, 0, {
     id: `tool-${tool}`,
     label,
-    status: "active",
+    status: 'active',
     input,
   });
   return next;

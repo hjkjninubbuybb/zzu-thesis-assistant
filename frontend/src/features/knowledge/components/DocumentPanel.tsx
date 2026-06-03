@@ -1,97 +1,82 @@
-import { useState, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileText, Loader2, Trash2 } from "lucide-react";
-import { documentApi, extractError } from "@shared/lib/api";
-import type { DocType, UploadParams } from "@shared/types/api";
+import { useState, useCallback } from 'react';
+import { FileText, Loader2, Trash2 } from 'lucide-react';
+import { extractError } from '@shared/lib/errorHandler';
+import type { DocType, UploadParams } from '@shared/types/api';
+import { useKBDocuments } from '../hooks/useKBDocuments';
 import {
   UploadZone,
   type QueueItem,
   DEFAULT_UPLOAD_PARAMS,
   DOC_TYPE_LABELS,
   formatSize,
-} from "./UploadZone";
+} from './UploadZone';
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+  return new Date(iso).toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
 }
 
 interface DocumentPanelProps {
   kbName: string;
-  onToast: (msg: string, type: "success" | "error") => void;
+  onToast: (msg: string, type: 'success' | 'error') => void;
 }
 
 export function DocumentPanel({ kbName, onToast }: DocumentPanelProps) {
-  const qc = useQueryClient();
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [params, setParams] = useState<UploadParams>(DEFAULT_UPLOAD_PARAMS);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const { data: docs, isLoading: docsLoading } = useQuery({
-    queryKey: ["documents", kbName],
-    queryFn: () => documentApi.list(kbName),
-  });
+  const { docs, docsLoading, deleteDoc, deleteDocPending, uploadDoc } = useKBDocuments(kbName);
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const items: QueueItem[] = Array.from(files).map((file) => ({
       id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
       file,
-      status: "pending",
+      status: 'pending',
       progress: 0,
     }));
     setQueue((prev) => [...prev, ...items]);
   }, []);
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => documentApi.delete(kbName, id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["documents", kbName] });
-      qc.invalidateQueries({ queryKey: ["knowledge-bases"] });
-      setDeleteId(null);
-      onToast("文档已删除", "success");
-    },
-    onError: (e) => onToast(extractError(e), "error"),
-  });
+  const handleDelete = (id: number) => {
+    deleteDoc(id, {
+      onSuccess: () => {
+        setDeleteId(null);
+        onToast('文档已删除', 'success');
+      },
+      onError: (e) => onToast(extractError(e), 'error'),
+    });
+  };
 
   const startUpload = async () => {
-    const pending = queue.filter((item) => item.status === "pending");
+    const pending = queue.filter((item) => item.status === 'pending');
     if (!pending.length) return;
     setUploading(true);
     let successCount = 0;
     let failCount = 0;
     for (const item of pending) {
       setQueue((prev) =>
-        prev.map((q) =>
-          q.id === item.id ? { ...q, status: "uploading", progress: 0 } : q,
-        ),
+        prev.map((q) => (q.id === item.id ? { ...q, status: 'uploading', progress: 0 } : q)),
       );
       try {
-        const doc = await documentApi.upload(kbName, item.file, params, (pct) =>
-          setQueue((prev) =>
-            prev.map((q) => (q.id === item.id ? { ...q, progress: pct } : q)),
-          ),
+        const doc = await uploadDoc(item.file, params, (pct) =>
+          setQueue((prev) => prev.map((q) => (q.id === item.id ? { ...q, progress: pct } : q))),
         );
         setQueue((prev) =>
           prev.map((q) =>
-            q.id === item.id
-              ? { ...q, status: "done", progress: 100, chunks: doc.chunk_count }
-              : q,
+            q.id === item.id ? { ...q, status: 'done', progress: 100, chunks: doc.chunk_count } : q,
           ),
         );
         successCount++;
-        qc.invalidateQueries({ queryKey: ["documents", kbName] });
-        qc.invalidateQueries({ queryKey: ["knowledge-bases"] });
       } catch (e) {
         setQueue((prev) =>
           prev.map((q) =>
-            q.id === item.id
-              ? { ...q, status: "error", error: extractError(e) }
-              : q,
+            q.id === item.id ? { ...q, status: 'error', error: extractError(e) } : q,
           ),
         );
         failCount++;
@@ -99,9 +84,9 @@ export function DocumentPanel({ kbName, onToast }: DocumentPanelProps) {
     }
     setUploading(false);
     if (successCount > 0 && failCount === 0) {
-      onToast(`${successCount} 个文档入库成功`, "success");
+      onToast(`${successCount} 个文档入库成功`, 'success');
     } else if (failCount > 0) {
-      onToast(`${successCount} 成功，${failCount} 失败`, "error");
+      onToast(`${successCount} 成功，${failCount} 失败`, 'error');
     }
   };
 
@@ -114,12 +99,8 @@ export function DocumentPanel({ kbName, onToast }: DocumentPanelProps) {
         advancedOpen={advancedOpen}
         uploading={uploading}
         onAddFiles={addFiles}
-        onRemoveItem={(id) =>
-          setQueue((prev) => prev.filter((q) => q.id !== id))
-        }
-        onClearDone={() =>
-          setQueue((prev) => prev.filter((q) => q.status !== "done"))
-        }
+        onRemoveItem={(id) => setQueue((prev) => prev.filter((q) => q.id !== id))}
+        onClearDone={() => setQueue((prev) => prev.filter((q) => q.status !== 'done'))}
         onParamsChange={setParams}
         onToggleAdvanced={() => setAdvancedOpen((o) => !o)}
         onStartUpload={startUpload}
@@ -128,13 +109,13 @@ export function DocumentPanel({ kbName, onToast }: DocumentPanelProps) {
       {/* Document list */}
       <div className="p-5">
         <p className="text-xs font-semibold text-[#334155] mb-3">
-          已入库文档{docs ? ` (${docs.length})` : ""}
+          已入库文档{docs ? ` (${docs.length})` : ''}
         </p>
 
         {docsLoading && (
           <div
             className="flex items-center gap-2 text-xs py-6 justify-center"
-            style={{ color: "#8A8A8A" }}
+            style={{ color: '#8A8A8A' }}
           >
             <Loader2 size={13} className="animate-spin" />
             加载中...
@@ -142,7 +123,7 @@ export function DocumentPanel({ kbName, onToast }: DocumentPanelProps) {
         )}
 
         {docs && docs.length === 0 && (
-          <p className="text-xs text-center py-6" style={{ color: "#AAAAAA" }}>
+          <p className="text-xs text-center py-6" style={{ color: '#AAAAAA' }}>
             暂无文档，请上传
           </p>
         )}
@@ -161,32 +142,27 @@ export function DocumentPanel({ kbName, onToast }: DocumentPanelProps) {
                 <span className="text-xs shrink-0 px-2 py-0.5 rounded-full bg-[#F2EFE9] text-gray-600">
                   {DOC_TYPE_LABELS[doc.doc_type as DocType] ?? doc.doc_type}
                 </span>
-                <span className="text-xs shrink-0" style={{ color: "#8A8A8A" }}>
+                <span className="text-xs shrink-0" style={{ color: '#8A8A8A' }}>
                   {formatSize(doc.file_size)}
                 </span>
-                <span className="text-xs shrink-0" style={{ color: "#8A8A8A" }}>
+                <span className="text-xs shrink-0" style={{ color: '#8A8A8A' }}>
                   {doc.chunk_count} chunks
                 </span>
-                <span
-                  className="text-xs w-24 text-right shrink-0"
-                  style={{ color: "#8A8A8A" }}
-                >
+                <span className="text-xs w-24 text-right shrink-0" style={{ color: '#8A8A8A' }}>
                   {formatDate(doc.created_at)}
                 </span>
                 <div className="shrink-0">
                   {deleteId === doc.id ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs" style={{ color: "#8A8A8A" }}>
+                      <span className="text-xs" style={{ color: '#8A8A8A' }}>
                         确认？
                       </span>
                       <button
-                        onClick={() => deleteMutation.mutate(doc.id)}
-                        disabled={deleteMutation.isPending}
+                        onClick={() => handleDelete(doc.id)}
+                        disabled={deleteDocPending}
                         className="text-xs px-2 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-1"
                       >
-                        {deleteMutation.isPending && (
-                          <Loader2 size={10} className="animate-spin" />
-                        )}
+                        {deleteDocPending && <Loader2 size={10} className="animate-spin" />}
                         确认
                       </button>
                       <button

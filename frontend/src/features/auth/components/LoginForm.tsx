@@ -1,12 +1,12 @@
-import { useState, useEffect, type FormEvent } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuthUser, useAuthLogout } from "@shared/store/authStore";
-import BlobBackdrop from "@shared/components/layout/BlobBackdrop";
-import { useLogin } from "../hooks/useLogin";
-import type { Portal } from "@shared/lib/auth";
+import { useState, useEffect, type FormEvent } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuthUser, useAuthLogout } from '@shared/store/authStore';
+import BlobBackdrop from '@shared/components/layout/BlobBackdrop';
+import { useLogin } from '../hooks/useLogin';
+import type { Portal } from '@shared/lib/auth';
 
 interface LoginFormProps {
-  variant: "admin" | "student";
+  variant: 'admin' | 'student';
 }
 
 export function LoginForm({ variant }: LoginFormProps) {
@@ -14,24 +14,21 @@ export function LoginForm({ variant }: LoginFormProps) {
   const user = useAuthUser();
   const logout = useAuthLogout();
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
-  const portal: Portal = variant === "student" ? "student" : "admin";
+  const portal: Portal = variant === 'student' ? 'student' : 'admin';
   const mutation = useLogin(portal);
 
-  const isStudent = variant === "student";
+  const isStudent = variant === 'student';
 
   // 已登录的用户访问登录页时：角色匹配则直接跳转，否则清除会话
   useEffect(() => {
     if (!user) return;
-    if (isStudent && user.role === "student") {
-      navigate("/student", { replace: true });
-    } else if (
-      !isStudent &&
-      (user.role === "admin" || user.role === "teacher")
-    ) {
-      navigate("/admin", { replace: true });
+    if (isStudent && user.role === 'student') {
+      navigate('/student', { replace: true });
+    } else if (!isStudent && (user.role === 'admin' || user.role === 'teacher')) {
+      navigate('/admin', { replace: true });
     } else {
       // 角色与登录页不匹配（如学生访问管理员登录页），清除旧会话
       logout();
@@ -52,7 +49,7 @@ export function LoginForm({ variant }: LoginFormProps) {
     mutation.isError && mutation.error instanceof Error
       ? mutation.error.message
       : mutation.isError
-        ? "登录失败，请检查用户名和密码"
+        ? '登录失败，请检查用户名和密码'
         : null;
 
   if (isStudent) {
@@ -60,31 +57,22 @@ export function LoginForm({ variant }: LoginFormProps) {
       <div
         data-theme="student"
         className="relative flex-1 flex items-center justify-center p-4 flex-col gap-6 overflow-hidden"
-        style={{ background: "hsl(215, 25%, 94%)" }}
+        style={{ background: 'hsl(215, 25%, 94%)' }}
       >
         <BlobBackdrop variant="cool" intensity="hero" />
-        <div
-          className="glass-card relative z-10 w-full max-w-sm rounded-2xl p-8"
-          style={settle(0)}
-        >
+        <div className="glass-card relative z-10 w-full max-w-sm rounded-2xl p-8" style={settle(0)}>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-[#2563EB] rounded-xl flex items-center justify-center shadow-sm shrink-0">
-              <span className="text-white text-sm font-bold tracking-tight">
-                R
-              </span>
+              <span className="text-white text-sm font-bold tracking-tight">R</span>
             </div>
             <div>
-              <div className="text-sm font-semibold text-[#202938] tracking-tight">
-                RAG 1.0
-              </div>
+              <div className="text-sm font-semibold text-[#202938] tracking-tight">RAG 1.0</div>
               <div className="text-xs text-[#6E7787]">学生登录</div>
             </div>
           </div>
 
-          <h1 className="text-xl font-semibold text-[#202938] mb-6">
-            你好，同学
-          </h1>
+          <h1 className="text-xl font-semibold text-[#202938] mb-6">你好，同学</h1>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
@@ -121,12 +109,10 @@ export function LoginForm({ variant }: LoginFormProps) {
 
             <button
               type="submit"
-              disabled={
-                mutation.isPending || !username.trim() || !password.trim()
-              }
+              disabled={mutation.isPending || !username.trim() || !password.trim()}
               className="mt-2 w-full py-2.5 bg-[#2563EB] text-white text-sm font-medium rounded-xl hover:bg-[#1D4ED8] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {mutation.isPending ? "登录中..." : "登录"}
+              {mutation.isPending ? '登录中...' : '登录'}
             </button>
           </form>
         </div>
@@ -146,24 +132,17 @@ export function LoginForm({ variant }: LoginFormProps) {
   return (
     <div
       className="relative flex-1 flex items-center justify-center p-4 flex-col gap-6 overflow-hidden"
-      style={{ background: "hsl(38, 22%, 91%)" }}
+      style={{ background: 'hsl(38, 22%, 91%)' }}
     >
       <BlobBackdrop variant="warm" intensity="hero" />
-      <div
-        className="glass-card relative z-10 w-full max-w-sm rounded-2xl p-8"
-        style={settle(0)}
-      >
+      <div className="glass-card relative z-10 w-full max-w-sm rounded-2xl p-8" style={settle(0)}>
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 bg-slate-700 rounded-xl flex items-center justify-center shadow-sm shrink-0">
-            <span className="text-white text-sm font-bold tracking-tight">
-              R
-            </span>
+            <span className="text-white text-sm font-bold tracking-tight">R</span>
           </div>
           <div>
-            <div className="text-sm font-semibold text-[#334155] tracking-tight">
-              RAG 1.0
-            </div>
+            <div className="text-sm font-semibold text-[#334155] tracking-tight">RAG 1.0</div>
             <div className="text-xs text-[#9A9A9A]">管理员 / 教师登录</div>
           </div>
         </div>
@@ -205,12 +184,10 @@ export function LoginForm({ variant }: LoginFormProps) {
 
           <button
             type="submit"
-            disabled={
-              mutation.isPending || !username.trim() || !password.trim()
-            }
+            disabled={mutation.isPending || !username.trim() || !password.trim()}
             className="mt-2 w-full py-2.5 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-800 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {mutation.isPending ? "登录中..." : "登录"}
+            {mutation.isPending ? '登录中...' : '登录'}
           </button>
         </form>
       </div>

@@ -1,13 +1,13 @@
-import { create } from "zustand";
-import type { UserInfo } from "@shared/types/api";
+import { create } from 'zustand';
+import type { UserInfo } from '@shared/types/api';
 import {
   getStoredUser,
   saveAuth,
   clearAuth,
   getCurrentPortal,
   type Portal,
-} from "@shared/lib/auth";
-import { authApi } from "@shared/lib/api";
+} from '@shared/lib/auth';
+import { authApi } from '@shared/lib/api';
 
 interface AuthState {
   user: UserInfo | null;
@@ -22,13 +22,17 @@ interface AuthState {
   hydrate: () => void;
 }
 
+const _initialPortal = getCurrentPortal();
+const _initialUser = getStoredUser(_initialPortal);
+
 const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  portal: null,
+  user: _initialUser,
+  portal: _initialPortal,
 
   setUser: (user) => set({ user }),
   setPortal: (portal) => set({ portal }),
 
+  // kept for compatibility but no longer needed for startup
   hydrate: () => {
     const portal = getCurrentPortal();
     const user = getStoredUser(portal);
@@ -48,9 +52,9 @@ const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: null });
   },
 
-  isAdmin: () => get().user?.role === "admin",
-  isTeacher: () => get().user?.role === "teacher",
-  isStudent: () => get().user?.role === "student",
+  isAdmin: () => get().user?.role === 'admin',
+  isTeacher: () => get().user?.role === 'teacher',
+  isStudent: () => get().user?.role === 'student',
 }));
 
 // Selector hooks — components only use these, never the store directly

@@ -1,4 +1,4 @@
-import { StudentTicketList } from "@features/tickets";
+import { StudentTicketList } from '@features/tickets';
 
 export default function StudentTicketsPage() {
   return <StudentTicketList />;

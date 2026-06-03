@@ -1,14 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
-import { useKBList } from "@shared/hooks/useKBList";
-import { useAdminKb } from "@shared/hooks/useAdminKb";
-import { useSystemConfig } from "@shared/hooks/useSystemConfig";
+import { useQuery } from '@tanstack/react-query';
+import { useKBList } from '@shared/hooks/useKBList';
+import { useAdminKb } from '@shared/hooks/useAdminKb';
+import { useSystemConfig } from '@shared/hooks/useSystemConfig';
 
 function useHealth() {
   return useQuery({
-    queryKey: ["health"],
+    queryKey: ['health'],
     queryFn: async () => {
-      const r = await fetch("/health");
-      if (!r.ok) throw new Error("health check failed");
+      const r = await fetch('/health');
+      if (!r.ok) throw new Error('health check failed');
       return r.json() as Promise<Record<string, boolean>>;
     },
     staleTime: 60_000,

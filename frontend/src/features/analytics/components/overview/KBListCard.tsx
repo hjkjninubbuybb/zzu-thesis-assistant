@@ -1,16 +1,9 @@
-import { useNavigate } from "react-router-dom";
-import { ArrowRight, Plus } from "lucide-react";
-import type { KBInfo } from "@shared/types/api";
-import { useIsAdmin } from "@shared/store/authStore";
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, Plus } from 'lucide-react';
+import type { KBInfo } from '@shared/types/api';
+import { useIsAdmin } from '@shared/store/authStore';
 
-const KB_COLORS = [
-  "#E85D4A",
-  "#F0C040",
-  "#5EE67A",
-  "#60A5FA",
-  "#C084FC",
-  "#FB923C",
-];
+const KB_COLORS = ['#E85D4A', '#F0C040', '#5EE67A', '#60A5FA', '#C084FC', '#FB923C'];
 
 function SegmentBar({
   filled,
@@ -33,12 +26,12 @@ function SegmentBar({
           className="h-2 rounded-sm"
           style={{
             width: 10,
-            background: i < filled ? color : "#EAE6E0",
-            transformOrigin: "left center",
+            background: i < filled ? color : '#EAE6E0',
+            transformOrigin: 'left center',
             animation:
               animate && i < filled
                 ? `segFill 0.18s cubic-bezier(0.22,1,0.36,1) ${baseDelay + i * 45}ms both`
-                : "none",
+                : 'none',
           }}
         />
       ))}
@@ -46,13 +39,7 @@ function SegmentBar({
   );
 }
 
-export function KBListCard({
-  kbs,
-  animate,
-}: {
-  kbs: KBInfo[];
-  animate: boolean;
-}) {
+export function KBListCard({ kbs, animate }: { kbs: KBInfo[]; animate: boolean }) {
   const navigate = useNavigate();
   const isAdmin = useIsAdmin();
   const maxDocs = Math.max(...kbs.map((kb) => kb.doc_count), 1);
@@ -63,7 +50,7 @@ export function KBListCard({
         <h3 className="text-sm font-semibold text-[#1A1A1A]">知识库列表明细</h3>
         {isAdmin && (
           <button
-            onClick={() => navigate("/admin/knowledge")}
+            onClick={() => navigate('/admin/knowledge')}
             className="flex items-center gap-1 text-xs text-[#9A9A9A] hover:text-[#1A1A1A] transition-colors px-2 py-1 rounded-lg hover:bg-[#F2EFE9]"
           >
             <Plus size={12} />
@@ -74,10 +61,7 @@ export function KBListCard({
       <div className="flex flex-col gap-1">
         {kbs.map((kb, i) => {
           const color = KB_COLORS[i % KB_COLORS.length];
-          const filled = Math.max(
-            1,
-            Math.round((kb.doc_count / maxDocs) * SEG_TOTAL),
-          );
+          const filled = Math.max(1, Math.round((kb.doc_count / maxDocs) * SEG_TOTAL));
           return (
             <button
               key={kb.id}
@@ -85,7 +69,7 @@ export function KBListCard({
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F8F6F2] transition-colors group w-full text-left"
               style={{
                 opacity: animate ? 1 : 0,
-                transform: animate ? "translateX(0)" : "translateX(12px)",
+                transform: animate ? 'translateX(0)' : 'translateX(12px)',
                 transition: `opacity 0.4s ease ${200 + i * 100}ms, transform 0.4s ease ${200 + i * 100}ms`,
               }}
             >
@@ -96,9 +80,7 @@ export function KBListCard({
                 {kb.name.slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-[#1A1A1A] truncate">
-                  {kb.name}
-                </p>
+                <p className="text-xs font-medium text-[#1A1A1A] truncate">{kb.name}</p>
                 <div className="mt-1.5">
                   <SegmentBar
                     filled={filled}

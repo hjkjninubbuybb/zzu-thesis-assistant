@@ -1,9 +1,9 @@
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check } from 'lucide-react';
 
 export interface ThinkingStep {
   id: string;
   label: string;
-  status: "pending" | "active" | "done";
+  status: 'pending' | 'active' | 'done';
   input?: string;
 }
 
@@ -20,30 +20,26 @@ export function ThinkingProcess({ steps }: { steps: ThinkingStep[] }) {
           <div key={step.id} className="flex items-center gap-3">
             <div
               className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                step.status === "active"
-                  ? "bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                  : step.status === "done"
-                    ? "bg-emerald-500"
-                    : "bg-gray-200"
+                step.status === 'active'
+                  ? 'bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]'
+                  : step.status === 'done'
+                    ? 'bg-emerald-500'
+                    : 'bg-gray-200'
               }`}
             />
             <div className="flex flex-col min-w-0">
               <span
                 className={`text-xs font-medium truncate ${
-                  step.status === "pending" ? "text-gray-300" : "text-gray-600"
+                  step.status === 'pending' ? 'text-gray-300' : 'text-gray-600'
                 }`}
               >
                 {step.label}
               </span>
-              {step.input && step.status !== "pending" && (
-                <span className="text-[10px] text-gray-400 truncate italic">
-                  "{step.input}"
-                </span>
+              {step.input && step.status !== 'pending' && (
+                <span className="text-[10px] text-gray-400 truncate italic">"{step.input}"</span>
               )}
             </div>
-            {step.status === "done" && (
-              <Check size={10} className="text-emerald-500 shrink-0" />
-            )}
+            {step.status === 'done' && <Check size={10} className="text-emerald-500 shrink-0" />}
           </div>
         ))}
       </div>

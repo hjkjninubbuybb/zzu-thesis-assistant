@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect } from 'react';
 import {
   Plus,
   Search,
@@ -9,8 +9,8 @@ import {
   Upload,
   ChevronDown,
   X,
-} from "lucide-react";
-import type { KBInfo } from "@shared/types/api";
+} from 'lucide-react';
+import type { KBInfo } from '@shared/types/api';
 
 interface StatPillProps {
   label: string;
@@ -33,7 +33,6 @@ interface FaqToolbarProps {
   searchText: string;
   onSearchChange: (val: string) => void;
   isSearching: boolean;
-  isAiSearch: boolean;
   totalCount: number;
   approvedCount: number;
   isAdmin: boolean;
@@ -52,7 +51,6 @@ export function FaqToolbar({
   searchText,
   onSearchChange,
   isSearching,
-  isAiSearch,
   totalCount,
   approvedCount,
   isAdmin,
@@ -67,11 +65,10 @@ export function FaqToolbar({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node))
-        setMenuOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
-    if (menuOpen) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    if (menuOpen) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [menuOpen]);
 
   return (
@@ -137,13 +134,13 @@ export function FaqToolbar({
                 导入/导出
                 <ChevronDown
                   size={12}
-                  className={`transition-transform duration-150 ${menuOpen ? "rotate-180" : ""}`}
+                  className={`transition-transform duration-150 ${menuOpen ? 'rotate-180' : ''}`}
                 />
               </button>
               {menuOpen && (
                 <div
                   className="absolute right-0 top-full mt-1 bg-white border border-[#F0EDE8] rounded-xl shadow-lg z-30 overflow-hidden w-44 py-1 animate-apple-pop"
-                  style={{ transformOrigin: "top right" }}
+                  style={{ transformOrigin: 'top right' }}
                 >
                   <button
                     onClick={() => {

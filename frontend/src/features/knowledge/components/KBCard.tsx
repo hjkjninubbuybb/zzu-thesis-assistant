@@ -7,14 +7,14 @@ import {
   BookOpen,
   Users,
   Loader2,
-} from "lucide-react";
-import type { KBInfo } from "@shared/types/api";
+} from 'lucide-react';
+import type { KBInfo } from '@shared/types/api';
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+  return new Date(iso).toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
 }
 
@@ -69,10 +69,10 @@ export function KBCard({
       <div
         className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-colors ${
           highlighted
-            ? "bg-white border-gray-300"
+            ? 'bg-white border-gray-300'
             : isExpanded
-              ? "border-slate-400 bg-white"
-              : "border-[#F0EDE8] bg-white hover:bg-[#F8F6F2]"
+              ? 'border-slate-400 bg-white'
+              : 'border-[#F0EDE8] bg-white hover:bg-[#F8F6F2]'
         }`}
       >
         <div
@@ -97,20 +97,17 @@ export function KBCard({
               </span>
             )}
           </div>
-          <p className="text-xs truncate mt-0.5" style={{ color: "#8A8A8A" }}>
-            {kb.description || "暂无描述"}
+          <p className="text-xs truncate mt-0.5" style={{ color: '#8A8A8A' }}>
+            {kb.description || '暂无描述'}
           </p>
         </div>
         <div className="text-center w-16 shrink-0">
           <p className="text-lg font-bold text-[#334155]">{kb.doc_count}</p>
-          <p className="text-xs" style={{ color: "#8A8A8A" }}>
+          <p className="text-xs" style={{ color: '#8A8A8A' }}>
             篇文档
           </p>
         </div>
-        <p
-          className="text-xs w-24 text-right shrink-0"
-          style={{ color: "#8A8A8A" }}
-        >
+        <p className="text-xs w-24 text-right shrink-0" style={{ color: '#8A8A8A' }}>
           {formatDate(kb.created_at)}
         </p>
         <div className="flex items-center gap-2 shrink-0">
@@ -121,11 +118,7 @@ export function KBCard({
               disabled={isClearingAdmin}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
             >
-              {isClearingAdmin ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <X size={11} />
-              )}
+              {isClearingAdmin ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
               取消管理端
             </button>
           ) : (
@@ -149,11 +142,7 @@ export function KBCard({
               disabled={isClearingStudent}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-[#A5B4FC] bg-[#EEF2FF] text-[#4338CA] hover:bg-[#E0E7FF] disabled:opacity-50 transition-colors"
             >
-              {isClearingStudent ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <X size={11} />
-              )}
+              {isClearingStudent ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
               取消学生端
             </button>
           ) : (
@@ -174,12 +163,12 @@ export function KBCard({
             onClick={onToggleExpand}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${
               isExpanded
-                ? "bg-slate-700 text-white border-slate-400"
-                : "border-[#F0EDE8] text-[#334155] hover:bg-[#F2EFE9]"
+                ? 'bg-slate-700 text-white border-slate-400'
+                : 'border-[#F0EDE8] text-[#334155] hover:bg-[#F2EFE9]'
             }`}
           >
             <FileText size={12} />
-            {isExpanded ? "收起" : "管理文档"}
+            {isExpanded ? '收起' : '管理文档'}
             {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
           <button
@@ -187,11 +176,7 @@ export function KBCard({
             disabled={isBeingDeleted}
             className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
           >
-            {isBeingDeleted ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Trash2 size={14} />
-            )}
+            {isBeingDeleted ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
           </button>
         </div>
       </div>

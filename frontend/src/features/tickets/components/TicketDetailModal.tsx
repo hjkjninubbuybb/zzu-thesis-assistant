@@ -1,30 +1,22 @@
-import {
-  Ticket,
-  MessageSquare,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Calendar,
-  User,
-} from "lucide-react";
-import type { QARequestInfo } from "@shared/types/api";
+import { Ticket, MessageSquare, Clock, CheckCircle2, XCircle, Calendar, User } from 'lucide-react';
+import type { QARequestInfo } from '@shared/types/api';
 
-function StatusBadge({ status }: { status: QARequestInfo["status"] }) {
+function StatusBadge({ status }: { status: QARequestInfo['status'] }) {
   const map = {
     pending: {
-      label: "等待回复",
+      label: '等待回复',
       icon: Clock,
-      class: "bg-amber-50 text-amber-600 border-amber-100",
+      class: 'bg-amber-50 text-amber-600 border-amber-100',
     },
     replied: {
-      label: "导师已回复",
+      label: '导师已回复',
       icon: CheckCircle2,
-      class: "bg-emerald-50 text-emerald-600 border-emerald-100",
+      class: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     },
     closed: {
-      label: "已结束",
+      label: '已结束',
       icon: XCircle,
-      class: "bg-slate-50 text-slate-500 border-slate-100",
+      class: 'bg-slate-50 text-slate-500 border-slate-100',
     },
   };
   const config = map[status];
@@ -56,9 +48,7 @@ export function TicketDetailModal({
               <Ticket size={20} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-[#202938]">
-                答疑记录详情
-              </h2>
+              <h2 className="text-base font-bold text-[#202938]">答疑记录详情</h2>
               <p className="text-[10px] text-[#9A9A9A] font-mono tracking-tighter uppercase">
                 Query Reference: #{ticket.id}
               </p>
@@ -82,8 +72,7 @@ export function TicketDetailModal({
               {ticket.question}
             </div>
             <div className="flex items-center gap-1 text-[10px] text-gray-400 font-medium ml-1">
-              <Calendar size={10} /> 提交于{" "}
-              {new Date(ticket.created_at).toLocaleString()}
+              <Calendar size={10} /> 提交于 {new Date(ticket.created_at).toLocaleString()}
             </div>
           </div>
 
@@ -97,10 +86,7 @@ export function TicketDetailModal({
               </div>
             ) : (
               <div className="bg-amber-50/30 rounded-2xl p-6 border border-dashed border-amber-200 text-center">
-                <Clock
-                  size={24}
-                  className="mx-auto text-amber-400 mb-2 opacity-50"
-                />
+                <Clock size={24} className="mx-auto text-amber-400 mb-2 opacity-50" />
                 <p className="text-xs text-amber-600 font-medium">
                   导师正在处理中，请耐心等待回复...
                 </p>
@@ -108,8 +94,7 @@ export function TicketDetailModal({
             )}
             {ticket.replied_at && (
               <div className="flex items-center gap-1 text-[10px] text-emerald-500/70 font-medium ml-1">
-                <CheckCircle2 size={10} /> 回复于{" "}
-                {new Date(ticket.replied_at).toLocaleString()}
+                <CheckCircle2 size={10} /> 回复于 {new Date(ticket.replied_at).toLocaleString()}
               </div>
             )}
           </div>

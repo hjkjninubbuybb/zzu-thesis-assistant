@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from "react";
-import { chatService } from "../services/chatService";
-import type { FileItem, SourceItem } from "@shared/types/api";
-import type { ChatMessagesState } from "./useChatMessages";
+import { useState, useRef, useCallback } from 'react';
+import { chatService } from '../services/chatService';
+import type { FileItem, SourceItem } from '@shared/types/api';
+import type { ChatMessagesState } from './useChatMessages';
 import {
   MAX_REF,
   INITIAL_THINKING,
@@ -10,7 +10,7 @@ import {
   ensureConversation,
   saveUserMessage,
   saveAssistantTurn,
-} from "./chatStreamHelpers";
+} from './chatStreamHelpers';
 
 export interface ChatStreamState {
   isStreaming: boolean;
@@ -53,12 +53,7 @@ export function useChatStream(msgState: ChatMessagesState): ChatStreamState {
       abortRef.current = ctrl;
       const history = chatService.buildHistory(messages);
 
-      const convId = await ensureConversation(
-        chatKb,
-        activeConvId,
-        onConvCreated,
-        onInvalidate,
-      );
+      const convId = await ensureConversation(chatKb, activeConvId, onConvCreated, onInvalidate);
       if (!convId) return;
 
       const userDbMsg = await saveUserMessage(convId, query);
@@ -71,7 +66,7 @@ export function useChatStream(msgState: ChatMessagesState): ChatStreamState {
       setIsStreaming(true);
       setThinkingSteps([...INITIAL_THINKING]);
 
-      let accumulatedText = "";
+      let accumulatedText = '';
       let finalSources: SourceItem[] = [];
       const finalFiles: FileItem[] = [];
       let finalSuggestions: string[] = [];
@@ -97,8 +92,7 @@ export function useChatStream(msgState: ChatMessagesState): ChatStreamState {
             accumulatedText += token;
             updateAssistantContent(assistantId, accumulatedText);
           },
-          (tool: string, input: string) =>
-            setThinkingSteps((p) => applyToolStep(p, tool, input)),
+          (tool: string, input: string) => setThinkingSteps((p) => applyToolStep(p, tool, input)),
           (file: FileItem) => {
             finalFiles.push(file);
             appendAssistantFile(assistantId, file);
@@ -119,7 +113,7 @@ export function useChatStream(msgState: ChatMessagesState): ChatStreamState {
         );
         finalizeAssistant(assistantId, assistantDbId, finalSuggestions);
       } catch (e) {
-        if ((e as Error).name === "AbortError") return;
+        if ((e as Error).name === 'AbortError') return;
         updateAssistantError(assistantId, String(e));
       } finally {
         setIsStreaming(false);

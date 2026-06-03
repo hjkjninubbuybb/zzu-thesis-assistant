@@ -3,13 +3,13 @@
  * admin / student 两端使用独立的 key 前缀，互不干扰。
  */
 
-import type { LoginResponse, UserInfo } from "@shared/types/api";
+import type { LoginResponse, UserInfo } from '@shared/types/api';
 
-export type Portal = "admin" | "student";
+export type Portal = 'admin' | 'student';
 
 /** 根据当前 URL 推断所在门户 */
 export function getCurrentPortal(): Portal {
-  return window.location.pathname.startsWith("/student") ? "student" : "admin";
+  return window.location.pathname.startsWith('/student') ? 'student' : 'admin';
 }
 
 function keyOf(portal: Portal) {
@@ -62,8 +62,8 @@ export function isLoggedIn(portal?: Portal): boolean {
 /** 从 JWT 中提取过期时间戳（秒），解析失败返回 null */
 export function getTokenExp(token: string): number | null {
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return typeof payload.exp === "number" ? payload.exp : null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return typeof payload.exp === 'number' ? payload.exp : null;
   } catch {
     return null;
   }

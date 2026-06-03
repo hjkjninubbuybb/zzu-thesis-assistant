@@ -1,6 +1,7 @@
 export const knowledgeKeys = {
-  all: () => ["knowledge"] as const,
-  list: () => ["knowledge-bases"] as const,
-  active: () => ["active-kb"] as const,
-  adminActive: () => ["admin-kb"] as const,
+  all: () => ['knowledge'] as const,
+  list: () => ['knowledge-bases'] as const,
+  active: () => ['active-kb'] as const,
+  adminActive: () => ['admin-kb'] as const,
+  documents: (kbName: string) => ['documents', kbName] as const,
 };

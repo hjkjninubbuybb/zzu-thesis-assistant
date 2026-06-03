@@ -1,24 +1,24 @@
-import { useMemo } from "react";
+import { useMemo } from 'react';
 
 export function useModelOptions(availableModels: string[] | undefined) {
   const combinedLlmModels = useMemo(() => {
     const coreModels = [
-      "qwen-plus",
-      "qwen-turbo",
-      "qwen-max",
-      "deepseek-chat",
-      "deepseek-reasoner",
+      'qwen-plus',
+      'qwen-turbo',
+      'qwen-max',
+      'deepseek-chat',
+      'deepseek-reasoner',
     ];
     const excludePatterns = [
-      "image",
-      "speech",
-      "audio",
-      "vl",
-      "math",
-      "mt",
-      "v1",
-      "embedding",
-      "rerank",
+      'image',
+      'speech',
+      'audio',
+      'vl',
+      'math',
+      'mt',
+      'v1',
+      'embedding',
+      'rerank',
     ];
     const all = [...new Set([...(availableModels || []), ...coreModels])];
     const filtered = all.filter((m) => {
@@ -39,24 +39,24 @@ export function useModelOptions(availableModels: string[] | undefined) {
   }, [availableModels]);
 
   const combinedEmbeddingModels = useMemo(() => {
-    const coreModels = ["text-embedding-v3", "text-embedding-v2"];
+    const coreModels = ['text-embedding-v3', 'text-embedding-v2'];
     const all = [...new Set([...(availableModels || []), ...coreModels])];
-    const filtered = all.filter((m) => m.toLowerCase().includes("embedding"));
+    const filtered = all.filter((m) => m.toLowerCase().includes('embedding'));
     return filtered.map((m) => ({
       value: m,
       label: m,
-      desc: m === "text-embedding-v3" ? "推荐：1024维高精度" : undefined,
+      desc: m === 'text-embedding-v3' ? '推荐：1024维高精度' : undefined,
     }));
   }, [availableModels]);
 
   const combinedRerankerModels = useMemo(() => {
-    const coreModels = ["gte-rerank", "gte-rerank-hybrid"];
+    const coreModels = ['gte-rerank', 'gte-rerank-hybrid'];
     const all = [...new Set([...(availableModels || []), ...coreModels])];
-    const filtered = all.filter((m) => m.toLowerCase().includes("rerank"));
+    const filtered = all.filter((m) => m.toLowerCase().includes('rerank'));
     return filtered.map((m) => ({
       value: m,
       label: m,
-      desc: m === "gte-rerank" ? "推荐：通用重排序" : undefined,
+      desc: m === 'gte-rerank' ? '推荐：通用重排序' : undefined,
     }));
   }, [availableModels]);
 

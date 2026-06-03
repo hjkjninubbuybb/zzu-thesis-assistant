@@ -1,17 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { userService } from "../services/userService";
-import { userKeys } from "./queryKeys";
-import { useToast } from "@shared/store/uiStore";
-import { handleMutationError } from "@shared/lib/errorHandler";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { userService } from '../services/userService';
+import { userKeys } from './queryKeys';
+import { useToast } from '@shared/store/uiStore';
+import { handleMutationError } from '@shared/lib/errorHandler';
 
 export function useTeacherList(page = 1, pageSize = 20) {
   const qc = useQueryClient();
   const { showToast } = useToast();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["users", "teacher", page],
-    queryFn: () =>
-      userService.list({ role: "teacher", page, page_size: pageSize }),
+    queryKey: ['users', 'teacher', page],
+    queryFn: () => userService.list({ role: 'teacher', page, page_size: pageSize }),
   });
 
   const toggleActiveMutation = useMutation({
@@ -25,7 +24,7 @@ export function useTeacherList(page = 1, pageSize = 20) {
     mutationFn: userService.delete,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: userKeys.all() });
-      showToast("用户已删除", "success");
+      showToast('用户已删除', 'success');
     },
     onError: (err) => handleMutationError(err, showToast),
   });
@@ -33,7 +32,7 @@ export function useTeacherList(page = 1, pageSize = 20) {
   const resetPasswordMutation = useMutation({
     mutationFn: ({ id, password }: { id: number; password: string }) =>
       userService.resetPassword(id, password),
-    onSuccess: () => showToast("密码已重置", "success"),
+    onSuccess: () => showToast('密码已重置', 'success'),
     onError: (err) => handleMutationError(err, showToast),
   });
 

@@ -1,11 +1,11 @@
-export type DocType = "policy" | "manual" | "form";
+export type DocType = 'policy' | 'manual' | 'form';
 export type SplitterType =
-  | "recursive"
-  | "token"
-  | "sentence"
-  | "semantic"
-  | "table_aware"
-  | "manual_step";
+  | 'recursive'
+  | 'token'
+  | 'sentence'
+  | 'semantic'
+  | 'table_aware'
+  | 'manual_step';
 
 export interface KBInfo {
   id: number;
@@ -100,7 +100,7 @@ export interface ReviewDetail {
 }
 
 export interface HistoryMessage {
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
 }
 
@@ -126,14 +126,14 @@ export interface FileItem {
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   sources?: SourceItem[];
   files?: FileItem[];
   suggestions?: string[];
-  status?: "loading" | "done" | "error";
+  status?: 'loading' | 'done' | 'error';
   dbMessageId?: number;
-  feedback?: "up" | "down" | null;
+  feedback?: 'up' | 'down' | null;
   isNew?: boolean;
 }
 
@@ -161,11 +161,11 @@ export interface PaginatedConversations {
 export interface ConversationMessage {
   id: number;
   conversation_id: number;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   sources?: SourceItem[] | null;
   files?: FileItem[] | null;
-  feedback?: "up" | "down" | null;
+  feedback?: 'up' | 'down' | null;
   created_at: string;
 }
 
@@ -179,7 +179,7 @@ export interface FAQItem {
   category: string;
   sort_order: number;
   enabled: boolean;
-  status: "draft" | "pending" | "approved" | "rejected";
+  status: 'draft' | 'pending' | 'approved' | 'rejected';
   author_id?: number;
   created_at: string;
   updated_at: string;
@@ -198,7 +198,7 @@ export interface FAQUpdate {
   category?: string;
   sort_order?: number;
   enabled?: boolean;
-  status?: "draft" | "pending" | "approved" | "rejected";
+  status?: 'draft' | 'pending' | 'approved' | 'rejected';
 }
 
 export interface FAQSearchItem extends FAQItem {
@@ -248,7 +248,7 @@ export interface QARequestInfo {
   message_id: number;
   question: string;
   answer: string | null;
-  status: "pending" | "replied" | "closed";
+  status: 'pending' | 'replied' | 'closed';
   created_at: string;
   replied_at: string | null;
 }
@@ -261,7 +261,7 @@ export interface QARequestCreate {
 
 // ── 用户认证 ──────────────────────────────────────────────
 
-export type UserRole = "admin" | "teacher" | "student";
+export type UserRole = 'admin' | 'teacher' | 'student';
 
 export interface StudentProfile {
   user_id: number;
@@ -323,6 +323,27 @@ export interface TeacherProfileCreate {
 
 export interface PaginatedUsers {
   items: UserInfo[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface PaginatedFAQs {
+  items: FAQItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface PaginatedTickets {
+  items: QARequestInfo[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface PaginatedDocs {
+  items: DocInfo[];
   total: number;
   page: number;
   page_size: number;

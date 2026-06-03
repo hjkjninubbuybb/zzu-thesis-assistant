@@ -1,11 +1,5 @@
-import { streamChat, buildHistory } from "@shared/lib/streamChat";
-import {
-  conversationApi,
-  knowledgeApi,
-  faqApi,
-  documentApi,
-  ticketApi,
-} from "@shared/lib/api";
+import { streamChat, buildHistory } from '@shared/lib/streamChat';
+import { conversationApi, knowledgeApi, faqApi, documentApi, ticketApi } from '@shared/lib/api';
 
 export { buildHistory };
 
@@ -24,12 +18,10 @@ export const chatService = {
     cursor_updated_at?: string;
     limit?: number;
   }) => conversationApi.list(params),
-  createConversation: (kbName: string, title?: string) =>
-    conversationApi.create(kbName, title),
+  createConversation: (kbName: string, title?: string) => conversationApi.create(kbName, title),
   getConversation: (convId: number) => conversationApi.get(convId),
   deleteConversation: (convId: number) => conversationApi.delete(convId),
-  updateTitle: (convId: number, title: string) =>
-    conversationApi.updateTitle(convId, title),
+  updateTitle: (convId: number, title: string) => conversationApi.updateTitle(convId, title),
   summarizeTitle: (convId: number) => conversationApi.summarizeTitle(convId),
 
   // Messages
@@ -42,7 +34,7 @@ export const chatService = {
       files?: unknown[] | null;
     },
   ) => conversationApi.addMessage(convId, msg),
-  submitFeedback: (msgId: number, rating: "up" | "down") =>
+  submitFeedback: (msgId: number, rating: 'up' | 'down') =>
     conversationApi.submitFeedback(msgId, rating),
 
   // FAQs
@@ -52,9 +44,6 @@ export const chatService = {
   getDownloadToken: (url: string) => documentApi.getDownloadToken(url),
 
   // Tickets
-  createTicket: (body: {
-    conversation_id: number;
-    message_id: number;
-    question: string;
-  }) => ticketApi.create(body),
+  createTicket: (body: { conversation_id: number; message_id: number; question: string }) =>
+    ticketApi.create(body),
 };

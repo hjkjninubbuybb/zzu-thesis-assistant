@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   Ticket,
   Search,
@@ -7,29 +7,29 @@ import {
   CheckCircle2,
   XCircle,
   ChevronRight,
-} from "lucide-react";
-import { useTicketList } from "../hooks/useTicketList";
-import { TicketReplyModal } from "./TicketReplyModal";
-import type { QARequestInfo } from "@shared/types/api";
+} from 'lucide-react';
+import { useTicketList } from '../hooks/useTicketList';
+import { TicketReplyModal } from './TicketReplyModal';
+import type { QARequestInfo } from '@shared/types/api';
 
 // ── 状态标签 ──────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: QARequestInfo["status"] }) {
+function StatusBadge({ status }: { status: QARequestInfo['status'] }) {
   const map = {
     pending: {
-      label: "待处理",
+      label: '待处理',
       icon: Clock,
-      class: "bg-amber-50 text-amber-600 border-amber-100",
+      class: 'bg-amber-50 text-amber-600 border-amber-100',
     },
     replied: {
-      label: "已回复",
+      label: '已回复',
       icon: CheckCircle2,
-      class: "bg-emerald-50 text-emerald-600 border-emerald-100",
+      class: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     },
     closed: {
-      label: "已关闭",
+      label: '已关闭',
       icon: XCircle,
-      class: "bg-slate-50 text-slate-500 border-slate-100",
+      class: 'bg-slate-50 text-slate-500 border-slate-100',
     },
   };
   const config = map[status];
@@ -47,16 +47,15 @@ function StatusBadge({ status }: { status: QARequestInfo["status"] }) {
 // ── 主组件 ──────────────────────────────────────────────────
 
 export function TicketsManagement() {
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [selectedTicket, setSelectedTicket] = useState<QARequestInfo | null>(
-    null,
-  );
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [selectedTicket, setSelectedTicket] = useState<QARequestInfo | null>(null);
 
-  const { tickets, isLoading } = useTicketList("all");
+  const [page, setPage] = useState(1);
+  const { tickets, total: ticketTotal, totalPages, isLoading } = useTicketList('all', page);
 
   const filtered = tickets
-    .filter((t) => filterStatus === "all" || t.status === filterStatus)
+    .filter((t) => filterStatus === 'all' || t.status === filterStatus)
     .filter((t) => t.question.toLowerCase().includes(search.toLowerCase()));
 
   const settle = (d: number): React.CSSProperties => ({
@@ -66,32 +65,29 @@ export function TicketsManagement() {
   return (
     <div className="px-8 py-8 flex-1 overflow-y-auto glass-card rounded-2xl custom-scrollbar flex flex-col gap-5">
       {/* 头部 */}
-      <div
-        className="flex items-center justify-between shrink-0"
-        style={settle(0)}
-      >
+      <div className="flex items-center justify-between shrink-0" style={settle(0)}>
         <div>
           <h1 className="text-2xl font-bold text-[#334155]">答疑请求</h1>
           <p className="mt-1 text-sm text-[#8A8A8A]">处理来自学生的提问请求</p>
         </div>
         <div className="flex items-center gap-2 p-1.5 bg-[#F2EFE9] rounded-xl border border-[#E8E4DC]">
-          {["all", "pending", "replied", "closed"].map((s) => (
+          {['all', 'pending', 'replied', 'closed'].map((s) => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
               className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 filterStatus === s
-                  ? "bg-white text-[#334155] shadow-sm"
-                  : "text-[#8A8A8A] hover:text-[#334155]"
+                  ? 'bg-white text-[#334155] shadow-sm'
+                  : 'text-[#8A8A8A] hover:text-[#334155]'
               }`}
             >
-              {s === "all"
-                ? "全部"
-                : s === "pending"
-                  ? "待处理"
-                  : s === "replied"
-                    ? "已回复"
-                    : "已关闭"}
+              {s === 'all'
+                ? '全部'
+                : s === 'pending'
+                  ? '待处理'
+                  : s === 'replied'
+                    ? '已回复'
+                    : '已关闭'}
             </button>
           ))}
         </div>
@@ -99,10 +95,7 @@ export function TicketsManagement() {
 
       {/* 搜索 */}
       <div className="relative" style={settle(50)}>
-        <Search
-          size={14}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]"
-        />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -137,9 +130,9 @@ export function TicketsManagement() {
             >
               <div
                 className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${
-                  t.status === "pending"
-                    ? "bg-amber-100 text-amber-600"
-                    : "bg-[#F2EFE9] text-[#8A8A8A]"
+                  t.status === 'pending'
+                    ? 'bg-amber-100 text-amber-600'
+                    : 'bg-[#F2EFE9] text-[#8A8A8A]'
                 }`}
               >
                 <MessageSquare size={22} />
@@ -159,7 +152,7 @@ export function TicketsManagement() {
                 <h3 className="text-sm font-semibold text-[#334155] line-clamp-2 leading-relaxed group-hover:text-black transition-colors">
                   {t.question}
                 </h3>
-                {t.status === "replied" && (
+                {t.status === 'replied' && (
                   <div className="mt-3 flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2.5 py-1 rounded-lg border border-emerald-100">
                     <CheckCircle2 size={12} /> 导师已回复
                   </div>
@@ -173,11 +166,30 @@ export function TicketsManagement() {
         )}
       </div>
 
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2 shrink-0" style={settle(150)}>
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1.5 text-xs rounded-lg border border-[#E8E4DC] text-[#6A6A6A] hover:bg-[#F2EFE9] disabled:opacity-40"
+          >
+            上一页
+          </button>
+          <span className="text-xs text-[#9A9A9A]">
+            {page} / {totalPages}（共 {ticketTotal} 条）
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-3 py-1.5 text-xs rounded-lg border border-[#E8E4DC] text-[#6A6A6A] hover:bg-[#F2EFE9] disabled:opacity-40"
+          >
+            下一页
+          </button>
+        </div>
+      )}
+
       {selectedTicket && (
-        <TicketReplyModal
-          ticket={selectedTicket}
-          onClose={() => setSelectedTicket(null)}
-        />
+        <TicketReplyModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
       )}
     </div>
   );

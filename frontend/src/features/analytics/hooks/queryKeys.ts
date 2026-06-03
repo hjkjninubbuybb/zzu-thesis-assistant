@@ -1,3 +1,3 @@
 export const analyticsKeys = {
-  summary: () => ["analytics", "summary"] as const,
+  summary: () => ['analytics', 'summary'] as const,
 };

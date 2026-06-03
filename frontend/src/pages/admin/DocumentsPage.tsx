@@ -1,4 +1,4 @@
-import { DocumentManagement } from "@features/documents";
+import { DocumentManagement } from '@features/documents';
 
 export default function DocumentsPage() {
   return <DocumentManagement />;

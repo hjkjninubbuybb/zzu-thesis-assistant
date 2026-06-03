@@ -1,6 +1,6 @@
-import { Cpu } from "lucide-react";
-import { Section, Field, ModelSelect } from "./SettingsPrimitives";
-import type { FormState } from "../hooks/useSettings";
+import { Cpu } from 'lucide-react';
+import { Section, Field, ModelSelect } from './SettingsPrimitives';
+import type { FormState } from '../hooks/useSettings';
 
 interface ModelSettingsProps {
   form: FormState;
@@ -24,28 +24,28 @@ export function ModelSettings({
           <ModelSelect
             value={form.llm_model}
             options={llmModels}
-            onChange={(v) => set("llm_model", v)}
+            onChange={(v) => set('llm_model', v)}
           />
         </Field>
         <Field label="常规/极速模型 (快)" hint="用于最终回答生成">
           <ModelSelect
             value={form.llm_fast_model}
             options={llmModels}
-            onChange={(v) => set("llm_fast_model", v)}
+            onChange={(v) => set('llm_fast_model', v)}
           />
         </Field>
         <Field label="向量模型" hint="修改后需重新入库">
           <ModelSelect
             value={form.embedding_model}
             options={embeddingModels}
-            onChange={(v) => set("embedding_model", v)}
+            onChange={(v) => set('embedding_model', v)}
           />
         </Field>
         <Field label="重排序模型" hint="检索结果精排">
           <ModelSelect
             value={form.reranker_model}
             options={rerankerModels}
-            onChange={(v) => set("reranker_model", v)}
+            onChange={(v) => set('reranker_model', v)}
           />
         </Field>
       </div>

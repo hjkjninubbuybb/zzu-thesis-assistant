@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { chatService } from "../services/chatService";
-import { conversationKeys } from "./queryKeys";
+import { useQuery } from '@tanstack/react-query';
+import { chatService } from '../services/chatService';
+import { conversationKeys } from './queryKeys';
 
 export function useMessageHistory(conversationId: number | null) {
   return useQuery({

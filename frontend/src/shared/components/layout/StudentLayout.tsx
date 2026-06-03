@@ -1,6 +1,6 @@
-import { Outlet } from "react-router-dom";
-import StudentSidebar from "@shared/components/layout/StudentSidebar";
-import BlobBackdrop from "@shared/components/layout/BlobBackdrop";
+import { Outlet } from 'react-router-dom';
+import StudentSidebar from '@shared/components/layout/StudentSidebar';
+import BlobBackdrop from '@shared/components/layout/BlobBackdrop';
 
 export default function StudentLayout() {
   return (

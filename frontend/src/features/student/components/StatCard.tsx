@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 
 function useCountUp(target: number, duration = 900) {
   const [count, setCount] = useState(0);
@@ -34,14 +34,7 @@ interface StatCardProps {
   color: string;
 }
 
-export function StatCard({
-  delay,
-  icon: Icon,
-  label,
-  value,
-  suffix,
-  color,
-}: StatCardProps) {
+export function StatCard({ delay, icon: Icon, label, value, suffix, color }: StatCardProps) {
   const count = useCountUp(value);
 
   return (
@@ -58,9 +51,7 @@ export function StatCard({
       <div>
         <p className="text-2xl font-bold text-[#202938] leading-none">
           {count}
-          <span className="text-sm font-normal text-[#9CA3AF] ml-1">
-            {suffix}
-          </span>
+          <span className="text-sm font-normal text-[#9CA3AF] ml-1">{suffix}</span>
         </p>
         <p className="text-xs text-[#6E7787] mt-1">{label}</p>
       </div>

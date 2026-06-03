@@ -1,14 +1,6 @@
-import {
-  CheckCircle,
-  Eye,
-  EyeOff,
-  Key,
-  Loader2,
-  XCircle,
-  Zap,
-} from "lucide-react";
-import { Section, Field } from "./SettingsPrimitives";
-import type { useApiKeyManager } from "../hooks/useApiKeyManager";
+import { CheckCircle, Eye, EyeOff, Key, Loader2, XCircle, Zap } from 'lucide-react';
+import { Section, Field } from './SettingsPrimitives';
+import type { useApiKeyManager } from '../hooks/useApiKeyManager';
 
 type ApiKeyManagerReturn = ReturnType<typeof useApiKeyManager>;
 
@@ -57,7 +49,7 @@ export function ApiKeySection({ manager }: ApiKeySectionProps) {
                   <div className="relative flex-1 max-w-sm">
                     <input
                       readOnly
-                      type={showKey ? "text" : "password"}
+                      type={showKey ? 'text' : 'password'}
                       value={apiKeyInfo.masked_key}
                       className="w-full border border-stone-200 bg-stone-50 rounded-lg px-3 py-2 text-sm pr-10 font-mono text-stone-700 cursor-default"
                     />
@@ -80,7 +72,7 @@ export function ApiKeySection({ manager }: ApiKeySectionProps) {
                 <>
                   <div className="relative flex-1 max-w-sm">
                     <input
-                      type={showKey ? "text" : "password"}
+                      type={showKey ? 'text' : 'password'}
                       value={apiKeyInput}
                       onChange={(e) => setApiKeyInput(e.target.value)}
                       placeholder="请输入 API Key"
@@ -102,7 +94,7 @@ export function ApiKeySection({ manager }: ApiKeySectionProps) {
                     {apiKeyMutation.isPending ? (
                       <Loader2 size={14} className="animate-spin" />
                     ) : (
-                      "更新"
+                      '更新'
                     )}
                   </button>
                   {isEditingKey && (
@@ -129,9 +121,7 @@ export function ApiKeySection({ manager }: ApiKeySectionProps) {
                   ) : (
                     <Zap size={12} />
                   )}
-                  {testMutation.isPending
-                    ? "正在拉取模型..."
-                    : "测试连接并获取模型列表"}
+                  {testMutation.isPending ? '正在拉取模型...' : '测试连接并获取模型列表'}
                 </button>
               )}
               {apiKeyInfo && !apiKeyInfo.has_key && (
@@ -139,13 +129,9 @@ export function ApiKeySection({ manager }: ApiKeySectionProps) {
               )}
               {testResult && (
                 <span
-                  className={`text-xs flex items-center gap-1 ${testResult.ok ? "text-emerald-600" : "text-red-500"}`}
+                  className={`text-xs flex items-center gap-1 ${testResult.ok ? 'text-emerald-600' : 'text-red-500'}`}
                 >
-                  {testResult.ok ? (
-                    <CheckCircle size={12} />
-                  ) : (
-                    <XCircle size={12} />
-                  )}
+                  {testResult.ok ? <CheckCircle size={12} /> : <XCircle size={12} />}
                   {testResult.message}
                 </span>
               )}

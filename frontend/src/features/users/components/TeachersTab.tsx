@@ -1,17 +1,13 @@
-import { useState, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Download, Upload, FileDown } from "lucide-react";
-import { userService } from "../services/userService";
-import { userKeys } from "../hooks/queryKeys";
-import { useTeacherList } from "../hooks/useTeacherList";
-import { TeacherTable } from "./TeacherTable";
-import {
-  CreateTeacherModal,
-  EditTeacherModal,
-  TeacherResetPasswordModal,
-} from "./TeacherModals";
-import { extractError } from "@shared/lib/api";
-import type { UserInfo } from "@shared/types/api";
+import { useState, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Download, Upload, FileDown } from 'lucide-react';
+import { userService } from '../services/userService';
+import { userKeys } from '../hooks/queryKeys';
+import { useTeacherList } from '../hooks/useTeacherList';
+import { TeacherTable } from './TeacherTable';
+import { CreateTeacherModal, EditTeacherModal, TeacherResetPasswordModal } from './TeacherModals';
+import { extractError } from '@shared/lib/errorHandler';
+import type { UserInfo } from '@shared/types/api';
 
 type ImportResult = {
   total: number;
@@ -24,7 +20,7 @@ type ImportResult = {
 export function TeachersTab() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [resetTarget, setResetTarget] = useState<UserInfo | null>(null);
   const [editTarget, setEditTarget] = useState<UserInfo | null>(null);
@@ -33,8 +29,7 @@ export function TeachersTab() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { teachers, total, isLoading, toggleActive, deleteUser } =
-    useTeacherList(page, 20);
+  const { teachers, total, isLoading, toggleActive, deleteUser } = useTeacherList(page, 20);
 
   const totalPages = Math.ceil(total / 20) || 1;
 
@@ -42,9 +37,7 @@ export function TeachersTab() {
     ? teachers.filter(
         (u) =>
           u.display_name.includes(search) ||
-          ((u.profile as { employee_id?: string })?.employee_id ?? "").includes(
-            search,
-          ),
+          ((u.profile as { employee_id?: string })?.employee_id ?? '').includes(search),
       )
     : teachers;
 
@@ -67,7 +60,7 @@ export function TeachersTab() {
       });
     } finally {
       setImporting(false);
-      e.target.value = "";
+      e.target.value = '';
     }
   };
 
@@ -77,10 +70,7 @@ export function TeachersTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div
-        className="flex items-center justify-between shrink-0"
-        style={settle(0)}
-      >
+      <div className="flex items-center justify-between shrink-0" style={settle(0)}>
         <p className="text-sm text-[#8A8A8A]">共 {total} 名教师</p>
         <div className="flex items-center gap-2">
           <button
@@ -96,9 +86,9 @@ export function TeachersTab() {
             <Download size={14} /> 导出
           </button>
           <label
-            className={`flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm rounded-xl cursor-pointer transition-colors ${importing ? "opacity-50 cursor-not-allowed" : "text-[#334155] hover:bg-[#F8F6F2]"}`}
+            className={`flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm rounded-xl cursor-pointer transition-colors ${importing ? 'opacity-50 cursor-not-allowed' : 'text-[#334155] hover:bg-[#F8F6F2]'}`}
           >
-            <Upload size={14} /> {importing ? "导入中..." : "批量导入"}
+            <Upload size={14} /> {importing ? '导入中...' : '批量导入'}
             <input
               ref={fileInputRef}
               type="file"
@@ -119,12 +109,11 @@ export function TeachersTab() {
 
       {importResult && (
         <div
-          className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs border ${importResult.failed > 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}
+          className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs border ${importResult.failed > 0 ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}
         >
           <span>
-            导入完成：成功 {importResult.success} 条，跳过{" "}
-            {importResult.skipped} 条
-            {importResult.failed > 0 ? `，失败 ${importResult.failed} 条` : ""}
+            导入完成：成功 {importResult.success} 条，跳过 {importResult.skipped} 条
+            {importResult.failed > 0 ? `，失败 ${importResult.failed} 条` : ''}
           </span>
           <button
             onClick={() => setImportResult(null)}
@@ -136,10 +125,7 @@ export function TeachersTab() {
       )}
 
       <div className="relative" style={settle(50)}>
-        <Search
-          size={14}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]"
-        />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -158,7 +144,7 @@ export function TeachersTab() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex items-center justify-center h-48 text-sm text-[#9A9A9A]">
-            {search ? "没有匹配的教师" : "暂无教师账号，点击「添加教师」创建"}
+            {search ? '没有匹配的教师' : '暂无教师账号，点击「添加教师」创建'}
           </div>
         ) : (
           <TeacherTable
@@ -166,15 +152,10 @@ export function TeachersTab() {
             menuOpen={menuOpen}
             onMenuToggle={setMenuOpen}
             onEdit={setEditTarget}
-            onToggleActive={(u) =>
-              toggleActive({ id: u.id, isActive: !u.is_active })
-            }
+            onToggleActive={(u) => toggleActive({ id: u.id, isActive: !u.is_active })}
             onResetPassword={setResetTarget}
             onDelete={(u) => {
-              if (
-                confirm(`确定删除教师 "${u.display_name || u.username}" 吗？`)
-              )
-                deleteUser(u.id);
+              if (confirm(`确定删除教师 "${u.display_name || u.username}" 吗？`)) deleteUser(u.id);
             }}
           />
         )}
@@ -182,10 +163,7 @@ export function TeachersTab() {
 
       {/* 分页 */}
       {totalPages > 1 && (
-        <div
-          className="flex items-center justify-center gap-3 mt-2"
-          style={settle(150)}
-        >
+        <div className="flex items-center justify-center gap-3 mt-2" style={settle(150)}>
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
@@ -206,21 +184,11 @@ export function TeachersTab() {
         </div>
       )}
 
-      {showCreate && (
-        <CreateTeacherModal onClose={() => setShowCreate(false)} />
-      )}
+      {showCreate && <CreateTeacherModal onClose={() => setShowCreate(false)} />}
       {resetTarget && (
-        <TeacherResetPasswordModal
-          user={resetTarget}
-          onClose={() => setResetTarget(null)}
-        />
+        <TeacherResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} />
       )}
-      {editTarget && (
-        <EditTeacherModal
-          user={editTarget}
-          onClose={() => setEditTarget(null)}
-        />
-      )}
+      {editTarget && <EditTeacherModal user={editTarget} onClose={() => setEditTarget(null)} />}
     </div>
   );
 }

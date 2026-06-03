@@ -1,21 +1,17 @@
-import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
-import { Loader2, CheckCircle, AlertCircle, FileText, X } from "lucide-react";
-import Sidebar from "@shared/components/layout/Sidebar";
-import BlobBackdrop from "@shared/components/layout/BlobBackdrop";
-import { useUploadProcessor } from "@shared/hooks/useUploadProcessor";
-import { useUploadQueue } from "@shared/store/uploadStore";
+import { useEffect, useState } from 'react';
+import { Outlet } from 'react-router-dom';
+import { Loader2, CheckCircle, AlertCircle, FileText, X } from 'lucide-react';
+import Sidebar from '@shared/components/layout/Sidebar';
+import BlobBackdrop from '@shared/components/layout/BlobBackdrop';
+import { useUploadProcessor } from '@shared/hooks/useUploadProcessor';
+import { useUploadQueue } from '@shared/store/uploadStore';
 
 function UploadFloat() {
   const queue = useUploadQueue();
-  const isUploading = queue.some(
-    (q) => q.status === "uploading" || q.status === "pending",
-  );
+  const isUploading = queue.some((q) => q.status === 'uploading' || q.status === 'pending');
   const [visible, setVisible] = useState(false);
 
-  const activeItems = queue.filter(
-    (q) => q.status === "uploading" || q.status === "pending",
-  );
+  const activeItems = queue.filter((q) => q.status === 'uploading' || q.status === 'pending');
 
   useEffect(() => {
     if (isUploading) {
@@ -30,9 +26,7 @@ function UploadFloat() {
   if (!visible) return null;
 
   // show active items + last few completed
-  const doneItems = queue
-    .filter((q) => q.status === "done" || q.status === "error")
-    .slice(-3);
+  const doneItems = queue.filter((q) => q.status === 'done' || q.status === 'error').slice(-3);
   const displayItems = [...activeItems, ...doneItems].slice(0, 6);
 
   return (
@@ -45,14 +39,11 @@ function UploadFloat() {
             <CheckCircle size={14} className="text-emerald-500" />
           )}
           <span className="text-sm font-medium text-gray-800">
-            {isUploading ? `正在上传 (${activeItems.length})` : "上传完成"}
+            {isUploading ? `正在上传 (${activeItems.length})` : '上传完成'}
           </span>
         </div>
         {!isUploading && (
-          <button
-            onClick={() => setVisible(false)}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={() => setVisible(false)} className="text-gray-400 hover:text-gray-600">
             <X size={14} />
           </button>
         )}
@@ -62,10 +53,8 @@ function UploadFloat() {
         {displayItems.map((item) => (
           <div key={item.id} className="flex items-center gap-2">
             <FileText size={12} className="text-gray-400 shrink-0" />
-            <span className="text-xs text-gray-700 truncate flex-1 min-w-0">
-              {item.file.name}
-            </span>
-            {item.status === "uploading" && (
+            <span className="text-xs text-gray-700 truncate flex-1 min-w-0">{item.file.name}</span>
+            {item.status === 'uploading' && (
               <div className="w-16 bg-gray-200 rounded-full h-1 shrink-0">
                 <div
                   className="bg-blue-500 h-1 rounded-full transition-all duration-300"
@@ -73,13 +62,13 @@ function UploadFloat() {
                 />
               </div>
             )}
-            {item.status === "pending" && (
+            {item.status === 'pending' && (
               <span className="text-xs text-gray-400 shrink-0">等待</span>
             )}
-            {item.status === "done" && (
+            {item.status === 'done' && (
               <CheckCircle size={12} className="text-emerald-500 shrink-0" />
             )}
-            {item.status === "error" && (
+            {item.status === 'error' && (
               <span title={item.errorMsg}>
                 <AlertCircle size={12} className="text-red-500 shrink-0" />
               </span>

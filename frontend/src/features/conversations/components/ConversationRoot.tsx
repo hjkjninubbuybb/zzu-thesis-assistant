@@ -1,15 +1,12 @@
-import { useState, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  AdminConversationSidebar,
-  StudentConversationSidebar,
-} from "./ConversationSidebar";
-import { ChatPanel } from "./ChatPanel";
-import { useChat } from "../hooks/useChat";
-import { useConversationList } from "../hooks/useConversationList";
-import { conversationKeys } from "../hooks/queryKeys";
-import { chatService } from "../services/chatService";
-import { useIsStudent } from "@shared/store/authStore";
+import { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AdminConversationSidebar, StudentConversationSidebar } from './ConversationSidebar';
+import { ChatPanel } from './ChatPanel';
+import { useChat } from '../hooks/useChat';
+import { useConversationList } from '../hooks/useConversationList';
+import { conversationKeys } from '../hooks/queryKeys';
+import { chatService } from '../services/chatService';
+import { useIsStudent } from '@shared/store/authStore';
 
 export function ConversationRoot() {
   const isStudent = useIsStudent();
@@ -34,7 +31,7 @@ export function ConversationRoot() {
   });
   const adminKb = adminKbData?.kb_name ?? null;
 
-  const effectiveKb = isStudent ? (studentKb ?? "") : (adminKb ?? "");
+  const effectiveKb = isStudent ? (studentKb ?? '') : (adminKb ?? '');
 
   // 对话列表
   const {
@@ -46,15 +43,8 @@ export function ConversationRoot() {
   } = useConversationList(effectiveKb);
 
   // Chat state machine
-  const {
-    messages,
-    isStreaming,
-    thinkingSteps,
-    send,
-    clearMessages,
-    loadHistory,
-    applyFeedback,
-  } = useChat();
+  const { messages, isStreaming, thinkingSteps, send, clearMessages, loadHistory, applyFeedback } =
+    useChat();
 
   const activeConv = conversations.find((c) => c.id === activeConvId);
   const chatKb = activeConv?.kb_name ?? effectiveKb;
@@ -74,7 +64,7 @@ export function ConversationRoot() {
   const handleNewConversation = useCallback(async () => {
     if (!effectiveKb) return;
     try {
-      const conv = await chatService.createConversation(effectiveKb, "新对话");
+      const conv = await chatService.createConversation(effectiveKb, '新对话');
       setActiveConvId(conv.id);
       clearMessages();
       queryClient.invalidateQueries({ queryKey: conversationKeys.all() });
@@ -113,8 +103,7 @@ export function ConversationRoot() {
         chatKb,
         activeConvId,
         (newConvId) => setActiveConvId(newConvId),
-        () =>
-          queryClient.invalidateQueries({ queryKey: conversationKeys.all() }),
+        () => queryClient.invalidateQueries({ queryKey: conversationKeys.all() }),
       );
     },
     [send, chatKb, activeConvId, queryClient],

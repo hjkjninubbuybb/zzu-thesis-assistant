@@ -1,20 +1,20 @@
-import { useState } from "react";
-import { useIsAdmin } from "@shared/store/authStore";
-import { StudentsTab } from "./StudentsTab";
-import { TeachersTab } from "./TeachersTab";
-import { MentorRelationsTab } from "./MentorRelationsTab";
+import { useState } from 'react';
+import { useIsAdmin } from '@shared/store/authStore';
+import { StudentsTab } from './StudentsTab';
+import { TeachersTab } from './TeachersTab';
+import { MentorRelationsTab } from './MentorRelationsTab';
 
-type TabKey = "students" | "teachers" | "relations";
+type TabKey = 'students' | 'teachers' | 'relations';
 
 const ALL_TABS: { key: TabKey; label: string; adminOnly?: boolean }[] = [
-  { key: "students", label: "学生管理" },
-  { key: "teachers", label: "教师管理", adminOnly: true },
-  { key: "relations", label: "导师关系", adminOnly: true },
+  { key: 'students', label: '学生管理' },
+  { key: 'teachers', label: '教师管理', adminOnly: true },
+  { key: 'relations', label: '导师关系', adminOnly: true },
 ];
 
 export function UsersRoot() {
   const isAdmin = useIsAdmin();
-  const [tab, setTab] = useState<TabKey>("students");
+  const [tab, setTab] = useState<TabKey>('students');
 
   const tabs = ALL_TABS.filter((t) => !t.adminOnly || isAdmin);
 
@@ -29,9 +29,7 @@ export function UsersRoot() {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-                tab === t.key
-                  ? "text-[#334155]"
-                  : "text-[#9A9A9A] hover:text-[#6A6A6A]"
+                tab === t.key ? 'text-[#334155]' : 'text-[#9A9A9A] hover:text-[#6A6A6A]'
               }`}
             >
               {t.label}
@@ -44,9 +42,9 @@ export function UsersRoot() {
       </div>
 
       {/* Tab 内容 */}
-      {tab === "students" && <StudentsTab />}
-      {tab === "teachers" && isAdmin && <TeachersTab />}
-      {tab === "relations" && isAdmin && <MentorRelationsTab />}
+      {tab === 'students' && <StudentsTab />}
+      {tab === 'teachers' && isAdmin && <TeachersTab />}
+      {tab === 'relations' && isAdmin && <MentorRelationsTab />}
     </div>
   );
 }

@@ -1,9 +1,9 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { studentService } from "../services/studentService";
-import { studentKeys } from "./queryKeys";
-import { useToast } from "@shared/store/uiStore";
-import { handleMutationError } from "@shared/lib/errorHandler";
-import { useAuthUser } from "@shared/store/authStore";
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { studentService } from '../services/studentService';
+import { studentKeys } from './queryKeys';
+import { useToast } from '@shared/store/uiStore';
+import { handleMutationError } from '@shared/lib/errorHandler';
+import { useAuthUser } from '@shared/store/authStore';
 
 export function useStudentProfile() {
   const user = useAuthUser();
@@ -17,7 +17,7 @@ export function useStudentProfile() {
   const changePasswordMutation = useMutation({
     mutationFn: ({ oldPwd, newPwd }: { oldPwd: string; newPwd: string }) =>
       studentService.changePassword(oldPwd, newPwd),
-    onSuccess: () => showToast("密码已修改", "success"),
+    onSuccess: () => showToast('密码已修改', 'success'),
     onError: (err) => handleMutationError(err, showToast),
   });
 

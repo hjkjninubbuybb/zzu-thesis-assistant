@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { X, Loader2, MessageSquareQuote, Hash } from "lucide-react";
-import type { FAQCreate, FAQItem } from "@shared/types/api";
+import { useState } from 'react';
+import { X, Loader2, MessageSquareQuote, Hash } from 'lucide-react';
+import type { FAQCreate, FAQItem } from '@shared/types/api';
 
 interface FaqFormProps {
   title: string;
@@ -11,23 +11,17 @@ interface FaqFormProps {
 }
 
 /** Create / edit FAQ dialog. */
-export function FaqForm({
-  title,
-  initial,
-  loading,
-  onClose,
-  onSubmit,
-}: FaqFormProps) {
-  const [question, setQuestion] = useState(initial?.question ?? "");
-  const [answer, setAnswer] = useState(initial?.answer ?? "");
-  const [category, setCategory] = useState(initial?.category ?? "");
+export function FaqForm({ title, initial, loading, onClose, onSubmit }: FaqFormProps) {
+  const [question, setQuestion] = useState(initial?.question ?? '');
+  const [answer, setAnswer] = useState(initial?.answer ?? '');
+  const [category, setCategory] = useState(initial?.category ?? '');
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = () => {
     const e: Record<string, string> = {};
-    if (!question.trim()) e.question = "问题不能为空";
-    if (!answer.trim()) e.answer = "答案不能为空";
+    if (!question.trim()) e.question = '问题不能为空';
+    if (!answer.trim()) e.answer = '答案不能为空';
     if (Object.keys(e).length) {
       setErrors(e);
       return;
@@ -68,15 +62,13 @@ export function FaqForm({
               value={question}
               onChange={(e) => {
                 setQuestion(e.target.value);
-                setErrors((v) => ({ ...v, question: "" }));
+                setErrors((v) => ({ ...v, question: '' }));
               }}
               rows={2}
               placeholder="输入学生可能会问的问题..."
-              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-400 resize-none transition-colors placeholder:text-gray-300 ${errors.question ? "border-red-400 bg-red-50" : "border-[#E8E4DC] bg-white"}`}
+              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-400 resize-none transition-colors placeholder:text-gray-300 ${errors.question ? 'border-red-400 bg-red-50' : 'border-[#E8E4DC] bg-white'}`}
             />
-            {errors.question && (
-              <p className="mt-1 text-xs text-red-500">{errors.question}</p>
-            )}
+            {errors.question && <p className="mt-1 text-xs text-red-500">{errors.question}</p>}
           </div>
 
           {/* 答案 */}
@@ -88,15 +80,13 @@ export function FaqForm({
               value={answer}
               onChange={(e) => {
                 setAnswer(e.target.value);
-                setErrors((v) => ({ ...v, answer: "" }));
+                setErrors((v) => ({ ...v, answer: '' }));
               }}
               rows={6}
               placeholder="输入官方标准答案，将被向量化用于 RAG 检索..."
-              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-400 resize-none transition-colors placeholder:text-gray-300 ${errors.answer ? "border-red-400 bg-red-50" : "border-[#E8E4DC] bg-white"}`}
+              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-400 resize-none transition-colors placeholder:text-gray-300 ${errors.answer ? 'border-red-400 bg-red-50' : 'border-[#E8E4DC] bg-white'}`}
             />
-            {errors.answer && (
-              <p className="mt-1 text-xs text-red-500">{errors.answer}</p>
-            )}
+            {errors.answer && <p className="mt-1 text-xs text-red-500">{errors.answer}</p>}
           </div>
 
           {/* 分类 + 排序 */}
@@ -146,7 +136,7 @@ export function FaqForm({
             className="px-5 py-2 text-sm rounded-xl bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2 transition-colors"
           >
             {loading && <Loader2 size={13} className="animate-spin" />}
-            {loading ? "保存中…" : "保存"}
+            {loading ? '保存中…' : '保存'}
           </button>
         </div>
       </div>

@@ -1,33 +1,18 @@
-import { useState, useRef, useCallback } from "react";
-import {
-  Upload,
-  Loader2,
-  X,
-  FileText,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-} from "lucide-react";
-import type { DocType, UploadParams } from "@shared/types/api";
-import type { UploadItem } from "@shared/store/uploadStore";
-import { UploadParamsPanel } from "./UploadParamsPanel";
+import { useState, useRef, useCallback } from 'react';
+import { Upload, Loader2, X, FileText, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import type { DocType, UploadParams } from '@shared/types/api';
+import type { UploadItem } from '@shared/store/uploadStore';
+import { UploadParamsPanel } from './UploadParamsPanel';
 
 function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function UploadStatusIcon({
-  status,
-}: {
-  status: "pending" | "uploading" | "done" | "error";
-}) {
-  if (status === "pending")
-    return <Clock size={14} className="text-gray-400" />;
-  if (status === "uploading")
-    return <Loader2 size={14} className="animate-spin text-blue-500" />;
-  if (status === "done")
-    return <CheckCircle size={14} className="text-emerald-500" />;
+function UploadStatusIcon({ status }: { status: 'pending' | 'uploading' | 'done' | 'error' }) {
+  if (status === 'pending') return <Clock size={14} className="text-gray-400" />;
+  if (status === 'uploading') return <Loader2 size={14} className="animate-spin text-blue-500" />;
+  if (status === 'done') return <CheckCircle size={14} className="text-emerald-500" />;
   return <AlertCircle size={14} className="text-red-500" />;
 }
 
@@ -71,7 +56,7 @@ export function UploadPanel({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) addStaged(e.target.files);
-    e.target.value = "";
+    e.target.value = '';
   };
 
   const handleStartUpload = () => {
@@ -80,10 +65,8 @@ export function UploadPanel({
     setStagedFiles([]);
   };
 
-  const handleParamChange = <K extends keyof UploadParams>(
-    key: K,
-    value: UploadParams[K],
-  ) => setParams((p) => ({ ...p, [key]: value }));
+  const handleParamChange = <K extends keyof UploadParams>(key: K, value: UploadParams[K]) =>
+    setParams((p) => ({ ...p, [key]: value }));
 
   const showQueue = activeUploads.length > 0;
 
@@ -91,9 +74,7 @@ export function UploadPanel({
     <div className="mb-6 glass-card rounded-lg p-5">
       <h2 className="text-sm font-medium text-gray-700 mb-3">
         上传
-        <span
-          className={`ml-2 text-xs px-2 py-0.5 rounded font-semibold ${badge}`}
-        >
+        <span className={`ml-2 text-xs px-2 py-0.5 rounded font-semibold ${badge}`}>
           {typeLabel}
         </span>
       </h2>
@@ -110,9 +91,7 @@ export function UploadPanel({
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
             className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-              dragOver
-                ? "border-blue-400 bg-blue-50"
-                : "border-gray-300 hover:border-gray-400"
+              dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
             }`}
           >
             <input
@@ -127,9 +106,7 @@ export function UploadPanel({
             <p className="text-sm text-gray-600">
               拖拽文件到此处，或 <span className="text-blue-600">点击选择</span>
             </p>
-            <p className="text-xs text-gray-400 mt-1">
-              支持 .pdf / .docx / .txt / .md，可多选
-            </p>
+            <p className="text-xs text-gray-400 mt-1">支持 .pdf / .docx / .txt / .md，可多选</p>
           </div>
 
           {stagedFiles.length > 0 && (
@@ -140,16 +117,10 @@ export function UploadPanel({
                   className="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-50 border border-gray-100"
                 >
                   <FileText size={14} className="text-gray-400 shrink-0" />
-                  <span className="text-sm text-gray-800 truncate flex-1 min-w-0">
-                    {file.name}
-                  </span>
-                  <span className="text-xs text-gray-400 shrink-0">
-                    {formatSize(file.size)}
-                  </span>
+                  <span className="text-sm text-gray-800 truncate flex-1 min-w-0">{file.name}</span>
+                  <span className="text-xs text-gray-400 shrink-0">{formatSize(file.size)}</span>
                   <button
-                    onClick={() =>
-                      setStagedFiles((prev) => prev.filter((_, j) => j !== i))
-                    }
+                    onClick={() => setStagedFiles((prev) => prev.filter((_, j) => j !== i))}
                     className="text-gray-400 hover:text-gray-600 shrink-0"
                   >
                     <X size={12} />
@@ -174,7 +145,7 @@ export function UploadPanel({
             >
               <Upload size={14} />
               开始上传
-              {stagedFiles.length > 0 ? ` (${stagedFiles.length})` : ""}
+              {stagedFiles.length > 0 ? ` (${stagedFiles.length})` : ''}
             </button>
           </div>
         </>
@@ -185,9 +156,7 @@ export function UploadPanel({
         <div className="space-y-2">
           <div className="flex items-center gap-2 mb-3">
             <Loader2 size={14} className="animate-spin text-blue-500" />
-            <span className="text-sm font-medium text-gray-700">
-              入库中 — {typeLabel}
-            </span>
+            <span className="text-sm font-medium text-gray-700">入库中 — {typeLabel}</span>
           </div>
           {activeUploads.map((item) => (
             <div
@@ -199,10 +168,8 @@ export function UploadPanel({
               <span className="text-sm text-gray-800 truncate flex-1 min-w-0">
                 {item.file.name}
               </span>
-              <span className="text-xs text-gray-400 shrink-0">
-                {formatSize(item.file.size)}
-              </span>
-              {item.status === "uploading" && (
+              <span className="text-xs text-gray-400 shrink-0">{formatSize(item.file.size)}</span>
+              {item.status === 'uploading' && (
                 <div className="w-24 bg-gray-200 rounded-full h-1.5 shrink-0">
                   <div
                     className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
@@ -210,7 +177,7 @@ export function UploadPanel({
                   />
                 </div>
               )}
-              {item.status === "pending" && (
+              {item.status === 'pending' && (
                 <button
                   onClick={() => onRemoveItem(item.id)}
                   className="text-gray-400 hover:text-gray-600 shrink-0"

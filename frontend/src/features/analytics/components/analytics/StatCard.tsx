@@ -21,7 +21,7 @@ export function StatCard({
       style={{
         animation: animate
           ? `appleSettleIn 0.75s cubic-bezier(0.25,1,0.5,1) ${delay}ms both`
-          : "none",
+          : 'none',
       }}
     >
       <div className="flex items-start justify-between">
@@ -34,9 +34,7 @@ export function StatCard({
         </div>
       </div>
       <div>
-        <p className="text-[28px] font-bold text-[#1A1A1A] leading-none">
-          {value}
-        </p>
+        <p className="text-[28px] font-bold text-[#1A1A1A] leading-none">{value}</p>
         <p className="text-xs text-[#B8B4AC] mt-1.5">{sub}</p>
       </div>
     </div>

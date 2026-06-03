@@ -1,15 +1,15 @@
-import { useState, useRef } from "react";
-import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
-import { FileDown, Upload, Search, X } from "lucide-react";
-import { userService } from "../services/userService";
-import { MentorCard } from "./MentorCard";
-import { AddStudentsModal } from "./AddStudentsModal";
-import { extractError } from "@shared/lib/api";
-import type { UserInfo, ImportResult } from "@shared/types/api";
+import { useState, useRef } from 'react';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
+import { FileDown, Upload, Search, X } from 'lucide-react';
+import { userService } from '../services/userService';
+import { MentorCard } from './MentorCard';
+import { AddStudentsModal } from './AddStudentsModal';
+import { extractError } from '@shared/lib/errorHandler';
+import type { UserInfo, ImportResult } from '@shared/types/api';
 
 export function MentorRelationsTab() {
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importing, setImporting] = useState(false);
   const [addTarget, setAddTarget] = useState<UserInfo | null>(null);
@@ -17,9 +17,8 @@ export function MentorRelationsTab() {
 
   // 获取所有教师
   const { data: teachersData, isLoading: loadingTeachers } = useQuery({
-    queryKey: ["users", "teacher", "all"],
-    queryFn: () =>
-      userService.list({ role: "teacher", page: 1, page_size: 100 }),
+    queryKey: ['users', 'teacher', 'all'],
+    queryFn: () => userService.list({ role: 'teacher', page: 1, page_size: 100 }),
   });
 
   const teachers = teachersData?.items ?? [];
@@ -27,7 +26,7 @@ export function MentorRelationsTab() {
   // 并行获取每个教师名下的学生
   const studentQueries = useQueries({
     queries: teachers.map((t) => ({
-      queryKey: ["mentor-students", t.id],
+      queryKey: ['mentor-students', t.id],
       queryFn: () => userService.listMentorStudents(t.id),
       enabled: teachers.length > 0,
     })),
@@ -42,7 +41,7 @@ export function MentorRelationsTab() {
     try {
       const result = await userService.importMentorRelations(file);
       setImportResult({ ...result, skipped: 0 });
-      qc.invalidateQueries({ queryKey: ["mentor-students"] });
+      qc.invalidateQueries({ queryKey: ['mentor-students'] });
     } catch (err) {
       setImportResult({
         total: 0,
@@ -53,7 +52,7 @@ export function MentorRelationsTab() {
       });
     } finally {
       setImporting(false);
-      e.target.value = "";
+      e.target.value = '';
     }
   };
 
@@ -66,8 +65,8 @@ export function MentorRelationsTab() {
         } | null;
         return (
           t.display_name.includes(search) ||
-          (profile?.employee_id ?? "").includes(search) ||
-          (profile?.department ?? "").includes(search)
+          (profile?.employee_id ?? '').includes(search) ||
+          (profile?.department ?? '').includes(search)
         );
       })
     : teachers;
@@ -79,15 +78,9 @@ export function MentorRelationsTab() {
   return (
     <div className="flex flex-col gap-5">
       {/* 顶部操作栏 */}
-      <div
-        className="flex items-center justify-between shrink-0"
-        style={settle(0)}
-      >
+      <div className="flex items-center justify-between shrink-0" style={settle(0)}>
         <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]"
-          />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C0BDB8]" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -103,9 +96,9 @@ export function MentorRelationsTab() {
             <FileDown size={14} /> 下载模板
           </button>
           <label
-            className={`flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm rounded-xl cursor-pointer transition-colors ${importing ? "opacity-50 cursor-not-allowed" : "text-[#334155] hover:bg-[#F8F6F2]"}`}
+            className={`flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4DC] text-sm rounded-xl cursor-pointer transition-colors ${importing ? 'opacity-50 cursor-not-allowed' : 'text-[#334155] hover:bg-[#F8F6F2]'}`}
           >
-            <Upload size={14} /> {importing ? "导入中..." : "批量导入"}
+            <Upload size={14} /> {importing ? '导入中...' : '批量导入'}
             <input
               ref={fileInputRef}
               type="file"
@@ -121,11 +114,11 @@ export function MentorRelationsTab() {
       {/* 导入结果提示 */}
       {importResult && (
         <div
-          className={`flex items-center justify-between px-5 py-3 rounded-xl text-sm border ${importResult.failed > 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"} animate-apple-fade`}
+          className={`flex items-center justify-between px-5 py-3 rounded-xl text-sm border ${importResult.failed > 0 ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'} animate-apple-fade`}
         >
           <span>
             导入完成：成功 {importResult.success} 条
-            {importResult.failed > 0 ? `，失败 ${importResult.failed} 条` : ""}
+            {importResult.failed > 0 ? `，失败 ${importResult.failed} 条` : ''}
           </span>
           <button
             onClick={() => setImportResult(null)}
@@ -143,7 +136,7 @@ export function MentorRelationsTab() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex items-center justify-center h-48 text-sm text-[#9A9A9A]">
-          {search ? "没有匹配的教师" : "暂无教师，请先在「教师管理」中添加"}
+          {search ? '没有匹配的教师' : '暂无教师，请先在「教师管理」中添加'}
         </div>
       ) : (
         <div className="flex flex-col gap-3" style={settle(50)}>
@@ -173,10 +166,9 @@ export function MentorRelationsTab() {
           mentor={addTarget}
           existingStudentIds={
             new Set(
-              (
-                studentQueries[teachers.findIndex((t) => t.id === addTarget.id)]
-                  ?.data ?? []
-              ).map((s) => s.id),
+              (studentQueries[teachers.findIndex((t) => t.id === addTarget.id)]?.data ?? []).map(
+                (s) => s.id,
+              ),
             )
           }
           onClose={() => setAddTarget(null)}

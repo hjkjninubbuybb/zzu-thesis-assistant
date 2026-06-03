@@ -1,7 +1,7 @@
-import { useCallback } from "react";
-import { chatService } from "../services/chatService";
-import { useChatMessages } from "./useChatMessages";
-import { useChatStream } from "./useChatStream";
+import { useCallback } from 'react';
+import { chatService } from '../services/chatService';
+import { useChatMessages } from './useChatMessages';
+import { useChatStream } from './useChatStream';
 
 export function useChat() {
   const msgState = useChatMessages();
@@ -19,7 +19,7 @@ export function useChat() {
             content: m.content,
             sources: m.sources ?? undefined,
             files: m.files ?? undefined,
-            status: "done" as const,
+            status: 'done' as const,
             dbMessageId: m.id,
             feedback: m.feedback ?? undefined,
           })),
@@ -32,14 +32,12 @@ export function useChat() {
   );
 
   const applyFeedback = useCallback(
-    async (msgId: number, rating: "up" | "down") => {
+    async (msgId: number, rating: 'up' | 'down') => {
       try {
         await chatService.submitFeedback(msgId, rating);
         setMessages((prev) =>
           prev.map((m) =>
-            m.dbMessageId === msgId
-              ? { ...m, feedback: m.feedback === rating ? null : rating }
-              : m,
+            m.dbMessageId === msgId ? { ...m, feedback: m.feedback === rating ? null : rating } : m,
           ),
         );
       } catch {

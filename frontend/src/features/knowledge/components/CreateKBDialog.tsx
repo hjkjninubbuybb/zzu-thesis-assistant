@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { X, Loader2 } from "lucide-react";
-import type { KBCreate } from "@shared/types/api";
+import { useState } from 'react';
+import { X, Loader2 } from 'lucide-react';
+import type { KBCreate } from '@shared/types/api';
 
 interface CreateKBDialogProps {
   isCreating: boolean;
@@ -17,20 +17,20 @@ export function CreateKBDialog({
   onClose,
   onSubmit,
 }: CreateKBDialogProps) {
-  const [name, setName] = useState("");
-  const [desc, setDesc] = useState("");
-  const [nameError, setNameError] = useState("");
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [nameError, setNameError] = useState('');
 
   const validate = () => {
     if (!name.trim()) {
-      setNameError("名称不能为空");
+      setNameError('名称不能为空');
       return false;
     }
     if (!NAME_PATTERN.test(name.trim())) {
-      setNameError("只支持字母、数字、下划线、中文");
+      setNameError('只支持字母、数字、下划线、中文');
       return false;
     }
-    setNameError("");
+    setNameError('');
     return true;
   };
 
@@ -54,24 +54,20 @@ export function CreateKBDialog({
               名称 <span className="text-red-500">*</span>
             </label>
             <input
-              className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 ${nameError ? "border-red-400" : "border-gray-300"}`}
+              className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 ${nameError ? 'border-red-400' : 'border-gray-300'}`}
               placeholder="字母/数字/下划线/中文"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
-                if (nameError) setNameError("");
+                if (nameError) setNameError('');
               }}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               autoFocus
             />
-            {nameError && (
-              <p className="text-xs text-red-500 mt-1">{nameError}</p>
-            )}
+            {nameError && <p className="text-xs text-red-500 mt-1">{nameError}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              描述
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">描述</label>
             <input
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400"
               placeholder="可选"
@@ -81,9 +77,7 @@ export function CreateKBDialog({
           </div>
           {createError && (
             <p className="text-xs text-red-500">
-              {createError instanceof Error
-                ? createError.message
-                : String(createError)}
+              {createError instanceof Error ? createError.message : String(createError)}
             </p>
           )}
         </div>

@@ -1,21 +1,14 @@
-import { NavLink, useNavigate } from "react-router-dom";
-import {
-  Home,
-  MessagesSquare,
-  HelpCircle,
-  User,
-  LogOut,
-  Ticket,
-} from "lucide-react";
-import { cn } from "@shared/lib/utils";
-import { useAuthUser, useAuthLogout } from "@shared/store/authStore";
+import { NavLink, useNavigate } from 'react-router-dom';
+import { Home, MessagesSquare, HelpCircle, User, LogOut, Ticket } from 'lucide-react';
+import { cn } from '@shared/lib/utils';
+import { useAuthUser, useAuthLogout } from '@shared/store/authStore';
 
 const STUDENT_NAV = [
-  { to: "/student", label: "首页", icon: Home, end: true },
-  { to: "/student/chat", label: "智能问答", icon: MessagesSquare },
-  { to: "/student/tickets", label: "答疑记录", icon: Ticket },
-  { to: "/student/faq", label: "常见问题", icon: HelpCircle },
-  { to: "/student/profile", label: "我的", icon: User },
+  { to: '/student', label: '首页', icon: Home, end: true },
+  { to: '/student/chat', label: '智能问答', icon: MessagesSquare },
+  { to: '/student/tickets', label: '答疑记录', icon: Ticket },
+  { to: '/student/faq', label: '常见问题', icon: HelpCircle },
+  { to: '/student/profile', label: '我的', icon: User },
 ];
 
 function NavItem({
@@ -35,10 +28,10 @@ function NavItem({
       end={end}
       className={({ isActive }) =>
         cn(
-          "w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 text-sm",
+          'w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 text-sm',
           isActive
-            ? "bg-[#2563EB] text-white shadow-md"
-            : "text-[#6E7787] hover:bg-white/50 hover:text-[#2563EB] active:scale-[0.97]",
+            ? 'bg-[#2563EB] text-white shadow-md'
+            : 'text-[#6E7787] hover:bg-white/50 hover:text-[#2563EB] active:scale-[0.97]',
         )
       }
     >
@@ -55,10 +48,10 @@ export default function StudentSidebar() {
 
   const handleLogout = () => {
     logout();
-    navigate("/student/login", { replace: true });
+    navigate('/student/login', { replace: true });
   };
 
-  const displayName = user?.display_name || user?.username || "同学";
+  const displayName = user?.display_name || user?.username || '同学';
   const avatarChar = displayName.slice(0, 1).toUpperCase();
 
   return (
@@ -68,9 +61,7 @@ export default function StudentSidebar() {
         <div className="w-9 h-9 bg-[#2563EB] rounded-xl flex items-center justify-center shadow-md shrink-0">
           <span className="text-white text-xs font-bold tracking-tight">R</span>
         </div>
-        <span className="text-sm font-bold text-[#202938] tracking-tight">
-          RAG 1.0
-        </span>
+        <span className="text-sm font-bold text-[#202938] tracking-tight">RAG 1.0</span>
       </div>
 
       {/* Navigation */}

@@ -1,16 +1,16 @@
-import { useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { settingsService } from "../services/settingsService";
-import { settingsKeys } from "./queryKeys";
-import { useToast } from "@shared/store/uiStore";
-import { handleMutationError } from "@shared/lib/errorHandler";
+import { useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { settingsService } from '../services/settingsService';
+import { settingsKeys } from './queryKeys';
+import { useToast } from '@shared/store/uiStore';
+import { handleMutationError } from '@shared/lib/errorHandler';
 
 export function useApiKeyManager() {
   const qc = useQueryClient();
   const { showToast } = useToast();
 
-  const [apiKeyInput, setApiKeyInput] = useState("");
-  const [apiUrlInput, setApiUrlInput] = useState("");
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiUrlInput, setApiUrlInput] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [isEditingKey, setIsEditingKey] = useState(false);
   const [testResult, setTestResult] = useState<{
@@ -33,7 +33,7 @@ export function useApiKeyManager() {
   useEffect(() => {
     if (apiKeyInfo) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setApiUrlInput(apiKeyInfo.api_base_url || "");
+      setApiUrlInput(apiKeyInfo.api_base_url || '');
     }
   }, [apiKeyInfo]);
 
@@ -42,11 +42,11 @@ export function useApiKeyManager() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: settingsKeys.apiKey() });
       qc.invalidateQueries({ queryKey: settingsKeys.models() });
-      setApiKeyInput("");
+      setApiKeyInput('');
       setShowKey(false);
       setIsEditingKey(false);
       setTestResult(null);
-      showToast("API 信息已更新", "success");
+      showToast('API 信息已更新', 'success');
     },
     onError: (err) => handleMutationError(err, showToast),
   });
@@ -58,14 +58,14 @@ export function useApiKeyManager() {
       if (data.ok) qc.invalidateQueries({ queryKey: settingsKeys.models() });
     },
     onError: (err) => {
-      const message = err instanceof Error ? err.message : "连接测试失败";
+      const message = err instanceof Error ? err.message : '连接测试失败';
       setTestResult({ ok: false, message });
     },
   });
 
   const cancelEdit = () => {
     setIsEditingKey(false);
-    setApiKeyInput("");
+    setApiKeyInput('');
     setShowKey(false);
   };
 

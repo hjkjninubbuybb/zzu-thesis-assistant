@@ -1,6 +1,6 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
-import type { DocType, SplitterType, UploadParams } from "@shared/types/api";
-import { DOC_TYPE_LABELS } from "./UploadZone";
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import type { DocType, SplitterType, UploadParams } from '@shared/types/api';
+import { DOC_TYPE_LABELS } from './UploadZone';
 
 // ── UploadParamsPanel ──────────────────────────────────────
 
@@ -25,21 +25,19 @@ export function UploadParamsPanel({
       <div className="mt-4">
         <p className="text-xs font-medium text-gray-600 mb-2">文档类型</p>
         <div className="flex gap-2">
-          {(Object.entries(DOC_TYPE_LABELS) as [DocType, string][]).map(
-            ([val, label]) => (
-              <button
-                key={val}
-                onClick={() => onParamsChange({ ...params, doc_type: val })}
-                className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
-                  params.doc_type === val
-                    ? "bg-slate-700 text-white border-slate-400"
-                    : "border-[#E8E4DE] text-gray-700 hover:bg-[#F2EFE9]"
-                }`}
-              >
-                {label}
-              </button>
-            ),
-          )}
+          {(Object.entries(DOC_TYPE_LABELS) as [DocType, string][]).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => onParamsChange({ ...params, doc_type: val })}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                params.doc_type === val
+                  ? 'bg-slate-700 text-white border-slate-400'
+                  : 'border-[#E8E4DE] text-gray-700 hover:bg-[#F2EFE9]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -47,7 +45,7 @@ export function UploadParamsPanel({
       <button
         onClick={onToggleAdvanced}
         className="mt-4 flex items-center gap-1 text-xs hover:text-gray-700 transition-colors"
-        style={{ color: "#8A8A8A" }}
+        style={{ color: '#8A8A8A' }}
       >
         {advancedOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         高级参数
@@ -57,9 +55,7 @@ export function UploadParamsPanel({
       {advancedOpen && (
         <div className="mt-3 grid grid-cols-2 gap-4 pt-3 border-t border-[#F0EDE8]">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              切分策略
-            </label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">切分策略</label>
             <select
               value={params.splitter_type}
               onChange={(e) =>
@@ -77,8 +73,7 @@ export function UploadParamsPanel({
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Chunk 大小{" "}
-              <span className="text-gray-400">{params.chunk_size}</span>
+              Chunk 大小 <span className="text-gray-400">{params.chunk_size}</span>
             </label>
             <input
               type="range"
@@ -97,10 +92,8 @@ export function UploadParamsPanel({
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Overlap 比例{" "}
-              <span className="text-gray-400">
-                {params.chunk_overlap_ratio.toFixed(2)}
-              </span>
+              Overlap 比例{' '}
+              <span className="text-gray-400">{params.chunk_overlap_ratio.toFixed(2)}</span>
             </label>
             <input
               type="range"
@@ -122,17 +115,11 @@ export function UploadParamsPanel({
               type="checkbox"
               id={`cleaning-${kbName}`}
               checked={params.enable_cleaning}
-              onChange={(e) =>
-                onParamsChange({ ...params, enable_cleaning: e.target.checked })
-              }
+              onChange={(e) => onParamsChange({ ...params, enable_cleaning: e.target.checked })}
               className="rounded"
             />
-            <label
-              htmlFor={`cleaning-${kbName}`}
-              className="text-sm text-gray-600 cursor-pointer"
-            >
-              启用 LLM 清洗{" "}
-              <span className="text-xs text-gray-400">（较慢）</span>
+            <label htmlFor={`cleaning-${kbName}`} className="text-sm text-gray-600 cursor-pointer">
+              启用 LLM 清洗 <span className="text-xs text-gray-400">（较慢）</span>
             </label>
           </div>
         </div>

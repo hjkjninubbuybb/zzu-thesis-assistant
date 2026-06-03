@@ -1,5 +1,5 @@
-import ReactMarkdown from "react-markdown";
-import type { SourceItem } from "@shared/types/api";
+import ReactMarkdown from 'react-markdown';
+import type { SourceItem } from '@shared/types/api';
 
 export function AcademicMarkdown({
   content,
@@ -24,9 +24,7 @@ export function AcademicMarkdown({
       {parts.map((part, i) => {
         const match = part.match(/^\[(\d+(?:,\s*\d+)*)\]$/);
         if (match && sources && sources.length > 0) {
-          const indices = match[1]
-            .split(",")
-            .map((s) => parseInt(s.trim()) - 1);
+          const indices = match[1].split(',').map((s) => parseInt(s.trim()) - 1);
           return (
             <span key={i} className="inline-flex gap-0.5">
               {indices.map((idx) => {
@@ -49,12 +47,10 @@ export function AcademicMarkdown({
           <ReactMarkdown
             key={i}
             components={{
-              p: "span",
+              p: 'span',
               a: ({ href, children, ...props }) => {
-                if (href?.startsWith("#sandbox:")) {
-                  const filename = decodeURIComponent(
-                    href.replace("#sandbox:", ""),
-                  );
+                if (href?.startsWith('#sandbox:')) {
+                  const filename = decodeURIComponent(href.replace('#sandbox:', ''));
                   return (
                     <a
                       href="#"

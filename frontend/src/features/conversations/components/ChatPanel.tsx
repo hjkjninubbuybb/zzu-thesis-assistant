@@ -1,14 +1,14 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowUp, Loader2, Plus } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { MessageBubble } from "./MessageBubble";
-import { ThinkingProcess, ConversationSkeleton } from "./ThinkingProcess";
-import { AgentAvatar } from "./AgentAvatar";
-import { TutorHelpModal } from "./TutorHelpModal";
-import { chatService } from "../services/chatService";
-import { conversationKeys } from "../hooks/queryKeys";
-import type { ChatMessage } from "@shared/types/api";
-import type { ThinkingStep } from "./ThinkingProcess";
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowUp, Loader2, Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { MessageBubble } from './MessageBubble';
+import { ThinkingProcess, ConversationSkeleton } from './ThinkingProcess';
+import { AgentAvatar } from './AgentAvatar';
+import { TutorHelpModal } from './TutorHelpModal';
+import { chatService } from '../services/chatService';
+import { conversationKeys } from '../hooks/queryKeys';
+import type { ChatMessage } from '@shared/types/api';
+import type { ThinkingStep } from './ThinkingProcess';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -21,7 +21,7 @@ interface ChatPanelProps {
   isStudent: boolean;
   studentKb: string | null;
   onSend: (query: string) => void;
-  onFeedback: (msgId: number, rating: "up" | "down") => void;
+  onFeedback: (msgId: number, rating: 'up' | 'down') => void;
   onClearMessages: () => void;
 }
 
@@ -39,7 +39,7 @@ export function ChatPanel({
   onFeedback,
   onClearMessages,
 }: ChatPanelProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [helpMsg, setHelpMsg] = useState<ChatMessage | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -57,7 +57,7 @@ export function ChatPanel({
   useEffect(() => {
     cancelAnimationFrame(scrollRAF.current);
     scrollRAF.current = requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     });
   }, [messages]);
 
@@ -65,7 +65,7 @@ export function ChatPanel({
   const autoResize = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "auto";
+    el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, []);
 
@@ -76,12 +76,12 @@ export function ChatPanel({
   const handleSend = useCallback(() => {
     const q = query.trim();
     if (!q) return;
-    setQuery("");
+    setQuery('');
     onSend(q);
   }, [query, onSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -115,7 +115,7 @@ export function ChatPanel({
       {/* 消息区 */}
       <div
         className="flex-1 overflow-y-auto py-5"
-        style={{ contain: "paint", transform: "translateZ(0)" }}
+        style={{ contain: 'paint', transform: 'translateZ(0)' }}
       >
         <div className="max-w-2xl mx-auto w-full px-4 space-y-4 h-full flex flex-col">
           {isLoadingHistory ? (
@@ -128,12 +128,8 @@ export function ChatPanel({
                     <AgentAvatar isStudent={true} />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-gray-800">
-                      暂无可用知识库
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      请联系管理员为学生分配知识库后再使用
-                    </p>
+                    <p className="text-sm font-semibold text-gray-800">暂无可用知识库</p>
+                    <p className="text-xs text-gray-400">请联系管理员为学生分配知识库后再使用</p>
                   </div>
                 </div>
               ) : (
@@ -142,13 +138,11 @@ export function ChatPanel({
                     <AgentAvatar isStudent={isStudent} />
                   </div>
                   <div className="text-center space-y-1">
-                    <p className="text-sm font-semibold text-gray-800">
-                      开始提问
-                    </p>
+                    <p className="text-sm font-semibold text-gray-800">开始提问</p>
                     <p className="text-xs text-gray-400">
                       {!chatKb
-                        ? "请先在知识库页面配置知识库，然后新建对话"
-                        : "在下方输入框中输入问题，按回车发送"}
+                        ? '请先在知识库页面配置知识库，然后新建对话'
+                        : '在下方输入框中输入问题，按回车发送'}
                     </p>
                   </div>
                   {chatKb && faqs && faqs.length > 0 && (
@@ -157,7 +151,7 @@ export function ChatPanel({
                         <button
                           key={faq.id}
                           onClick={() => handleFaqClick(faq.question)}
-                          className={`text-xs px-3 py-1.5 rounded-full border bg-white text-gray-600 transition-colors text-left ${isStudent ? "border-[#D9DEE5] hover:bg-[#EEF2FF] hover:text-[#2563EB]" : "border-[#F0EDE8] hover:bg-[#F2EFE9] hover:text-[#334155]"}`}
+                          className={`text-xs px-3 py-1.5 rounded-full border bg-white text-gray-600 transition-colors text-left ${isStudent ? 'border-[#D9DEE5] hover:bg-[#EEF2FF] hover:text-[#2563EB]' : 'border-[#F0EDE8] hover:bg-[#F2EFE9] hover:text-[#334155]'}`}
                         >
                           {faq.question}
                         </button>
@@ -197,26 +191,22 @@ export function ChatPanel({
             disabled={isStreaming || !effectiveKb}
             placeholder={
               isStudent && !studentKb
-                ? "等待管理员分配知识库..."
+                ? '等待管理员分配知识库...'
                 : effectiveKb
-                  ? "有问题，尽管问"
-                  : "请先在知识库页面配置知识库，然后新建对话"
+                  ? '有问题，尽管问'
+                  : '请先在知识库页面配置知识库，然后新建对话'
             }
             rows={1}
             className="w-full resize-none outline-none text-sm text-gray-800 placeholder:text-gray-400 bg-transparent overflow-y-auto disabled:text-gray-400"
-            style={{ minHeight: "1.5rem", maxHeight: "10rem" }}
+            style={{ minHeight: '1.5rem', maxHeight: '10rem' }}
           />
           <div className="flex items-center justify-end">
             <button
               onClick={handleSend}
               disabled={!query.trim() || !effectiveKb || isStreaming}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-200 ${isStudent ? "bg-[#2563EB] hover:bg-[#1D4ED8]" : "bg-gray-900 hover:bg-gray-700"}`}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-200 ${isStudent ? 'bg-[#2563EB] hover:bg-[#1D4ED8]' : 'bg-gray-900 hover:bg-gray-700'}`}
             >
-              {isStreaming ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <ArrowUp size={15} />
-              )}
+              {isStreaming ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={15} />}
             </button>
           </div>
         </div>

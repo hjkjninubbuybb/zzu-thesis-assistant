@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Loader2, X as XIcon, HelpCircle } from "lucide-react";
-import { chatService } from "../services/chatService";
-import type { ChatMessage } from "@shared/types/api";
+import { useState } from 'react';
+import { Loader2, X as XIcon, HelpCircle } from 'lucide-react';
+import { chatService } from '../services/chatService';
+import type { ChatMessage } from '@shared/types/api';
 
 export function TutorHelpModal({
   msg,
@@ -14,7 +14,7 @@ export function TutorHelpModal({
   onClose: () => void;
   onSuccess: (msg: string) => void;
 }) {
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,14 +28,13 @@ export function TutorHelpModal({
         message_id: msg.dbMessageId!,
         question: question.trim(),
       });
-      onSuccess("请求已发送给导师");
+      onSuccess('请求已发送给导师');
     } catch (err: unknown) {
       const detail =
-        err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: { detail?: string } } }).response
-              ?.data?.detail
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      setError(detail ?? "发送失败，请稍后重试");
+      setError(detail ?? '发送失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -51,10 +50,7 @@ export function TutorHelpModal({
             </div>
             <h3 className="text-sm font-semibold text-slate-700">求助导师</h3>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <XIcon size={18} />
           </button>
         </div>
@@ -82,9 +78,7 @@ export function TutorHelpModal({
               className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none shadow-inner"
             />
           </div>
-          {error && (
-            <p className="text-xs text-red-500 animate-shake">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-500 animate-shake">{error}</p>}
         </div>
 
         <div className="px-6 py-4 bg-gray-50/50 border-t border-[#F0EDE8] flex justify-end gap-3">
@@ -99,11 +93,7 @@ export function TutorHelpModal({
             disabled={loading || !question.trim()}
             className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md active:scale-[0.98]"
           >
-            {loading ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <HelpCircle size={14} />
-            )}
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <HelpCircle size={14} />}
             发送求助
           </button>
         </div>

@@ -1,34 +1,27 @@
-import React, { useState } from "react";
-import {
-  Ticket,
-  MessageSquare,
-  Clock,
-  CheckCircle2,
-  ChevronRight,
-  Search,
-} from "lucide-react";
-import { useTicketList } from "../hooks/useTicketList";
-import type { QARequestInfo } from "@shared/types/api";
-import { TicketDetailModal } from "./TicketDetailModal";
+import React, { useState } from 'react';
+import { Ticket, MessageSquare, Clock, CheckCircle2, ChevronRight, Search } from 'lucide-react';
+import { useTicketList } from '../hooks/useTicketList';
+import type { QARequestInfo } from '@shared/types/api';
+import { TicketDetailModal } from './TicketDetailModal';
 
 // ── 状态标签 ──────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: QARequestInfo["status"] }) {
+function StatusBadge({ status }: { status: QARequestInfo['status'] }) {
   const map = {
     pending: {
-      label: "等待回复",
+      label: '等待回复',
       icon: Clock,
-      class: "bg-amber-50 text-amber-600 border-amber-100",
+      class: 'bg-amber-50 text-amber-600 border-amber-100',
     },
     replied: {
-      label: "导师已回复",
+      label: '导师已回复',
       icon: CheckCircle2,
-      class: "bg-emerald-50 text-emerald-600 border-emerald-100",
+      class: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     },
     closed: {
-      label: "已结束",
+      label: '已结束',
       icon: Clock,
-      class: "bg-slate-50 text-slate-500 border-slate-100",
+      class: 'bg-slate-50 text-slate-500 border-slate-100',
     },
   };
   const config = map[status];
@@ -46,16 +39,13 @@ function StatusBadge({ status }: { status: QARequestInfo["status"] }) {
 // ── 主组件 ──────────────────────────────────────────────────
 
 export function StudentTicketList() {
-  const [search, setSearch] = useState("");
-  const [selectedTicket, setSelectedTicket] = useState<QARequestInfo | null>(
-    null,
-  );
+  const [search, setSearch] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState<QARequestInfo | null>(null);
 
-  const { tickets, isLoading } = useTicketList("mine");
+  const [page, setPage] = useState(1);
+  const { tickets, totalPages, isLoading } = useTicketList('mine', page);
 
-  const filtered = tickets.filter((t) =>
-    t.question.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = tickets.filter((t) => t.question.toLowerCase().includes(search.toLowerCase()));
 
   const settle = (d: number): React.CSSProperties => ({
     animation: `appleSettleIn 0.75s cubic-bezier(0.25, 1, 0.5, 1) ${d}ms both`,
@@ -64,15 +54,10 @@ export function StudentTicketList() {
   return (
     <div className="px-8 py-8 flex-1 overflow-y-auto glass-card rounded-2xl custom-scrollbar flex flex-col gap-6">
       {/* 头部 */}
-      <div
-        className="flex items-center justify-between shrink-0"
-        style={settle(0)}
-      >
+      <div className="flex items-center justify-between shrink-0" style={settle(0)}>
         <div>
           <h1 className="text-2xl font-bold text-[#334155]">我的答疑记录</h1>
-          <p className="mt-1 text-sm text-[#8A8A8A]">
-            查看向导师提交的所有求助请求及回复
-          </p>
+          <p className="mt-1 text-sm text-[#8A8A8A]">查看向导师提交的所有求助请求及回复</p>
         </div>
         <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shadow-sm">
           <Ticket size={24} />
@@ -81,10 +66,7 @@ export function StudentTicketList() {
 
       {/* 搜索 */}
       <div className="relative" style={settle(50)}>
-        <Search
-          size={14}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-        />
+        <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -127,9 +109,9 @@ export function StudentTicketList() {
               >
                 <div
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 shadow-sm border ${
-                    t.status === "pending"
-                      ? "bg-amber-50 text-amber-600 border-amber-100"
-                      : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                    t.status === 'pending'
+                      ? 'bg-amber-50 text-amber-600 border-amber-100'
+                      : 'bg-emerald-50 text-emerald-600 border-emerald-100'
                   }`}
                 >
                   <MessageSquare size={22} />
@@ -164,11 +146,30 @@ export function StudentTicketList() {
         )}
       </div>
 
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-2 shrink-0">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1.5 text-xs rounded-xl border border-[#E8E4DC] text-[#6A6A6A] hover:bg-[#F2EFE9] disabled:opacity-40"
+          >
+            上一页
+          </button>
+          <span className="text-xs text-[#9A9A9A]">
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-3 py-1.5 text-xs rounded-xl border border-[#E8E4DC] text-[#6A6A6A] hover:bg-[#F2EFE9] disabled:opacity-40"
+          >
+            下一页
+          </button>
+        </div>
+      )}
+
       {selectedTicket && (
-        <TicketDetailModal
-          ticket={selectedTicket}
-          onClose={() => setSelectedTicket(null)}
-        />
+        <TicketDetailModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
       )}
     </div>
   );

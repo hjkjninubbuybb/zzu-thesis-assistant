@@ -1,11 +1,11 @@
-import { memo } from "react";
+import { memo } from 'react';
 
 export const AgentAvatar = memo(({ isStudent }: { isStudent: boolean }) => (
   <div
     className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:rotate-3 border ${
       isStudent
-        ? "bg-blue-50 text-[#2563EB] border-[#DBEAFE]"
-        : "bg-slate-100 text-[#334155] border-[#E2E8F0]"
+        ? 'bg-blue-50 text-[#2563EB] border-[#DBEAFE]'
+        : 'bg-slate-100 text-[#334155] border-[#E2E8F0]'
     }`}
   >
     <svg
@@ -25,15 +25,9 @@ export const AgentAvatar = memo(({ isStudent }: { isStudent: boolean }) => (
       {/* 流苏 */}
       <path d="M22 8V13" />
       {/* AI 核心节点 */}
-      <circle
-        cx="12"
-        cy="8"
-        r="1.5"
-        fill="currentColor"
-        className="animate-pulse"
-      />
+      <circle cx="12" cy="8" r="1.5" fill="currentColor" className="animate-pulse" />
       <circle cx="12" cy="14" r="1" fill="currentColor" opacity="0.5" />
     </svg>
   </div>
 ));
-AgentAvatar.displayName = "AgentAvatar";
+AgentAvatar.displayName = 'AgentAvatar';
