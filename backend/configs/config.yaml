@@ -2,11 +2,13 @@ qdrant:
   url: http://localhost:6333
   timeout: 30
 embedding:
+  api_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   model: text-embedding-v3
   dimension: 1024
   embed_batch_size: 10
 llm:
-  api_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # 默认使用阿里云兼容模式地址
+  api_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1      # 推理型 LLM 平台
+  fast_api_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # 快速 LLM 平台
   model: qwen-plus       # 主模型：对话生成、文档清洗改写
   fast_model: qwen-turbo # 快速模型：简单判断任务（如清洗质量评估）
 vlm:
@@ -44,6 +46,7 @@ retrieval:
   query_enhance: true
   protect_raw_top_n: 1
 reranker:
+  api_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   model: gte-rerank
   top_n: 5
 rag:
