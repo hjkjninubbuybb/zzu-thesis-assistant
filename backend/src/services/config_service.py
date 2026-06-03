@@ -25,12 +25,19 @@ CONFIG_PATH = ROOT_DIR / "configs" / "config.yaml"
 
 GROUPS = ("llm", "fast_llm", "embedding", "reranker")
 
-_GROUP_CRED_LOADERS = {
-    "llm": get_llm_credentials,
-    "fast_llm": get_fast_llm_credentials,
-    "embedding": get_embedding_credentials,
-    "reranker": get_reranker_credentials,
-}
+
+def _load_credentials(group: str) -> tuple[str | None, str]:
+    """按组名分派到对应的 getter（每次解析模块属性，便于测试 patch）。"""
+    if group == "llm":
+        return get_llm_credentials()
+    if group == "fast_llm":
+        return get_fast_llm_credentials()
+    if group == "embedding":
+        return get_embedding_credentials()
+    if group == "reranker":
+        return get_reranker_credentials()
+    raise ValueError(f"未知模型组: {group}")
+
 
 # group -> (yaml_section, model_field_name)
 _GROUP_YAML_MODEL = {
@@ -71,7 +78,7 @@ class ConfigService(BaseService):
         cfg = get_config()
         out: dict[str, Any] = {}
         for group in GROUPS:
-            url, key = _GROUP_CRED_LOADERS[group]()
+            url, key = _load_credentials(group)
             yaml_section, model_field = _GROUP_YAML_MODEL[group]
             model = cfg.get(yaml_section, {}).get(model_field)
             out[group] = {
@@ -93,7 +100,7 @@ class ConfigService(BaseService):
         return dict(zip(GROUPS, results, strict=True))
 
     async def _test_group(self, group: str) -> dict:
-        url, key = _GROUP_CRED_LOADERS[group]()
+        url, key = _load_credentials(group)
         if not url or not key:
             return {"ok": False, "message": "未配置 URL 或 Key", "models": []}
         try:

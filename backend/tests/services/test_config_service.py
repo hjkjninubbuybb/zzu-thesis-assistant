@@ -1,10 +1,10 @@
-"""Unit tests for ConfigService."""
+"""Unit tests for ConfigService — 4-group credentials."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.services.config_service import ConfigService
+from src.services.config_service import GROUPS, ConfigService
 
 
 @pytest.fixture
@@ -12,129 +12,185 @@ def svc(mock_settings_store):
     return ConfigService(settings_store=mock_settings_store)
 
 
-# ── get_api_key_info ──────────────────────────────────────────────────
+# ── get_api_info ──────────────────────────────────────────────
 
 
-def test_get_api_key_info_no_key(svc):
+def test_get_api_info_returns_all_four_groups(svc):
+    fake_cfg = {
+        "llm": {"model": "qwen-plus", "fast_model": "qwen-turbo"},
+        "embedding": {"model": "text-embedding-v3"},
+        "reranker": {"model": "gte-rerank"},
+    }
     with (
-        patch("src.services.config_service.get_api_key", return_value=""),
-        patch("src.services.config_service.get_api_base_url", return_value="https://api.example.com"),
+        patch("src.services.config_service.get_config", return_value=fake_cfg),
+        patch(
+            "src.services.config_service.get_llm_credentials",
+            return_value=("https://llm.example.com", "sk-llm-1234567890"),
+        ),
+        patch(
+            "src.services.config_service.get_fast_llm_credentials",
+            return_value=("https://fast.example.com", "sk-fast-1234567890"),
+        ),
+        patch(
+            "src.services.config_service.get_embedding_credentials",
+            return_value=("https://emb.example.com", "sk-emb-1234567890"),
+        ),
+        patch(
+            "src.services.config_service.get_reranker_credentials",
+            return_value=("https://rerank.example.com", "sk-rerank-1234567890"),
+        ),
     ):
-        result = svc.get_api_key_info()
+        info = svc.get_api_info()
 
-    assert result["has_key"] is False
-    assert result["masked_key"] == ""
-    assert result["api_base_url"] == "https://api.example.com"
+    assert set(info.keys()) == set(GROUPS)
+    assert info["llm"]["model"] == "qwen-plus"
+    assert info["fast_llm"]["model"] == "qwen-turbo"
+    assert info["embedding"]["model"] == "text-embedding-v3"
+    assert info["reranker"]["model"] == "gte-rerank"
+    assert info["llm"]["has_key"] is True
+    assert info["llm"]["masked_key"].startswith("sk-")
+    assert info["llm"]["masked_key"].endswith("7890")
+    assert "****" in info["llm"]["masked_key"]
 
 
-def test_get_api_key_info_long_key_masked(svc):
+def test_get_api_info_no_key_returns_empty_masked(svc):
     with (
-        patch("src.services.config_service.get_api_key", return_value="sk-abcdefghijklmno1234"),
-        patch("src.services.config_service.get_api_base_url", return_value="https://api.example.com"),
+        patch("src.services.config_service.get_config", return_value={}),
+        patch("src.services.config_service.get_llm_credentials", return_value=(None, "")),
+        patch("src.services.config_service.get_fast_llm_credentials", return_value=(None, "")),
+        patch("src.services.config_service.get_embedding_credentials", return_value=(None, "")),
+        patch("src.services.config_service.get_reranker_credentials", return_value=(None, "")),
     ):
-        result = svc.get_api_key_info()
+        info = svc.get_api_info()
 
-    assert result["has_key"] is True
-    assert result["masked_key"].startswith("sk-")
-    assert result["masked_key"].endswith("1234")
-    assert "****" in result["masked_key"]
-
-
-def test_get_api_key_info_short_key_fully_masked(svc):
-    with (
-        patch("src.services.config_service.get_api_key", return_value="short"),
-        patch("src.services.config_service.get_api_base_url", return_value="https://api.example.com"),
-    ):
-        result = svc.get_api_key_info()
-
-    assert result["has_key"] is True
-    assert result["masked_key"] == "****"
+    assert info["llm"]["has_key"] is False
+    assert info["llm"]["masked_key"] == ""
+    assert info["llm"]["api_base_url"] is None
 
 
-def test_get_api_key_info_exactly_7_chars_fully_masked(svc):
-    # len("1234567") == 7, which is NOT > 7, so masked = "****"
-    with (
-        patch("src.services.config_service.get_api_key", return_value="1234567"),
-        patch("src.services.config_service.get_api_base_url", return_value="https://api.example.com"),
-    ):
-        result = svc.get_api_key_info()
-
-    assert result["masked_key"] == "****"
+# ── update_config: per-group credentials ─────────────────────
 
 
-def test_get_api_key_info_8_chars_shows_prefix_suffix(svc):
-    # len("12345678") == 8 > 7, so masked = "123****5678"
-    with (
-        patch("src.services.config_service.get_api_key", return_value="12345678"),
-        patch("src.services.config_service.get_api_base_url", return_value="https://api.example.com"),
-    ):
-        result = svc.get_api_key_info()
-
-    assert result["masked_key"] == "123****5678"
+def _patch_yaml_io(fake_cfg: dict):
+    """Helper: build the patches needed for update_config()'s file IO."""
+    mock_open_obj = MagicMock()
+    mock_open_obj.return_value.__enter__ = MagicMock(return_value=MagicMock())
+    mock_open_obj.return_value.__exit__ = MagicMock(return_value=False)
+    return mock_open_obj
 
 
-# ── update_api_key ────────────────────────────────────────────────────
-
-
-def test_update_api_key_sets_key(svc, mock_settings_store):
-    result = svc.update_api_key("new-key-abc")
-
-    mock_settings_store.set_setting.assert_any_call("api_key", "new-key-abc")
-    assert result["has_key"] is True
-    assert result["message"] == "API 信息已更新"
-
-
-def test_update_api_key_also_sets_base_url(svc, mock_settings_store):
-    svc.update_api_key("new-key", api_base_url="https://new-url.com")
-
-    calls = {call.args[0]: call.args[1] for call in mock_settings_store.set_setting.call_args_list}
-    assert calls["api_key"] == "new-key"
-    assert calls["api_base_url"] == "https://new-url.com"
-
-
-def test_update_api_key_no_base_url_skips_url_setting(svc, mock_settings_store):
-    svc.update_api_key("new-key", api_base_url=None)
-
-    keys_set = [call.args[0] for call in mock_settings_store.set_setting.call_args_list]
-    assert "api_base_url" not in keys_set
-
-
-# ── read_config ───────────────────────────────────────────────────────
-
-
-def test_read_config_returns_config_dict(svc):
-    fake_config = {"llm": {"model": "qwen-plus"}, "retrieval": {"vector_top_k": 5}}
-
-    with patch("src.services.config_service.get_config", return_value=fake_config):
-        result = svc.read_config()
-
-    assert result == fake_config
-
-
-# ── update_config ─────────────────────────────────────────────────────
-
-
-def test_update_config_invalid_embedding_model_raises(svc):
-    with pytest.raises(ValueError, match="不支持的 Embedding 模型"):
-        svc.update_config({"embedding_model": "invalid-model-xyz"})
-
-
-def test_update_config_valid_embedding_model_allowed(svc):
-    fake_config = {"embedding": {}, "llm": {}}
+def test_update_config_persists_per_group_keys(svc, mock_settings_store):
+    fake_cfg = {"llm": {}, "embedding": {}, "reranker": {}}
 
     with (
         patch("builtins.open", create=True) as mock_open,
-        patch("yaml.safe_load", return_value=fake_config),
+        patch("yaml.safe_load", return_value=fake_cfg),
         patch("yaml.dump"),
         patch("src.services.config_service.get_config") as mock_get_config,
     ):
         mock_get_config.cache_clear = MagicMock()
-        mock_get_config.return_value = {"embedding": {"model": "text-embedding-v3"}}
+        mock_get_config.return_value = {}
         mock_open.return_value.__enter__ = MagicMock(return_value=MagicMock())
         mock_open.return_value.__exit__ = MagicMock(return_value=False)
 
-        # Should not raise for a valid model
-        import contextlib
+        svc.update_config(
+            {
+                "llm": {
+                    "api_base_url": "https://new-llm.com/v1",
+                    "api_key": "sk-new-llm",
+                    "model": "qwen-plus",
+                },
+                "embedding": {
+                    "api_base_url": "https://new-emb.com/v1",
+                    "api_key": "sk-new-emb",
+                    "model": "bge-m3",
+                },
+            }
+        )
 
-        with contextlib.suppress(Exception):  # file I/O errors are acceptable here; we only check no ValueError
-            svc.update_config({"embedding_model": "text-embedding-v3"})
+    calls = {c.args[0]: c.args[1] for c in mock_settings_store.set_setting.call_args_list}
+    assert calls["llm_api_base_url"] == "https://new-llm.com/v1"
+    assert calls["llm_api_key"] == "sk-new-llm"
+    assert calls["embedding_api_base_url"] == "https://new-emb.com/v1"
+    assert calls["embedding_api_key"] == "sk-new-emb"
+    # untouched groups should not appear
+    assert "fast_llm_api_key" not in calls
+    assert "reranker_api_key" not in calls
+
+
+def test_update_config_empty_key_keeps_existing(svc, mock_settings_store):
+    fake_cfg = {"llm": {}}
+
+    with (
+        patch("builtins.open", create=True) as mock_open,
+        patch("yaml.safe_load", return_value=fake_cfg),
+        patch("yaml.dump"),
+        patch("src.services.config_service.get_config") as mock_get_config,
+    ):
+        mock_get_config.cache_clear = MagicMock()
+        mock_get_config.return_value = {}
+        mock_open.return_value.__enter__ = MagicMock(return_value=MagicMock())
+        mock_open.return_value.__exit__ = MagicMock(return_value=False)
+
+        svc.update_config({"llm": {"api_base_url": "https://x.com/v1", "api_key": "", "model": "qwen-plus"}})
+
+    keys = [c.args[0] for c in mock_settings_store.set_setting.call_args_list]
+    assert "llm_api_key" not in keys  # empty key skipped
+    assert "llm_api_base_url" in keys  # URL still persisted
+
+
+# ── test_all_connections ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_test_all_connections_returns_all_groups(svc):
+    async def fake_fetch(url, key):
+        return ["model-a", "model-b"]
+
+    with (
+        patch(
+            "src.services.config_service.get_llm_credentials",
+            return_value=("https://x.com", "sk-x"),
+        ),
+        patch(
+            "src.services.config_service.get_fast_llm_credentials",
+            return_value=("https://x.com", "sk-x"),
+        ),
+        patch(
+            "src.services.config_service.get_embedding_credentials",
+            return_value=("https://x.com", "sk-x"),
+        ),
+        patch(
+            "src.services.config_service.get_reranker_credentials",
+            return_value=("https://x.com", "sk-x"),
+        ),
+        patch.object(ConfigService, "_fetch_remote_models", side_effect=fake_fetch),
+    ):
+        results = await svc.test_all_connections()
+
+    assert set(results.keys()) == set(GROUPS)
+    for group in GROUPS:
+        assert results[group]["ok"] is True
+        assert results[group]["models"] == ["model-a", "model-b"]
+
+
+@pytest.mark.asyncio
+async def test_test_all_connections_handles_missing_creds(svc):
+    async def fake_fetch(url, key):
+        return ["m1"]
+
+    with (
+        patch("src.services.config_service.get_llm_credentials", return_value=(None, "")),
+        patch(
+            "src.services.config_service.get_fast_llm_credentials",
+            return_value=("https://x.com", "sk-x"),
+        ),
+        patch("src.services.config_service.get_embedding_credentials", return_value=(None, "")),
+        patch("src.services.config_service.get_reranker_credentials", return_value=(None, "")),
+        patch.object(ConfigService, "_fetch_remote_models", side_effect=fake_fetch),
+    ):
+        results = await svc.test_all_connections()
+
+    assert results["llm"]["ok"] is False
+    assert "未配置" in results["llm"]["message"]
+    assert results["fast_llm"]["ok"] is True
