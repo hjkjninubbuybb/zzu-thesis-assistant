@@ -19,6 +19,14 @@ from src.api.schemas.chat import (
     SaveMessageRequest,
 )
 from src.api.schemas.common import MessageResponse
+from src.api.schemas.config import (
+    ApiInfoResponse,
+    ConfigUpdate,
+    GroupCredentials,
+    GroupInfo,
+    GroupTestResult,
+    TestConnectionResponse,
+)
 from src.api.schemas.document import (
     ChunkPreview,
     ChunkPreviewResult,
@@ -63,11 +71,13 @@ from src.api.schemas.user import (
 
 __all__ = [
     "ActiveKBResponse",
+    "ApiInfoResponse",
     "ChangePasswordRequest",
     "ChatRequest",
     "ChunkPreview",
     "ChunkPreviewResult",
     "CleanResult",
+    "ConfigUpdate",
     "ConfirmCleanRequest",
     "ConfirmIndexResult",
     "ConversationCreate",
@@ -86,6 +96,9 @@ __all__ = [
     "FAQSearchResponse",
     "FAQUpdate",
     "FeedbackRequest",
+    "GroupCredentials",
+    "GroupInfo",
+    "GroupTestResult",
     "HistoryMessage",
     "IndexRequest",
     "KBCreate",
@@ -109,6 +122,7 @@ __all__ = [
     "SetActiveKBRequest",
     "StudentProfileCreate",
     "TeacherProfileCreate",
+    "TestConnectionResponse",
     "UpdateProfileRequest",
     "UserCreate",
     "UserInfo",
