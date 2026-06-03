@@ -49,32 +49,51 @@ def get_config() -> dict:
     return _resolve_dict(raw)
 
 
-def get_api_key() -> str:
-    """获取 LLM API Key（数据库 system_settings 表，回退环境变量）。"""
+def _credential_pair(
+    group: str,
+    yaml_section: str,
+    yaml_url_field: str,
+    env_url: str,
+    env_key: str,
+) -> tuple[str | None, str]:
+    """读取某模型组的 (api_base_url, api_key)。
+
+    查找顺序：system_settings DB → 环境变量 → config.yaml。
+    """
+    url: str | None = None
+    key: str | None = None
     try:
         from src.storage.settings_store import SettingsStore
 
         store = SettingsStore()
-        # 兼容旧名称 dashscope_api_key
-        key = store.get_setting("api_key") or store.get_setting("dashscope_api_key")
-        if key:
-            return key
+        url = store.get_setting(f"{group}_api_base_url")
+        key = store.get_setting(f"{group}_api_key")
     except (ImportError, OSError, RuntimeError) as e:
-        logger.debug("[config] 无法从数据库读取 API Key，回退环境变量: %s", e)
-    return os.environ.get("LLM_API_KEY") or os.environ.get("DASHSCOPE_API_KEY", "")
+        logger.debug("[config] settings_store 不可用 (%s): %s", group, e)
+
+    if not url:
+        cfg = get_config()
+        url = cfg.get(yaml_section, {}).get(yaml_url_field) or os.environ.get(env_url)
+    if not key:
+        key = os.environ.get(env_key, "")
+    return url, key
 
 
-def get_api_base_url() -> str | None:
-    """获取 LLM API Base URL（数据库优先）。"""
-    try:
-        from src.storage.settings_store import SettingsStore
+def get_llm_credentials() -> tuple[str | None, str]:
+    """推理型 LLM（qwen-plus 等）。"""
+    return _credential_pair("llm", "llm", "api_base_url", "LLM_API_BASE_URL", "LLM_API_KEY")
 
-        store = SettingsStore()
-        url = store.get_setting("api_base_url")
-        if url:
-            return url
-    except (ImportError, OSError, RuntimeError) as e:
-        logger.debug("[config] 无法从数据库读取 api_base_url: %s", e)
 
-    cfg = get_config()
-    return cfg.get("llm", {}).get("api_base_url") or os.environ.get("LLM_API_BASE_URL")
+def get_fast_llm_credentials() -> tuple[str | None, str]:
+    """快速 LLM（qwen-turbo 等）。"""
+    return _credential_pair("fast_llm", "llm", "fast_api_base_url", "FAST_LLM_API_BASE_URL", "FAST_LLM_API_KEY")
+
+
+def get_embedding_credentials() -> tuple[str | None, str]:
+    """向量模型。"""
+    return _credential_pair("embedding", "embedding", "api_base_url", "EMBEDDING_API_BASE_URL", "EMBEDDING_API_KEY")
+
+
+def get_reranker_credentials() -> tuple[str | None, str]:
+    """重排序模型。"""
+    return _credential_pair("reranker", "reranker", "api_base_url", "RERANKER_API_BASE_URL", "RERANKER_API_KEY")
