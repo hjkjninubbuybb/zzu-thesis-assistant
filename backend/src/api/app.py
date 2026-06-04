@@ -197,9 +197,10 @@ def health():
         qdrant_ok = False
 
     # DashScope API key 存在即视为可用（避免计费探测）
-    from src.config import get_api_key
+    from src.config import get_llm_credentials
 
-    dashscope_ok = bool(get_api_key().strip())
+    _, _llm_key = get_llm_credentials()
+    dashscope_ok = bool(_llm_key.strip())
 
     return {
         "fastapi": True,

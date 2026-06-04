@@ -1,11 +1,16 @@
-"""DashScope Embedding 封装，实现 BaseEmbedder 接口。"""
+"""DashScope Embedding 封装，实现 BaseEmbedder 接口。
+
+注：当前底层使用 llama_index 的 DashScopeEmbedding（DashScope 原生 SDK），
+仅 api_key 生效；api_base_url 字段已通过 4 组凭据机制纳入配置，但 DashScope
+SDK 内部走固定端点，URL 暂未通到 SDK 层（后续如需切换其他平台再换 OpenAI 兼容客户端）。
+"""
 
 from llama_index.embeddings.dashscope import (
     DashScopeEmbedding,
     DashScopeTextEmbeddingModels,
 )
 
-from src.config import get_api_key, get_config
+from src.config import get_config, get_embedding_credentials
 from src.core.interfaces import BaseEmbedder
 
 _MODEL_MAP = {
@@ -21,10 +26,11 @@ class DashScopeEmbedder(BaseEmbedder):
         cfg = get_config()
         model_name = cfg["embedding"].get("model", "text-embedding-v3")
         embed_batch_size = cfg["embedding"].get("embed_batch_size", 10)
+        _url, key = get_embedding_credentials()
         self._model = DashScopeEmbedding(
             model_name=_MODEL_MAP.get(model_name, DashScopeTextEmbeddingModels.TEXT_EMBEDDING_V3),
             text_type=text_type,
-            api_key=get_api_key(),
+            api_key=key,
             embed_batch_size=embed_batch_size,
         )
 
@@ -40,9 +46,10 @@ def get_embed_model(text_type: str = "document") -> DashScopeEmbedding:
     cfg = get_config()
     model_name = cfg["embedding"].get("model", "text-embedding-v3")
     embed_batch_size = cfg["embedding"].get("embed_batch_size", 10)
+    _url, key = get_embedding_credentials()
     return DashScopeEmbedding(
         model_name=_MODEL_MAP.get(model_name, DashScopeTextEmbeddingModels.TEXT_EMBEDDING_V3),
         text_type=text_type,
-        api_key=get_api_key(),
+        api_key=key,
         embed_batch_size=embed_batch_size,
     )

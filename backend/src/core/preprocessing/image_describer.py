@@ -17,7 +17,7 @@ import logging
 import re
 from pathlib import Path
 
-from src.config import get_api_key
+from src.config import get_llm_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +100,11 @@ def _describe_images_batch(
     )
 
     try:
+        _url, _key = get_llm_credentials()  # VLM rides on the reasoning LLM creds (spec §6)
         resp = MultiModalConversation.call(
             model=vlm_model,
             messages=[{"role": "user", "content": content}],
-            api_key=get_api_key(),
+            api_key=_key,
         )
         if resp.status_code != 200:
             logger.warning("[image_describer] VLM 批量描述失败 HTTP %s", resp.status_code)
