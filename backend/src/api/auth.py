@@ -151,6 +151,13 @@ def require_teacher_or_admin(current_user: dict = Depends(get_current_user)) -> 
     return current_user
 
 
+def require_teacher(current_user: dict = Depends(get_current_user)) -> dict:
+    """仅 teacher 可访问。"""
+    if current_user["role"] != "teacher":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要教师权限")
+    return current_user
+
+
 # ── 启动时初始化 ──────────────────────────────────────────────
 
 
