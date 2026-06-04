@@ -31,7 +31,8 @@ import type {
   PaginatedDocs,
   StudentProfileCreate,
   TeacherProfileCreate,
-  ApiKeyInfo,
+  ApiInfo,
+  TestConnectionResult,
   AnalyticsSummary,
   QARequestInfo,
   QARequestCreate,
@@ -365,24 +366,9 @@ export const documentApi = {
 export const configApi = {
   get: () => client.get<SystemConfig>('/config').then((r) => r.data),
   update: (body: ConfigUpdate) => client.post<SystemConfig>('/config', body).then((r) => r.data),
-  getApiKey: () =>
-    client.get<ApiKeyInfo & { api_base_url: string }>('/config/api-key').then((r) => r.data),
-  updateApiKey: (apiKey: string, apiBaseUrl?: string) =>
-    client
-      .put<{ message: string; has_key: boolean }>('/config/api-key', {
-        api_key: apiKey,
-        api_base_url: apiBaseUrl,
-      })
-      .then((r) => r.data),
-  testApiKey: () =>
-    client
-      .post<{
-        ok: boolean;
-        message: string;
-        models?: string[];
-      }>('/config/api-key/test')
-      .then((r) => r.data),
-  getModels: () => client.get<string[]>('/config/models').then((r) => r.data),
+  getApiInfo: () => client.get<ApiInfo>('/config/api-info').then((r) => r.data),
+  testConnection: () =>
+    client.post<TestConnectionResult>('/config/test-connection').then((r) => r.data),
 };
 
 // ── FAQ API ───────────────────────────────────────────────
