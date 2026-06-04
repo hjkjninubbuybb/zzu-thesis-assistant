@@ -115,3 +115,83 @@ class TicketStore:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT * FROM qa_requests WHERE id = %s", (request_id,))
             return cur.fetchone()
+
+    def count_pending_by_mentor(self, mentor_id: int) -> int:
+        """计算 mentor 名下 pending 工单数。
+
+        Args:
+            mentor_id: 导师用户 ID。
+
+        Returns:
+            status='pending' 的工单数量。
+        """
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) AS cnt FROM qa_requests WHERE mentor_id = %s AND status = 'pending'",
+                (mentor_id,),
+            )
+            row = cur.fetchone()
+            return int(row["cnt"]) if row else 0
+
+    def list_recent_events_by_mentor(self, mentor_id: int, limit: int) -> list[dict]:
+        """返回该 mentor 名下最近 limit 个工单事件，按 occurred_at 倒序。
+
+        事件类型：
+        - ticket_created：工单创建（created_at）
+        - ticket_replied：导师已回复（replied_at，status='replied'）
+        - ticket_closed：工单已关闭（replied_at，status='closed'）
+
+        注意：qa_requests 表无 closed_at 列，closed 事件使用 replied_at 时间戳。
+
+        Args:
+            mentor_id: 导师用户 ID。
+            limit: 最多返回条数。
+
+        Returns:
+            事件 dict 列表，每项包含 event_type / student_id / student_name /
+            ticket_id / ticket_title / occurred_at，按 occurred_at 倒序。
+        """
+        with get_conn() as conn, conn.cursor() as cur:
+            sql = """
+                SELECT 'ticket_created' AS event_type,
+                       qa.student_id,
+                       u.display_name AS student_name,
+                       qa.id AS ticket_id,
+                       qa.question AS ticket_title,
+                       qa.created_at AS occurred_at
+                  FROM qa_requests qa
+                  JOIN users u ON u.id = qa.student_id
+                 WHERE qa.mentor_id = %s
+                UNION ALL
+                SELECT 'ticket_replied',
+                       qa.student_id,
+                       u.display_name,
+                       qa.id,
+                       qa.question,
+                       qa.replied_at
+                  FROM qa_requests qa
+                  JOIN users u ON u.id = qa.student_id
+                 WHERE qa.mentor_id = %s
+                   AND qa.status = 'replied'
+                   AND qa.replied_at IS NOT NULL
+                UNION ALL
+                SELECT 'ticket_closed',
+                       qa.student_id,
+                       u.display_name,
+                       qa.id,
+                       qa.question,
+                       qa.replied_at
+                  FROM qa_requests qa
+                  JOIN users u ON u.id = qa.student_id
+                 WHERE qa.mentor_id = %s
+                   AND qa.status = 'closed'
+                   AND qa.replied_at IS NOT NULL
+                ORDER BY occurred_at DESC
+                LIMIT %s
+            """
+            cur.execute(sql, (mentor_id, mentor_id, mentor_id, int(limit)))
+            rows = cur.fetchall() or []
+            for r in rows:
+                title = r.get("ticket_title") or ""
+                r["ticket_title"] = title[:60]
+            return list(rows)

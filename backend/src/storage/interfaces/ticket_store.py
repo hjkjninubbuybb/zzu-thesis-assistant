@@ -40,3 +40,20 @@ class BaseTicketStore(Protocol):
     def get_qa_request(self, request_id: int) -> dict | None:
         """按 ID 查询工单，不存在返回 None。"""
         ...
+
+    def count_pending_by_mentor(self, mentor_id: int) -> int:
+        """返回该 mentor 名下 status='pending' 的工单数。"""
+        ...
+
+    def list_recent_events_by_mentor(self, mentor_id: int, limit: int) -> list[dict]:
+        """返回该 mentor 名下最近 limit 个工单事件，按 occurred_at 倒序。
+
+        每个事件 dict 字段：
+            event_type: 'ticket_created' | 'ticket_replied' | 'ticket_closed'
+            student_id: int
+            student_name: str
+            ticket_id: int
+            ticket_title: str  (取 question 前 60 字符)
+            occurred_at: datetime
+        """
+        ...
