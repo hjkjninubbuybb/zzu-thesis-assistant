@@ -1,93 +1,40 @@
-import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsService } from '../services/settingsService';
 import { settingsKeys } from './queryKeys';
 import { useToast } from '@shared/store/uiStore';
-import { handleMutationError } from '@shared/lib/errorHandler';
+import type { ApiGroup, TestConnectionResult } from '@shared/types/api';
+
+const ALL_GROUPS: ApiGroup[] = ['llm', 'fast_llm', 'embedding', 'reranker'];
 
 export function useApiKeyManager() {
   const qc = useQueryClient();
   const { showToast } = useToast();
 
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [apiUrlInput, setApiUrlInput] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const [isEditingKey, setIsEditingKey] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    ok: boolean;
-    message: string;
-    models?: string[];
-  } | null>(null);
-
-  const { data: apiKeyInfo } = useQuery({
-    queryKey: settingsKeys.apiKey(),
-    queryFn: settingsService.getApiKey,
+  const { data: apiInfo, isLoading: apiInfoLoading } = useQuery({
+    queryKey: settingsKeys.apiInfo(),
+    queryFn: settingsService.getApiInfo,
   });
 
-  const { data: availableModels } = useQuery({
-    queryKey: settingsKeys.models(),
-    queryFn: settingsService.getModels,
-    enabled: !!apiKeyInfo?.has_key,
-  });
-
-  useEffect(() => {
-    if (apiKeyInfo) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setApiUrlInput(apiKeyInfo.api_base_url || '');
-    }
-  }, [apiKeyInfo]);
-
-  const apiKeyMutation = useMutation({
-    mutationFn: () => settingsService.updateApiKey(apiKeyInput, apiUrlInput),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: settingsKeys.apiKey() });
-      qc.invalidateQueries({ queryKey: settingsKeys.models() });
-      setApiKeyInput('');
-      setShowKey(false);
-      setIsEditingKey(false);
-      setTestResult(null);
-      showToast('API 信息已更新', 'success');
-    },
-    onError: (err) => handleMutationError(err, showToast),
-  });
-
-  const testMutation = useMutation({
-    mutationFn: settingsService.testApiKey,
+  const testMutation = useMutation<TestConnectionResult>({
+    mutationFn: settingsService.testConnection,
     onSuccess: (data) => {
-      setTestResult(data);
-      if (data.ok) qc.invalidateQueries({ queryKey: settingsKeys.models() });
+      const failed = ALL_GROUPS.filter((g) => !data[g].ok);
+      if (failed.length === 0) {
+        showToast('全部 4 组连接成功', 'success');
+      } else {
+        showToast(`${failed.length} 组连接失败：${failed.join(', ')}`, 'error');
+      }
     },
-    onError: (err) => {
-      const message = err instanceof Error ? err.message : '连接测试失败';
-      setTestResult({ ok: false, message });
-    },
+    onError: () => showToast('测试连接失败', 'error'),
   });
-
-  const cancelEdit = () => {
-    setIsEditingKey(false);
-    setApiKeyInput('');
-    setShowKey(false);
-  };
-
-  const startEdit = () => {
-    setIsEditingKey(true);
-    setShowKey(false);
-  };
 
   return {
-    apiKeyInfo,
-    availableModels,
-    apiKeyInput,
-    setApiKeyInput,
-    apiUrlInput,
-    setApiUrlInput,
-    showKey,
-    setShowKey,
-    isEditingKey,
-    startEdit,
-    cancelEdit,
-    testResult,
-    apiKeyMutation,
+    apiInfo,
+    apiInfoLoading,
     testMutation,
+    /** Per-group model lists (only populated after testMutation succeeds). */
+    perGroupModels: testMutation.data,
+    /** Convenience: invalidate api-info after successful save. */
+    invalidateApiInfo: () => qc.invalidateQueries({ queryKey: settingsKeys.apiInfo() }),
   };
 }
