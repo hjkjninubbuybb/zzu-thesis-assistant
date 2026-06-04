@@ -5,10 +5,12 @@ import { settingsKeys } from './queryKeys';
 import { useToast } from '@shared/store/uiStore';
 import { handleMutationError } from '@shared/lib/errorHandler';
 import { DEFAULT_FORM, configToForm } from './settingsForm';
-import type { FormState } from './settingsForm';
+import type { FormState, ApiGroupForm } from './settingsForm';
 
-export type { DocTypeSplitterForm, FormState } from './settingsForm';
+export type { DocTypeSplitterForm, FormState, ApiGroupForm } from './settingsForm';
 export { DEFAULT_FORM } from './settingsForm';
+
+const GROUPS = ['llm', 'fast_llm', 'embedding', 'reranker'] as const;
 
 export function useSettings() {
   const qc = useQueryClient();
@@ -28,14 +30,11 @@ export function useSettings() {
   const saveMutation = useMutation({
     mutationFn: () =>
       settingsService.update({
-        llm_model: form.llm_model,
-        llm_fast_model: form.llm_fast_model,
-        embedding_model: form.embedding_model,
+        ...Object.fromEntries(GROUPS.map((g) => [g, form[g]])),
         vector_top_k: form.vector_top_k,
         bm25_top_k: form.bm25_top_k,
         hybrid_top_k: form.hybrid_top_k,
         rrf_k: form.rrf_k,
-        reranker_model: form.reranker_model,
         reranker_top_n: form.reranker_top_n,
         max_reformulations: form.max_reformulations,
         agent_recursion_limit: form.agent_recursion_limit,
@@ -64,6 +63,15 @@ export function useSettings() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: settingsKeys.config() });
+      qc.invalidateQueries({ queryKey: settingsKeys.apiInfo() });
+      // Clear stored keys in form so subsequent saves don't resend them
+      setForm((prev) => ({
+        ...prev,
+        llm: { ...prev.llm, api_key: '' },
+        fast_llm: { ...prev.fast_llm, api_key: '' },
+        embedding: { ...prev.embedding, api_key: '' },
+        reranker: { ...prev.reranker, api_key: '' },
+      }));
       showToast('配置已保存', 'success');
     },
     onError: (err) => handleMutationError(err, showToast),
@@ -72,12 +80,15 @@ export function useSettings() {
   const updateConfig = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const updateGroup = (group: (typeof GROUPS)[number], patch: Partial<ApiGroupForm>) =>
+    setForm((prev) => ({ ...prev, [group]: { ...prev[group], ...patch } }));
+
   return {
     config: form,
     isLoading,
     updateConfig,
+    updateGroup,
     isSaving: saveMutation.isPending,
-    // expose mutate for components that need to trigger save
     save: () => saveMutation.mutate(),
   };
 }
