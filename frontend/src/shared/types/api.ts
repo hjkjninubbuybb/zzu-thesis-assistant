@@ -358,9 +358,21 @@ export interface DocTypeSplitterParams {
   enable_cleaning?: boolean;
 }
 
+export type ApiGroup = 'llm' | 'fast_llm' | 'embedding' | 'reranker';
+
 export interface SystemConfig {
-  llm: { model: string; fast_model: string; api_base_url?: string };
-  embedding: { model: string; dimension: number; embed_batch_size: number };
+  llm: {
+    model: string;
+    fast_model: string;
+    api_base_url?: string;
+    fast_api_base_url?: string;
+  };
+  embedding: {
+    model: string;
+    dimension: number;
+    embed_batch_size: number;
+    api_base_url?: string;
+  };
   splitter: {
     strategy?: string;
     chunk_size: number;
@@ -377,7 +389,7 @@ export interface SystemConfig {
     hybrid_top_k: number;
     rrf_k: number;
   };
-  reranker: { model: string; top_n: number };
+  reranker: { model: string; top_n: number; api_base_url?: string };
   rag: {
     max_reformulations: number;
     agent_recursion_limit: number;
@@ -403,27 +415,45 @@ export interface SplitterConfigUpdate {
   form?: DocTypeSplitterUpdate;
 }
 
+export interface GroupCredentialsUpdate {
+  api_base_url?: string;
+  /** Empty string means: keep existing key. */
+  api_key?: string;
+  model?: string;
+}
+
 export interface ConfigUpdate {
-  llm_base_url?: string;
-  llm_model?: string;
-  llm_fast_model?: string;
-  embedding_model?: string;
+  llm?: GroupCredentialsUpdate;
+  fast_llm?: GroupCredentialsUpdate;
+  embedding?: GroupCredentialsUpdate;
+  reranker?: GroupCredentialsUpdate;
   splitter?: SplitterConfigUpdate;
   vector_top_k?: number;
   bm25_top_k?: number;
   hybrid_top_k?: number;
   rrf_k?: number;
-  reranker_model?: string;
   reranker_top_n?: number;
   max_reformulations?: number;
   agent_recursion_limit?: number;
   agent_retry_count?: number;
 }
 
-export interface ApiKeyInfo {
+export interface GroupInfo {
   has_key: boolean;
   masked_key: string;
+  api_base_url: string | null;
+  model: string | null;
 }
+
+export type ApiInfo = Record<ApiGroup, GroupInfo>;
+
+export interface GroupTestResult {
+  ok: boolean;
+  message: string;
+  models: string[];
+}
+
+export type TestConnectionResult = Record<ApiGroup, GroupTestResult>;
 
 // ── 使用统计 ──────────────────────────────────────────────
 
