@@ -13,6 +13,7 @@ from src.services.conversation_service import ConversationService
 from src.services.document_service import DocumentService
 from src.services.faq_service import FAQService
 from src.services.knowledge_service import KnowledgeService
+from src.services.mentor_service import MentorService
 from src.services.ticket_service import TicketService
 from src.services.user_service import UserService
 from src.storage.conversation_store import ConversationStore
@@ -137,3 +138,10 @@ def get_document_service(
     vector_store: VectorStore = Depends(get_vector_store),
 ) -> DocumentService:
     return DocumentService(doc_store=doc_store, kb_store=kb_store, vector_store=vector_store)
+
+
+def get_mentor_service(
+    user_store: UserStore = Depends(get_user_store),
+    ticket_store: TicketStore = Depends(get_ticket_store),
+) -> MentorService:
+    return MentorService(user_store=user_store, ticket_store=ticket_store)
