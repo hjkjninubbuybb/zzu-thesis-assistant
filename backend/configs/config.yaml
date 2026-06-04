@@ -1,0 +1,81 @@
+qdrant:
+  url: http://localhost:6333
+  timeout: 30
+embedding:
+  api_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model: text-embedding-v3
+  dimension: 1024
+  embed_batch_size: 10
+llm:
+  api_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1      # 推理型 LLM 平台
+  fast_api_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # 快速 LLM 平台
+  model: qwen-plus       # 主模型：对话生成、文档清洗改写
+  fast_model: qwen-turbo # 快速模型：简单判断任务（如清洗质量评估）
+vlm:
+  model: qwen-vl-plus    # 图文模式：VLM 批量图片描述（batch=8 最优）
+splitter:
+  chunk_size: 256
+  chunk_overlap_ratio: 0.2
+  separators: chinese_markdown
+  policy:
+    type: recursive            # 纯文本文档：实验最优策略
+    chunk_size: 512
+    chunk_overlap_ratio: 0.1
+    enable_cleaning: true
+  manual:
+    type: manual_step          # 图文混排文档：按步骤结构切分 + LLM 语义抽取
+    use_llm: true
+    chunk_size: 256
+    chunk_overlap_ratio: 0.1
+    enable_cleaning: true
+  form:
+    type: recursive            # 模板文档：表格在解析阶段已分离，文本部分用 recursive
+    chunk_size: 256
+    chunk_overlap_ratio: 0.0
+    enable_cleaning: false
+  semantic:                    # semantic 类型专用参数（任意 doc_type 可选用）
+    buffer_size: 2
+    breakpoint_percentile_threshold: 90
+faq:
+  score_threshold: 0.75     # FAQ 语义匹配阈值，>= 走快答，< 走 RAG Agent
+retrieval:
+  vector_top_k: 10
+  bm25_top_k: 10
+  hybrid_top_k: 15
+  rrf_k: 60
+  query_enhance: true
+  protect_raw_top_n: 1
+reranker:
+  api_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model: gte-rerank
+  top_n: 5
+rag:
+  max_reformulations: 2
+  agent_recursion_limit: 15
+  agent_retry_count: 3
+server:
+  api_host: 0.0.0.0
+  api_port: 8000
+  # 前端来源白名单（CORS）。前端独立部署时按实际域名填写。
+  cors_origins:
+    - http://localhost:5173      # Vite dev 默认端口
+    - http://127.0.0.1:5173
+    - http://localhost:7860      # 旧前端 dev 端口（保留兼容）
+    - http://127.0.0.1:7860
+    - http://localhost:3000      # 备用
+    - http://127.0.0.1:3000
+database:
+  host: ${MYSQL_HOST:-localhost}
+  port: 3306
+  user: ${MYSQL_USER:-rag_user}
+  password: ${MYSQL_PASSWORD:-rag_pass_123}
+  database: rag_db
+  pool_size: 5
+  pool_recycle: 3600
+auth:
+  secret_key: ${AUTH_SECRET_KEY:-change-me-in-production-please}
+  algorithm: HS256
+  access_token_expire_minutes: 480   # 8小时
+  refresh_token_expire_days: 30
+  default_admin_username: admin
+  default_admin_password: admin123

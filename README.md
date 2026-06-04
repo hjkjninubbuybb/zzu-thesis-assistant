@@ -81,6 +81,7 @@ cd zzu-thesis-assistant
 ### 第三步：安装后端依赖
 
 ```bash
+cd backend
 poetry install
 ```
 
@@ -101,26 +102,31 @@ cd ..
 
 ---
 
-### 第五步：确保 Docker 运行时已启动
+### 第五步：启动基础设施（MySQL + Qdrant）
 
-程序启动时会**自动执行** `docker compose up -d` 并等待 MySQL / Qdrant 就绪，无需手动操作。
-但需要先确保 Docker daemon 本身在运行：
+```bash
+docker-compose -f infra/docker-compose.yml up -d
+```
+
+确保 Docker daemon 本身在运行：
 
 - **macOS（Colima）**：`colima start`
 - **macOS / Windows（Docker Desktop）**：打开 Docker Desktop 应用，等待托盘图标变绿
-- **Linux**：`sudo systemctl start docker`（或上一步已 enable，重登后自动启动）
+- **Linux**：`sudo systemctl start docker`
 
 ---
 
 ### 第六步：启动服务
 
 ```bash
-# 生产模式：前后端统一在 :8000
-poetry run start
+# 后端（:8000）
+cd backend && poetry run dev
 
-# 开发模式：前端 :5173（热重载）+ 后端 :8000（热重载）
-poetry run dev
+# 前端（:5173，开新终端）
+cd frontend && npm run dev
 ```
+
+> 前后端**完全分开**：后端只暴露 `/api/*`，前端独立运行在 :5173，通过 CORS 访问后端。
 
 启动时程序会自动完成：
 - 检测并启动 Colima（macOS）
@@ -171,7 +177,7 @@ poetry run dev
 # JWT 签名密钥（默认值不安全）
 export AUTH_SECRET_KEY=你的随机长字符串
 
-# MySQL 密码（需与 docker-compose.yml 中保持一致）
+# MySQL 密码（需与 infra/docker-compose.yml 中保持一致）
 export MYSQL_PASSWORD=你的数据库密码
 ```
 
@@ -211,9 +217,8 @@ export MYSQL_PASSWORD=你的数据库密码
                    ▼
 ┌─────────────────────────────────────────┐
 │ 第二层：RAG Core（rag_pipeline.py）       │
-│  StateGraph 四条路由：                   │
-│   hard_rag → 严苛 CRAG 评估 + 重写       │
-│   easy_rag → 快速检索，有结果即通过       │
+│  StateGraph 三条路由：                   │
+│   hard_rag → CRAG 深度评估 + 重写         │
 │   download → 文件卡片下发                │
 │   direct   → 闲聊直接生成                │
 │  混合检索（Vector + BM25 + RRF）          │
@@ -221,12 +226,11 @@ export MYSQL_PASSWORD=你的数据库密码
 └─────────────────────────────────────────┘
 ```
 
-### RAG Pipeline 四条路由
+### RAG Pipeline 三条路由
 
 | 路由 | 触发条件 | 检索策略 |
 |------|---------|---------|
-| `hard_rag` | 涉及具体政策、时间节点、多实体对比 | 检索 + 慢模型 CRAG 评估 + 最多 3 次重写 |
-| `easy_rag` | 简单常识、基础概念 | 检索，有结果即通过 |
+| `hard_rag` | 所有毕设相关的实质性问题 | 检索 + 强能力模型 CRAG 评估 + 最多 3 次重写 |
 | `download` | 明确要求下载/获取文件 | 跳过检索，直接匹配文件 |
 | `direct` | 闲聊、非毕设相关 | 跳过检索，直接生成 |
 
@@ -261,108 +265,42 @@ query → enhance_query（规则扩写）
 
 ## 目录结构
 
+前后端**完全分开**为两个独立项目：
+
 ```
 rag1.0/
-├── configs/
-│   └── config.yaml              # 全局配置（模型/检索/DB/Auth 等所有参数）
-├── sql/
-│   └── init.sql                 # MySQL 建表 DDL + 预置数据
-├── docker-compose.yml           # Qdrant + MySQL 容器
-├── pyproject.toml               # Poetry 依赖 + scripts（start/dev）
-├── .env                         # 环境变量（不提交 git）
-├── data/
-│   ├── images/                  # VLM 图片缓存（按 kb_name/md5 组织）
-│   └── calendar_cache.json      # 学术日历缓存
-├── scripts/
-│   ├── seed_demo_data.py        # 初始化演示数据
-│   ├── seed_doc00_faqs.py       # 批量导入 FAQ
-│   ├── evaluate_rag_dataset.py  # RAG 评测（完整数据集）
-│   ├── evaluate_ragas_like_judge.py  # RAGAS 风格裁判评测
-│   └── test_form_extraction.py  # form 提取功能测试
-├── src/
-│   ├── main.py                  # 启动入口（run/dev，自动管理 Docker + Vite）
-│   ├── config.py                # YAML + env 配置加载（LRU cached，支持 DB 覆盖）
-│   ├── api/
-│   │   ├── app.py               # FastAPI 实例、路由注册、静态托管、startup hook
-│   │   ├── auth.py              # JWT 生成/验证、bcrypt、角色守卫、ensure_default_admin
-│   │   ├── schemas.py           # 所有 Pydantic 请求/响应模型
-│   │   └── routes/
-│   │       ├── auth.py          # /api/auth/* (login/refresh/me/password)
-│   │       ├── chat.py          # /api/chat  (SSE 流式，双层问答入口)
-│   │       ├── knowledge.py     # /api/knowledge/* (KB CRUD + active 设置)
-│   │       ├── document.py      # /api/document/* (上传/下载/重索引/删除)
-│   │       ├── faq.py           # /api/faq/* (CRUD + 批量导入导出 + 语义搜索)
-│   │       ├── conversation.py  # /api/conversation/* (对话/消息/反馈)
-│   │       ├── user.py          # /api/users/* (用户管理 + 学生/教师批量导入 + 导师关系)
-│   │       ├── ticket.py        # /api/tickets/* (学生求助工单 → 导师回答)
-│   │       ├── config.py        # /api/config/* (系统配置 + API Key 管理)
-│   │       └── analytics.py     # /api/analytics/summary
-│   ├── core/
-│   │   ├── faq_match.py         # FAQ 防线：改写 → embed → Qdrant → fast_model
-│   │   ├── rag_pipeline.py      # 主 RAG：手写 StateGraph + CRAG + safety guards
-│   │   ├── tools.py             # Agent 工具（4 个：日历/文档列表/检索/文件链接）
-│   │   ├── retrieval.py         # 混合检索：VectorRetriever + BM25Retriever + HybridRetriever
-│   │   ├── retrieval_strategy.py # enhance_query（规则扩写）+ protect_raw_candidates
-│   │   ├── reranker.py          # DashScope GTE-Rerank（分批并行）
-│   │   ├── embedding.py         # DashScope Embedding 工厂函数
-│   │   ├── indexing.py          # 文档入库分发（policy/manual/form 三条流水线）
-│   │   ├── splitter.py          # 5 种切分策略工厂
-│   │   ├── splitter_manual.py   # 操作手册步骤级切分（规则解析 + LLM 语义提取）
-│   │   ├── image_describer.py   # VLM 批量图片描述（qwen-vl-plus，batch=8，MD5 缓存）
-│   │   ├── cleaning/            # LangGraph 文本清洗子图
-│   │   │   ├── graph.py         # optimizer → placeholder_check → evaluator
-│   │   │   ├── nodes.py         # 三个节点实现
-│   │   │   ├── prompts.py       # 清洗 / 评估 LLM 提示词
-│   │   │   └── state.py         # CleaningState TypedDict
-│   │   └── form_extraction/     # LangGraph 表单提取子图（Evaluator-Optimizer）
-│   │       ├── graph.py         # extractor → evaluator → 条件循环（最多 3 次）
-│   │       ├── nodes.py         # extractor_node（强模型）+ evaluator_node（快速模型）
-│   │       ├── prompts.py       # 提取 / 评估提示词
-│   │       └── state.py         # FormExtractionState TypedDict
-│   ├── storage/
-│   │   ├── database.py          # PyMySQL + DBUtils 连接池（DictCursor）
-│   │   ├── document_store.py    # MySQL CRUD：KB/文档/FAQ/对话/消息/反馈/工单/系统设置
-│   │   ├── user_store.py        # MySQL CRUD：用户/学生档案/教师档案/登录日志/导师关系
-│   │   └── vector_store.py      # Qdrant 封装：集合管理/向量 CRUD/payload 过滤
-│   └── parsers/                 # 文档解析器（PDF/DOCX/TXT/MD）
-│       ├── base.py
-│       ├── registry.py
-│       ├── converter.py         # Word → PDF 转换
-│       ├── txt_parser.py
-│       ├── docx_parser.py
-│       └── pdf/
-│           ├── pdf_parser.py
-│           ├── text_extractor.py    # pymupdf4llm 多模态提取
-│           ├── image_extractor.py
-│           └── table_extractor.py
-└── frontend/
-    ├── vite.config.ts
-    ├── package.json
-    └── src/
-        ├── main.tsx / App.tsx
-        ├── lib/
-        │   ├── api.ts           # Axios client（自动 refresh）+ 9 个 API 模块
-        │   └── auth.ts          # token 存取
-        ├── types/api.ts         # 所有接口 TypeScript 类型定义
-        ├── hooks/useAuth.ts
-        ├── components/          # AuthProvider / RouteGuard / Layout / 通用组件
-        └── pages/
-            ├── LoginPage.tsx
-            ├── OverviewPage.tsx         # 总览仪表盘
-            ├── KnowledgeBasePage.tsx    # 知识库管理
-            ├── DocumentPage.tsx         # 文档管理（上传/重索引）
-            ├── FaqPage.tsx              # FAQ 管理（CRUD + 批量）
-            ├── ConversationsPage.tsx    # 对话历史（管理员视角）
-            ├── StudentsPage.tsx         # 学生账号管理 + 导师绑定
-            ├── TeachersPage.tsx         # 教师账号管理
-            ├── TicketsPage.tsx          # 导师 Q&A 工单
-            ├── SettingsPage.tsx         # 系统配置（模型/检索/API Key）
-            ├── AnalyticsPage.tsx        # 使用统计
-            └── student/
-                ├── StudentHomePage.tsx  # 学生聊天主界面
-                ├── StudentFaqPage.tsx   # FAQ 浏览
-                ├── StudentProfilePage.tsx
-                └── StudentTicketsPage.tsx  # 学生工单（求助导师）
+├── backend/                  ← Python / FastAPI 后端
+│   ├── src/                  # api / services / core / storage / parsers
+│   ├── tests/                # pytest 测试，镜像 src/ 结构
+│   ├── evaluation/           # RAG 评测套件（独立于 tests/）
+│   ├── configs/config.yaml   # 全局配置
+│   ├── sql/init.sql          # MySQL DDL
+│   ├── scripts/              # 一次性工具脚本（seed/migrate/normalize）
+│   ├── data/                 # 运行时数据（gitignore）
+│   ├── pyproject.toml + poetry.lock
+│   ├── CLAUDE.md             # 后端编码规范入口
+│   └── docs/standards.md     # 后端完整规范（1200+ 行）
+│
+├── frontend/                 ← React / TypeScript / Vite 前端
+│   ├── src/                  # app / features / pages / shared
+│   ├── e2e/                  # Playwright 端到端测试
+│   ├── package.json + vite.config.ts
+│   ├── CLAUDE.md             # 前端编码规范入口
+│   └── docs/standards.md     # 前端完整规范（1000+ 行）
+│
+├── infra/
+│   └── docker-compose.yml    # Qdrant + MySQL 容器（前后端共用基础设施）
+│
+├── docs/                     # 跨项目文档
+│   ├── directory-layout.md   # 顶层目录规范
+│   └── superpowers/specs/    # 历史设计稿
+│
+├── .github/                  # CI 工作流（path filter 区分前后端）
+├── CLAUDE.md                 # 顶层薄入口，指向 backend/ + frontend/
+└── README.md
+```
+
+详细的内部结构和模块职责见各项目的 `docs/standards.md` 和顶层 [docs/directory-layout.md](./docs/directory-layout.md)。
 ```
 
 ---
@@ -387,12 +325,12 @@ raw_query
 
 | 节点 | 模型 | 职责 |
 |------|------|------|
-| `router_node` | fast_model | 意图分类（4 路由）+ 任务拆解 + 文件 hint 提取 |
+| `router_node` | fast_model | 意图分类（3 路由）+ 任务拆解 + 文件 hint 提取 |
 | `retrieve_node` | — | 占位节点，实际检索由调用方注入 |
-| `grade_documents_node` | 强能力模型 | CRAG 严苛评估（仅 hard_rag 触发） |
+| `grade_documents_node` | 强能力模型 | CRAG 深度评估（hard_rag 触发） |
 | `rewrite_query_node` | fast_model | 检索失败时改写查询词 |
 | `document_link_node` | — | 文件模糊匹配，生成下载卡片 |
-| `generate_node` | 强/快速模型 | 最终回答生成（含 safety guards 拦截） |
+| `generate_node` | 强能力模型 | 最终回答生成（含 safety guards 拦截） |
 
 **Safety Guards**：`_apply_answer_safety_guards()` 内置 20+ 条针对高频错误答案的硬编码规则（如查重率标准、开题时间、指导人数上限等），在 LLM 生成后直接替换，避免模型幻觉。
 
@@ -708,26 +646,29 @@ system_settings(key PK, value TEXT)
 
 ## 开发工作流
 
+> 完整流程见 [backend/docs/standards.md § 9 新增功能标准流程](./backend/docs/standards.md#9-新增功能标准流程)。以下为速查。
+
 ### 添加新 API 路由
 
-1. 在 `src/api/routes/` 新建路由文件
-2. 在 `src/api/schemas.py` 添加 Pydantic 模型
-3. 在 `src/api/app.py` 注册 `app.include_router()`（必须在 SPA fallback 之前）
-4. 所有路由添加认证依赖：`Depends(get_current_user)` 或更高权限
+1. 在 `backend/src/api/schemas/<域>.py` 添加 Pydantic 模型
+2. 如需新存储操作，先在 `backend/src/storage/interfaces/<store>.py` 加接口
+3. 在 `backend/src/services/<service>.py` 实现业务逻辑（不抛 HTTPException）
+4. 在 `backend/src/api/deps.py` 注册 Service 工厂函数
+5. 在 `backend/src/api/routes/<域>.py` 加路由函数，调 Service
+6. 加认证依赖：`Depends(get_current_user)` / `require_admin` 等
 
 ### 添加新 Agent 工具
 
-1. 在 `src/core/tools.py` 添加 `@tool` 函数（或工厂函数）
+1. 在 `backend/src/core/agent/tools/<tool>.py` 定义 `@tool` 函数
 2. 工具必须返回 `str`，内部异常必须捕获
 3. docstring 写清楚"何时调用、参数含义"（LLM 会读）
-4. 在 `src/api/routes/chat.py` 的工具列表里追加（不改其他地方）
+4. 在 `backend/src/core/agent/factory.py` 工具列表里追加
 
 ### 添加新文档类型
 
-1. 在 `src/core/indexing.py` 的 `index_document()` 分发逻辑中添加新分支
-2. 实现对应的 `_index_xxx_document()` 函数
-3. 在 `src/api/routes/document.py` 的上传参数中允许新 doc_type 值
-4. 前端 `DocumentPage.tsx` 中的下拉选项同步更新
+1. 在 `backend/src/core/indexing/<type>.py` 新建文件，继承 `BaseIndexingPipeline`
+2. 在 `backend/src/core/indexing/dispatcher.py` 加分发逻辑
+3. 前端 `frontend/src/features/knowledge/components/DocumentPanel.tsx` 的 doc_type 选项同步更新
 
 ### 前端构建
 

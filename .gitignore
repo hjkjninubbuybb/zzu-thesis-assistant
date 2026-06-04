@@ -28,6 +28,12 @@ diagnose.py
 # macOS
 .DS_Store
 
+# Tool-generated directories
+.antigravitycli/
+.superpowers/
+node_modules/
+scripts/
+
 # Dev evaluation reports
 reports/
 
