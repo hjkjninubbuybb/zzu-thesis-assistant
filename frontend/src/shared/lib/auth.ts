@@ -5,11 +5,14 @@
 
 import type { LoginResponse, UserInfo } from '@shared/types/api';
 
-export type Portal = 'admin' | 'student';
+export type Portal = 'admin' | 'teacher' | 'student';
 
 /** 根据当前 URL 推断所在门户 */
 export function getCurrentPortal(): Portal {
-  return window.location.pathname.startsWith('/student') ? 'student' : 'admin';
+  const p = window.location.pathname;
+  if (p.startsWith('/student')) return 'student';
+  if (p.startsWith('/teacher')) return 'teacher';
+  return 'admin';
 }
 
 function keyOf(portal: Portal) {
