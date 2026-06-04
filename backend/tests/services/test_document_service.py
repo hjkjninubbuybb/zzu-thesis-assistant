@@ -42,7 +42,7 @@ def test_list_documents_success(svc, mock_kb_store, mock_doc_store):
 
     items, total = svc.list_documents("kb1")
 
-    mock_doc_store.list_documents.assert_called_once_with("kb1", page=1, page_size=20)
+    mock_doc_store.list_documents.assert_called_once_with("kb1", page=1, page_size=20, doc_type=None)
     assert len(items) == 1
     assert total == 1
 
