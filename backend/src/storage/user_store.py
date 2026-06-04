@@ -221,11 +221,30 @@ class UserStore:
         """获取学生的指导教师。"""
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute(
-                """SELECT u.*, tp.employee_id, tp.department, tp.title 
-                       FROM users u 
+                """SELECT u.*, tp.employee_id, tp.department, tp.title
+                       FROM users u
                        JOIN mentor_student_relations msr ON u.id = msr.mentor_id
                        LEFT JOIN teacher_profiles tp ON u.id = tp.user_id
                        WHERE msr.student_id = %s""",
                 (student_id,),
             )
+            return cur.fetchone()
+
+    # ── 自助资料更新 ──────────────────────────────────────────
+
+    def update_self_profile(self, user_id: int, display_name: str | None) -> dict | None:
+        """部分字段更新（只更新非 None 字段）。"""
+        updates: dict[str, object] = {}
+        if display_name is not None:
+            updates["display_name"] = display_name
+        if not updates:
+            return self.get_user_by_id(user_id)
+
+        set_clause = ", ".join(f"{k} = %s" for k in updates)
+        values = list(updates.values()) + [user_id]
+
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(f"UPDATE users SET {set_clause} WHERE id = %s", values)
+            conn.commit()
+            cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
             return cur.fetchone()

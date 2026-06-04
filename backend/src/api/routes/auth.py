@@ -20,6 +20,7 @@ from src.api.schemas import (
     LoginResponse,
     MessageResponse,
     RefreshTokenRequest,
+    UpdateMeRequest,
     UserInfo,
 )
 from src.exceptions import UserNotFoundError
@@ -99,6 +100,18 @@ def get_me(
     """获取当前登录用户信息。"""
     profile = svc.get_profile(current_user)
     return _to_user_info(current_user, profile)
+
+
+@router.put("/me", response_model=UserInfo)
+def update_me(
+    body: UpdateMeRequest,
+    current_user: dict = Depends(get_current_user),
+    svc: UserService = Depends(get_user_service),
+):
+    """登录用户更新自己的 display_name。"""
+    updated = svc.update_self_profile(current_user["id"], body.display_name)
+    profile = svc.get_profile(updated)
+    return _to_user_info(updated, profile)
 
 
 @router.put("/me/password", response_model=MessageResponse)

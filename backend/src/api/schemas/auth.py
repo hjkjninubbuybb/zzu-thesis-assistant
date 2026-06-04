@@ -23,3 +23,7 @@ class ChangePasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=64)
+
+
+class UpdateMeRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=64)

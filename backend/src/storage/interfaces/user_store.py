@@ -110,3 +110,7 @@ class BaseUserStore(Protocol):
     def get_student_mentor(self, student_id: int) -> dict | None:
         """查询学生的导师，不存在返回 None。"""
         ...
+
+    def update_self_profile(self, user_id: int, display_name: str | None) -> dict | None:
+        """仅更新自己可改的字段（display_name），其他字段不动。"""
+        ...

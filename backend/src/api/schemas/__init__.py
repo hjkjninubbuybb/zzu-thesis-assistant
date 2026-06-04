@@ -5,6 +5,7 @@ from src.api.schemas.auth import (
     LoginResponse,
     RefreshTokenRequest,
     ResetPasswordRequest,
+    UpdateMeRequest,
 )
 from src.api.schemas.chat import (
     ChatRequest,
@@ -132,6 +133,7 @@ __all__ = [
     "StudentProfileCreate",
     "TeacherProfileCreate",
     "TestConnectionResponse",
+    "UpdateMeRequest",
     "UpdateProfileRequest",
     "UserCreate",
     "UserInfo",
