@@ -37,6 +37,8 @@ import type {
   QARequestInfo,
   QARequestCreate,
   ImportResult,
+  MentorOverview,
+  UpdateMeRequest,
 } from '@shared/types/api';
 import {
   getAccessToken,
@@ -142,6 +144,8 @@ export const authApi = {
         new_password: newPassword,
       })
       .then((r) => r.data),
+  updateMe: (body: UpdateMeRequest) =>
+    client.put<UserInfo>('/auth/me', body).then((r) => r.data),
 };
 
 // ── 用户管理 API ──────────────────────────────────────────
@@ -475,10 +479,14 @@ export const conversationApi = {
 // ── 答疑请求 API ──────────────────────────────────────────
 
 export const ticketApi = {
-  list: (page = 1, pageSize = 20) =>
+  list: (page = 1, pageSize = 20, studentId?: number) =>
     client
       .get<PaginatedTickets>('/tickets', {
-        params: { page, page_size: pageSize },
+        params: {
+          page,
+          page_size: pageSize,
+          ...(studentId !== undefined ? { student_id: studentId } : {}),
+        },
       })
       .then((r) => r.data),
   get: (id: number) => client.get<QARequestInfo>(`/tickets/${id}`).then((r) => r.data),
@@ -487,4 +495,11 @@ export const ticketApi = {
   reply: (id: number, answer: string) =>
     client.post<QARequestInfo>(`/tickets/${id}/reply`, { answer }).then((r) => r.data),
   close: (id: number) => client.post<QARequestInfo>(`/tickets/${id}/close`).then((r) => r.data),
+};
+
+// ── 导师工作台 API ─────────────────────────────────────────
+
+export const mentorApi = {
+  getMyOverview: () => client.get<MentorOverview>('/mentors/me/overview').then((r) => r.data),
+  getMyStudents: () => client.get<UserInfo[]>('/mentors/me/students').then((r) => r.data),
 };
