@@ -3,7 +3,6 @@ import { useSettings } from '../hooks/useSettings';
 import { useModelOptions } from '../hooks/useModelOptions';
 import { useApiKeyManager } from '../hooks/useApiKeyManager';
 import { ApiKeySection } from './ApiKeySection';
-import { ModelSettings } from './ModelSettings';
 import { RetrievalSettings } from './RetrievalSettings';
 import { AgentSettings } from './AgentSettings';
 import { SplitterSettings } from './SplitterSettings';
@@ -13,11 +12,9 @@ const settle = (d: number): React.CSSProperties => ({
 });
 
 export function SettingsRoot() {
-  const { config, isLoading, updateConfig, isSaving, save } = useSettings();
+  const { config, isLoading, updateConfig, updateGroup, isSaving, save } = useSettings();
   const apiKeyManager = useApiKeyManager();
-  const { combinedLlmModels, combinedEmbeddingModels, combinedRerankerModels } = useModelOptions(
-    apiKeyManager.availableModels,
-  );
+  const modelOptions = useModelOptions(apiKeyManager.perGroupModels);
 
   if (isLoading) {
     return (
@@ -47,28 +44,23 @@ export function SettingsRoot() {
 
       <div className="space-y-4">
         <div style={settle(80)}>
-          <ApiKeySection manager={apiKeyManager} />
-        </div>
-
-        <div style={settle(160)}>
-          <ModelSettings
+          <ApiKeySection
             form={config}
-            set={updateConfig}
-            llmModels={combinedLlmModels}
-            embeddingModels={combinedEmbeddingModels}
-            rerankerModels={combinedRerankerModels}
+            updateGroup={updateGroup}
+            manager={apiKeyManager}
+            modelOptions={modelOptions}
           />
         </div>
 
-        <div style={settle(240)}>
+        <div style={settle(160)}>
           <RetrievalSettings form={config} set={updateConfig} />
         </div>
 
-        <div style={settle(320)}>
+        <div style={settle(240)}>
           <AgentSettings form={config} set={updateConfig} />
         </div>
 
-        <div style={settle(400)}>
+        <div style={settle(320)}>
           <SplitterSettings form={config} set={updateConfig} />
         </div>
       </div>
