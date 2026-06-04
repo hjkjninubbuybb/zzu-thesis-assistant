@@ -5,6 +5,7 @@ import { getCurrentPortal } from '@shared/lib/auth';
 import RouteGuard from '@shared/components/auth/RouteGuard';
 import AppLayout from '@shared/components/layout/AppLayout';
 import StudentLayout from '@shared/components/layout/StudentLayout';
+import TeacherLayout from '@shared/components/layout/TeacherLayout';
 import { Providers } from './providers';
 
 // Admin pages
@@ -20,6 +21,13 @@ const TicketsPage = lazy(() => import('@pages/admin/TicketsPage'));
 const AnalyticsPage = lazy(() => import('@pages/admin/AnalyticsPage'));
 const SettingsPage = lazy(() => import('@pages/admin/SettingsPage'));
 
+// Teacher pages
+const TeacherHomePage = lazy(() => import('@pages/teacher/TeacherHomePage'));
+const MyStudentsPage = lazy(() => import('@pages/teacher/MyStudentsPage'));
+const MyStudentDetailPage = lazy(() => import('@pages/teacher/MyStudentDetailPage'));
+const TeacherTicketsPage = lazy(() => import('@pages/teacher/TeacherTicketsPage'));
+const TeacherProfilePage = lazy(() => import('@pages/teacher/TeacherProfilePage'));
+
 // Student pages
 const StudentHomePage = lazy(() => import('@pages/student/StudentHomePage'));
 const ChatPage = lazy(() => import('@pages/student/ChatPage'));
@@ -30,7 +38,9 @@ const StudentProfilePage = lazy(() => import('@pages/student/ProfilePage'));
 function RoleRedirect() {
   const user = useAuthUser();
   if (!user) return <Navigate to="/admin/login" replace />;
-  return <Navigate to={user.role === 'student' ? '/student' : '/admin'} replace />;
+  const target =
+    user.role === 'student' ? '/student' : user.role === 'teacher' ? '/teacher' : '/admin';
+  return <Navigate to={target} replace />;
 }
 
 function AppInit() {
@@ -52,9 +62,10 @@ export default function App() {
           <Routes>
             <Route path="/admin/login" element={<LoginPage />} />
             <Route path="/student/login" element={<LoginPage variant="student" />} />
+            <Route path="/teacher/login" element={<LoginPage variant="teacher" />} />
             <Route path="/login" element={<Navigate to="/admin/login" replace />} />
 
-            <Route path="admin" element={<RouteGuard allowedRoles={['admin', 'teacher']} />}>
+            <Route path="admin" element={<RouteGuard allowedRoles={['admin']} />}>
               <Route element={<AppLayout />}>
                 <Route index element={<OverviewPage />} />
                 <Route path="conversations" element={<ConversationsPage />} />
@@ -62,21 +73,28 @@ export default function App() {
                 <Route path="students" element={<Navigate to="/admin/users" replace />} />
                 <Route path="tickets" element={<TicketsPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
+                <Route path="knowledge" element={<KnowledgePage />} />
+                <Route path="documents" element={<DocumentsPage />} />
+                <Route
+                  path="document/:kbName/:docId/review"
+                  element={<DocumentCleanReviewPage />}
+                />
+                <Route
+                  path="document/:kbName/:docId/chunks"
+                  element={<DocumentChunkReviewPage />}
+                />
+                <Route path="teachers" element={<Navigate to="/admin/users" replace />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
+            </Route>
 
-                <Route element={<RouteGuard allowedRoles={['admin']} />}>
-                  <Route path="knowledge" element={<KnowledgePage />} />
-                  <Route path="documents" element={<DocumentsPage />} />
-                  <Route
-                    path="document/:kbName/:docId/review"
-                    element={<DocumentCleanReviewPage />}
-                  />
-                  <Route
-                    path="document/:kbName/:docId/chunks"
-                    element={<DocumentChunkReviewPage />}
-                  />
-                  <Route path="teachers" element={<Navigate to="/admin/users" replace />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                </Route>
+            <Route path="teacher" element={<RouteGuard allowedRoles={['teacher']} />}>
+              <Route element={<TeacherLayout />}>
+                <Route index element={<TeacherHomePage />} />
+                <Route path="students" element={<MyStudentsPage />} />
+                <Route path="students/:id" element={<MyStudentDetailPage />} />
+                <Route path="tickets" element={<TeacherTicketsPage />} />
+                <Route path="profile" element={<TeacherProfilePage />} />
               </Route>
             </Route>
 
