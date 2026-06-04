@@ -7,16 +7,16 @@ import type { QARequestCreate } from '@shared/types/api';
 
 const PAGE_SIZE = 20;
 
-export function useTicketList(scope: 'all' | 'mine', page: number) {
+export function useTicketList(scope: 'all' | 'mine', page: number, studentId?: number) {
   const qc = useQueryClient();
   const { showToast } = useToast();
 
   const { data, isLoading } = useQuery({
-    queryKey: ticketKeys.list(scope, page),
+    queryKey: ticketKeys.list(scope, page, studentId),
     queryFn: () =>
       scope === 'all'
-        ? ticketService.listAll(page, PAGE_SIZE)
-        : ticketService.listMine(page, PAGE_SIZE),
+        ? ticketService.listAll(page, PAGE_SIZE, studentId)
+        : ticketService.listMine(page, PAGE_SIZE, studentId),
   });
 
   const tickets = data?.items ?? [];

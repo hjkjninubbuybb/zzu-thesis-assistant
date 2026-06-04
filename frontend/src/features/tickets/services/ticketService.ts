@@ -3,8 +3,10 @@ import { extractError } from '@shared/lib/errorHandler';
 import type { QARequestCreate } from '@shared/types/api';
 
 export const ticketService = {
-  listAll: (page: number, pageSize: number) => ticketApi.list(page, pageSize),
-  listMine: (page: number, pageSize: number) => ticketApi.list(page, pageSize),
+  listAll: (page: number, pageSize: number, studentId?: number) =>
+    ticketApi.list(page, pageSize, studentId),
+  listMine: (page: number, pageSize: number, studentId?: number) =>
+    ticketApi.list(page, pageSize, studentId),
   create: (payload: QARequestCreate) => ticketApi.create(payload),
   reply: (id: number, answer: string) => ticketApi.reply(id, answer),
   close: (id: number) => ticketApi.close(id),
