@@ -1,6 +1,7 @@
 """用户账号数据存储。"""
 
 import logging
+from datetime import datetime
 
 from src.storage.database import get_conn
 
@@ -248,3 +249,74 @@ class UserStore:
             conn.commit()
             cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
             return cur.fetchone()
+
+    # ── 导师概览聚合查询 ──────────────────────────────────────
+
+    def list_silent_students_for_mentor(self, mentor_id: int, days_threshold: int) -> list[dict]:
+        """返回该 mentor 名下、最近活跃时间超过 days_threshold 天的学生。
+
+        last_active_at 取 conversations.updated_at 和 qa_requests.created_at 的最大值。
+        从未活动过的学生（last_active_at IS NULL）也包含在内。
+
+        返回字段：id, username, display_name, last_active_at, days_silent
+        """
+        sql = """
+            SELECT
+                u.id,
+                u.username,
+                u.display_name,
+                last_act.last_active_at,
+                CASE
+                    WHEN last_act.last_active_at IS NULL THEN 9999
+                    ELSE DATEDIFF(NOW(), last_act.last_active_at)
+                END AS days_silent
+            FROM mentor_student_relations msr
+            JOIN users u ON u.id = msr.student_id
+            LEFT JOIN (
+                SELECT student_id, MAX(act_at) AS last_active_at FROM (
+                    SELECT user_id AS student_id, MAX(updated_at) AS act_at
+                      FROM conversations GROUP BY user_id
+                    UNION ALL
+                    SELECT student_id, MAX(created_at) AS act_at
+                      FROM qa_requests GROUP BY student_id
+                ) merged GROUP BY student_id
+            ) last_act ON last_act.student_id = u.id
+            WHERE msr.mentor_id = %s
+              AND (last_act.last_active_at IS NULL
+                   OR last_act.last_active_at < NOW() - INTERVAL %s DAY)
+            ORDER BY last_act.last_active_at IS NULL DESC, last_act.last_active_at ASC
+        """
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(sql, (mentor_id, int(days_threshold)))
+            return cur.fetchall() or []
+
+    def list_weekly_activity_for_mentor(self, mentor_id: int, since: datetime) -> list[dict]:
+        """按学生分组返回 since 至今的对话条数 + 工单条数之和。
+
+        返回字段：student_id, display_name, count
+        """
+        sql = """
+            SELECT
+                u.id AS student_id,
+                u.display_name,
+                COALESCE(conv.cnt, 0) + COALESCE(tk.cnt, 0) AS count
+            FROM mentor_student_relations msr
+            JOIN users u ON u.id = msr.student_id
+            LEFT JOIN (
+                SELECT user_id, COUNT(*) AS cnt
+                  FROM conversations
+                 WHERE updated_at >= %s
+                 GROUP BY user_id
+            ) conv ON conv.user_id = u.id
+            LEFT JOIN (
+                SELECT student_id, COUNT(*) AS cnt
+                  FROM qa_requests
+                 WHERE created_at >= %s
+                 GROUP BY student_id
+            ) tk ON tk.student_id = u.id
+            WHERE msr.mentor_id = %s
+            ORDER BY count DESC, u.display_name ASC
+        """
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(sql, (since, since, mentor_id))
+            return cur.fetchall() or []

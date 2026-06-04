@@ -1,5 +1,6 @@
 """UserStore Protocol 接口。"""
 
+from datetime import datetime
 from typing import Protocol
 
 
@@ -113,4 +114,27 @@ class BaseUserStore(Protocol):
 
     def update_self_profile(self, user_id: int, display_name: str | None) -> dict | None:
         """仅更新自己可改的字段（display_name），其他字段不动。"""
+        ...
+
+    def list_silent_students_for_mentor(self, mentor_id: int, days_threshold: int) -> list[dict]:
+        """返回该 mentor 名下、最近 last_active_at 超过 days_threshold 天的学生。
+
+        last_active_at = MAX(
+            (SELECT MAX(updated_at) FROM conversations WHERE user_id = student.id),
+            (SELECT MAX(created_at) FROM qa_requests WHERE student_id = student.id)
+        )
+
+        永久沉默的学生（从未活动过）也包含进来。
+
+        返回字段：
+            id, display_name, username, last_active_at, days_silent
+        """
+        ...
+
+    def list_weekly_activity_for_mentor(self, mentor_id: int, since: datetime) -> list[dict]:
+        """按学生分组返回 since 至今的对话条数 + 工单条数之和。
+
+        返回字段：
+            student_id, display_name, count
+        """
         ...

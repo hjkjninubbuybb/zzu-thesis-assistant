@@ -323,6 +323,13 @@ def ticket_store():
     return TicketStore()
 
 
+@pytest.fixture()
+def conv_store():
+    from src.storage.conversation_store import ConversationStore
+
+    return ConversationStore()
+
+
 # ---------------------------------------------------------------------------
 # Mentor/student relationship fixtures (require a KB + conversation + message
 # as FK prerequisites for qa_requests rows).
