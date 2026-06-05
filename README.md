@@ -4,6 +4,30 @@
 
 ---
 
+## 项目预览
+
+> 学生端对话页 —— 自然语言提问，自动检索知识库并附文档来源
+
+![学生端对话页](docs/screenshots/hero-student-chat.png)
+
+### 学生端
+
+| 登录 | 对话与文档来源 |
+| --- | --- |
+| ![学生端登录](docs/screenshots/student-login.png) | ![学生端对话来源](docs/screenshots/student-chat-sources.png) |
+
+### 管理端
+
+| 登录 | 知识库管理 |
+| --- | --- |
+| ![管理端登录](docs/screenshots/admin-login.png) | ![知识库管理](docs/screenshots/admin-knowledge.png) |
+| **FAQ 管理** | **答疑工单** |
+| ![FAQ 管理](docs/screenshots/admin-faq.png) | ![答疑工单](docs/screenshots/admin-tickets.png) |
+| **使用统计** | **系统配置 / API 配置** |
+| ![使用统计](docs/screenshots/admin-analytics.png) | ![系统配置](docs/screenshots/admin-settings.png) |
+
+---
+
 ## 技术栈
 
 | 层次 | 技术 |
