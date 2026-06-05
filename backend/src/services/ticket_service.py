@@ -62,7 +62,14 @@ class TicketService(BaseService):
         )
         return ticket
 
-    def list_tickets(self, role: str, user_id: int, page: int = 1, page_size: int = 20) -> tuple[list[dict], int]:
+    def list_tickets(
+        self,
+        role: str,
+        user_id: int,
+        page: int = 1,
+        page_size: int = 20,
+        student_id: int | None = None,
+    ) -> tuple[list[dict], int]:
         """按角色过滤列出工单（分页）。
 
         Args:
@@ -70,16 +77,27 @@ class TicketService(BaseService):
             user_id: 调用方用户 ID。
             page: 页码（从 1 开始）。
             page_size: 每页条数。
+            student_id: 可选，按学生 ID 过滤（teacher/admin 专用，teacher 须拥有该学生）。
 
         Returns:
             (工单 dict 列表, 总条数) 元组。
+
+        Raises:
+            PermissionDeniedError: teacher 试图过滤不属于自己的学生。
         """
+        if student_id is not None and role == "teacher":
+            owner = self._user_store.get_student_mentor(student_id)
+            if not owner or owner.get("id") != user_id:
+                raise PermissionDeniedError(f"学生 {student_id} 不属于当前导师")
+
         if role == "student":
             return self._ticket_store.list_qa_requests(student_id=user_id, page=page, page_size=page_size)
         if role == "teacher":
-            return self._ticket_store.list_qa_requests(mentor_id=user_id, page=page, page_size=page_size)
-        # admin 看全部
-        return self._ticket_store.list_qa_requests(page=page, page_size=page_size)
+            return self._ticket_store.list_qa_requests(
+                mentor_id=user_id, student_id=student_id, page=page, page_size=page_size
+            )
+        # admin 看全部（可选按 student_id 过滤）
+        return self._ticket_store.list_qa_requests(student_id=student_id, page=page, page_size=page_size)
 
     def get(self, ticket_id: int, role: str, user_id: int) -> dict:
         """查询单个工单，含权限校验。

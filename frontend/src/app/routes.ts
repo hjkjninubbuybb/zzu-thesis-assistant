@@ -13,6 +13,14 @@ export const ROUTES = {
   ADMIN_ANALYTICS: '/admin/analytics',
   ADMIN_SETTINGS: '/admin/settings',
 
+  // Teacher
+  TEACHER_LOGIN: '/teacher/login',
+  TEACHER_ROOT: '/teacher',
+  TEACHER_STUDENTS: '/teacher/students',
+  TEACHER_STUDENT_DETAIL: '/teacher/students/:id',
+  TEACHER_TICKETS: '/teacher/tickets',
+  TEACHER_PROFILE: '/teacher/profile',
+
   // Student
   STUDENT_LOGIN: '/student/login',
   STUDENT_ROOT: '/student',

@@ -5,6 +5,7 @@ from src.api.schemas.auth import (
     LoginResponse,
     RefreshTokenRequest,
     ResetPasswordRequest,
+    UpdateMeRequest,
 )
 from src.api.schemas.chat import (
     ChatRequest,
@@ -57,6 +58,12 @@ from src.api.schemas.knowledge import (
     KBSplitterUpdate,
     SetActiveKBRequest,
 )
+from src.api.schemas.mentor import (
+    MentorOverviewResponse,
+    MentorRecentEventItem,
+    SilentStudentItem,
+    WeeklyActivityBucket,
+)
 from src.api.schemas.ticket import PaginatedTickets, QARequestCreate, QARequestInfo, QARequestReply
 from src.api.schemas.user import (
     MentorRelationRequest,
@@ -105,6 +112,8 @@ __all__ = [
     "KBInfo",
     "KBSplitterUpdate",
     "LoginResponse",
+    "MentorOverviewResponse",
+    "MentorRecentEventItem",
     "MentorRelationRequest",
     "MessageResponse",
     "PaginatedConversations",
@@ -120,11 +129,14 @@ __all__ = [
     "ReviewDetail",
     "SaveMessageRequest",
     "SetActiveKBRequest",
+    "SilentStudentItem",
     "StudentProfileCreate",
     "TeacherProfileCreate",
     "TestConnectionResponse",
+    "UpdateMeRequest",
     "UpdateProfileRequest",
     "UserCreate",
     "UserInfo",
     "UserUpdate",
+    "WeeklyActivityBucket",
 ]

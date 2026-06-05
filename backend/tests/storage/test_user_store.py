@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -175,3 +176,54 @@ class TestMentorRelation:
 
     def test_get_student_mentor_none(self, us):
         assert us.get_student_mentor(self.stu2["id"]) is None
+
+
+@pytest.mark.integration
+class TestMentorOverviewStorageQueries:
+    """导师概览所需的聚合查询。"""
+
+    # KB name created by the _ticket_prereqs fixture used inside mentor_with_student
+    # and two_mentors_with_students.
+    _KB = "_test_ticket_prereqs_kb"
+
+    def test_silent_students_returns_empty_when_all_active(self, user_store, conv_store, mentor_with_student):
+        mentor_id, student_id, _conv_id, _msg_id = mentor_with_student
+        conv_store.create_conversation(self._KB, title="t", user_id=student_id)
+
+        silent = user_store.list_silent_students_for_mentor(mentor_id, days_threshold=7)
+        assert silent == []
+
+    def test_silent_students_lists_never_active_students(self, user_store, mentor_with_student):
+        mentor_id, student_id, _conv_id, _msg_id = mentor_with_student
+        silent = user_store.list_silent_students_for_mentor(mentor_id, days_threshold=7)
+        ids = [s["id"] for s in silent]
+        assert student_id in ids
+
+    def test_silent_students_only_lists_own_mentor(self, user_store, two_mentors_with_students):
+        m1, s1, _c1, _msg1, _m2, s2, _c2, _msg2 = two_mentors_with_students
+        m1_silent = user_store.list_silent_students_for_mentor(m1, days_threshold=7)
+        ids = [s["id"] for s in m1_silent]
+        assert s1 in ids and s2 not in ids
+
+    def test_weekly_activity_returns_counts_by_student(self, user_store, conv_store, ticket_store, mentor_with_student):
+        mentor_id, student_id, conv_id, msg_id = mentor_with_student
+        # Create 2 conversations
+        conv_store.create_conversation(self._KB, title="t1", user_id=student_id)
+        conv_store.create_conversation(self._KB, title="t2", user_id=student_id)
+        # Create 1 ticket
+        ticket_store.create_qa_request(student_id, mentor_id, conv_id, msg_id, "q1")
+
+        since = datetime.now() - timedelta(days=7)
+        rows = user_store.list_weekly_activity_for_mentor(mentor_id, since=since)
+        target = next((r for r in rows if r["student_id"] == student_id), None)
+        assert target is not None
+        assert target["count"] >= 1
+
+    def test_weekly_activity_excludes_other_mentors_students(self, user_store, conv_store, two_mentors_with_students):
+        m1, _s1, _c1, _msg1, _m2, s2, _c2, _msg2 = two_mentors_with_students
+        conv_store.create_conversation(self._KB, title="t", user_id=s2)
+
+        since = datetime.now() - timedelta(days=7)
+        rows = user_store.list_weekly_activity_for_mentor(m1, since=since)
+        ids = [r["student_id"] for r in rows]
+        assert s2 not in ids

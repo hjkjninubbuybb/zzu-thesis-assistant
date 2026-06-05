@@ -480,3 +480,42 @@ export interface AnalyticsSummary {
   faq_count: number;
   recent_questions: RecentQuestion[];
 }
+
+// ── 导师工作台 ─────────────────────────────────────────────
+
+export interface WeeklyActivityBucket {
+  student_id: number;
+  display_name: string;
+  count: number;
+}
+
+export interface SilentStudent {
+  id: number;
+  display_name: string;
+  username: string;
+  last_active_at: string | null;
+  days_silent: number;
+}
+
+export type MentorEventType = 'ticket_created' | 'ticket_replied' | 'ticket_closed';
+
+export interface MentorRecentEvent {
+  event_type: MentorEventType;
+  student_id: number;
+  student_name: string;
+  ticket_id: number;
+  ticket_title: string;
+  occurred_at: string;
+}
+
+export interface MentorOverview {
+  pending_tickets: number;
+  weekly_activity: WeeklyActivityBucket[];
+  silent_students: SilentStudent[];
+  recent_events: MentorRecentEvent[];
+}
+
+export interface UpdateMeRequest {
+  display_name?: string;
+  email?: string;
+}

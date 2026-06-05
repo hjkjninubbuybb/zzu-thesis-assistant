@@ -40,11 +40,19 @@ async def create_ticket(
 async def list_tickets(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    student_id: int | None = Query(default=None, description="按学生过滤；teacher 仅可过滤自己的学生"),
     current_user: dict = Depends(get_current_user),
     svc: TicketService = Depends(get_ticket_service),
 ):
-    """获取答疑请求列表。学生看自己的，教师看分配给自己的。"""
-    items, total = await asyncio.to_thread(svc.list_tickets, current_user["role"], current_user["id"], page, page_size)
+    """获取答疑请求列表。学生看自己的，教师看分配给自己的（可按 student_id 过滤）。"""
+    try:
+        items, total = await asyncio.to_thread(
+            svc.list_tickets,
+            current_user["role"], current_user["id"],
+            page, page_size, student_id,
+        )
+    except PermissionDeniedError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 

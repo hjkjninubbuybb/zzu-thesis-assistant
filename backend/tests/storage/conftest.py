@@ -302,3 +302,111 @@ def _clean_tables(_test_db_setup):
         conn.commit()
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Shared store fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def user_store():
+    from src.storage.user_store import UserStore
+
+    return UserStore()
+
+
+@pytest.fixture()
+def ticket_store():
+    from src.storage.ticket_store import TicketStore
+
+    return TicketStore()
+
+
+@pytest.fixture()
+def conv_store():
+    from src.storage.conversation_store import ConversationStore
+
+    return ConversationStore()
+
+
+# ---------------------------------------------------------------------------
+# Mentor/student relationship fixtures (require a KB + conversation + message
+# as FK prerequisites for qa_requests rows).
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def _ticket_prereqs():
+    """Create the KB / conversation / message rows needed by qa_requests FKs.
+
+    Returns a callable ``make_prereqs(student_id)`` that inserts the rows and
+    returns ``(conversation_id, message_id)`` for the given student.
+    """
+    from src.storage.conversation_store import ConversationStore
+    from src.storage.kb_store import KBStore
+
+    kb = KBStore()
+    kb_name = "_test_ticket_prereqs_kb"
+    kb.create_kb(kb_name, "prereq kb for ticket tests")
+
+    conv_store = ConversationStore()
+
+    def make_prereqs(student_id: int) -> tuple[int, int]:
+        conv = conv_store.create_conversation(kb_name, title="test conv", user_id=student_id)
+        conv_id = conv["id"]
+        # Insert a message directly via raw SQL to avoid needing a full message store
+        conn = db_module.get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO conversation_messages (conversation_id, role, content) VALUES (%s, 'user', 'test')",
+                    (conv_id,),
+                )
+                msg_id = cur.lastrowid
+            conn.commit()
+        finally:
+            conn.close()
+        return conv_id, msg_id
+
+    return make_prereqs
+
+
+@pytest.fixture()
+def mentor_with_student(user_store, _ticket_prereqs):
+    """创建一个 mentor + 一个绑定学生，返回 (mentor_id, student_id, conv_id, msg_id)。
+
+    Tests that only need (mentor_id, student_id) can unpack the first two values.
+    """
+    mentor_id = user_store.create_user(
+        username="t_mentor_001",
+        hashed_pwd="x",
+        display_name="测试导师",
+        role="teacher",
+    )["id"]
+    student_id = user_store.create_user(
+        username="t_student_001",
+        hashed_pwd="x",
+        display_name="测试学生",
+        role="student",
+    )["id"]
+    user_store.add_mentor_relation(mentor_id, student_id)
+    conv_id, msg_id = _ticket_prereqs(student_id)
+    yield mentor_id, student_id, conv_id, msg_id
+
+
+@pytest.fixture()
+def two_mentors_with_students(user_store, _ticket_prereqs):
+    """两个 mentor 各带一个学生。
+
+    Returns (m1_id, s1_id, conv1_id, msg1_id, m2_id, s2_id, conv2_id, msg2_id).
+    """
+    m1 = user_store.create_user("t_m1", "x", display_name="M1", role="teacher")["id"]
+    s1 = user_store.create_user("t_s1", "x", display_name="S1", role="student")["id"]
+    m2 = user_store.create_user("t_m2", "x", display_name="M2", role="teacher")["id"]
+    s2 = user_store.create_user("t_s2", "x", display_name="S2", role="student")["id"]
+    user_store.add_mentor_relation(m1, s1)
+    user_store.add_mentor_relation(m2, s2)
+    c1, msg1 = _ticket_prereqs(s1)
+    c2, msg2 = _ticket_prereqs(s2)
+    yield m1, s1, c1, msg1, m2, s2, c2, msg2

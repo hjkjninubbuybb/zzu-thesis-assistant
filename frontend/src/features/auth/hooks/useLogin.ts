@@ -18,7 +18,13 @@ export function useLogin(portal: Portal) {
     onSuccess: (data) => {
       authService.persist(data, currentPortal);
       setUser(data.user);
-      navigate(currentPortal === 'student' ? '/student' : '/admin');
+      navigate(
+        currentPortal === 'student'
+          ? '/student'
+          : currentPortal === 'teacher'
+            ? '/teacher'
+            : '/admin',
+      );
     },
     onError: (err) => handleMutationError(err, showToast),
   });

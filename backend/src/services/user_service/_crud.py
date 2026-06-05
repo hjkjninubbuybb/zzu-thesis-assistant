@@ -180,3 +180,21 @@ class CrudMixin:
     def get_user_by_employee_id(self, employee_id: str) -> dict | None:
         """通过工号查用户。"""
         return self._user_store.get_user_by_employee_id(employee_id)
+
+    def update_self_profile(self, user_id: int, display_name: str | None) -> dict:
+        """更新登录用户自己的资料（display_name）。
+
+        Args:
+            user_id: 用户 ID。
+            display_name: 新展示名称，None 表示不更新。
+
+        Returns:
+            更新后的用户 dict。
+
+        Raises:
+            UserNotFoundError: 用户不存在。
+        """
+        user = self._user_store.update_self_profile(user_id, display_name)
+        if not user:
+            raise UserNotFoundError(f"用户 {user_id} 不存在")
+        return user
